@@ -35,17 +35,21 @@
 /* Entry Point */
 ENTRY(Reset_Handler)
 
-/* Highest address of the user mode stack */
-_estack = ORIGIN(RAM) + LENGTH(RAM); /* end of "RAM" Ram type memory */
+/* Highest address of the user mode stack.
+ * Oberste 32 Byte des RAM sind fuer das Enter-DFU-Magic reserviert
+ * (0x20023FE0, siehe dfu_common.h) und werden vom Stack nicht benutzt. */
+_estack = ORIGIN(RAM) + LENGTH(RAM) - 0x20; /* end of "RAM" minus DFU-Reserve */
 
 _Min_Heap_Size = 0x200; /* required amount of heap */
 _Min_Stack_Size = 0x400; /* required amount of stack */
 
-/* Memories definition */
+/* Memories definition
+ * OTA-Layout: Bootloader 0x08000000 (32K) | App 0x08008000 (90K) |
+ *             DFU-Metadaten 0x0801E800 (2K) | Config 0x0801F000 (4K) */
 MEMORY
 {
   RAM    (xrw)    : ORIGIN = 0x20000000,   LENGTH = 144K
-  FLASH    (rx)    : ORIGIN = 0x8000000,   LENGTH = 124K   /* Pages 62+63 (4K) fuer Config-Speicher reserviert */
+  FLASH    (rx)    : ORIGIN = 0x08008000,  LENGTH = 90K    /* Anwendungsbereich (hinter dem Bootloader) */
 }
 
 /* Sections */

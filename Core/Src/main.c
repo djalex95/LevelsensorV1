@@ -22,6 +22,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "config_store.h"
+#include "dfu_common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -233,6 +234,10 @@ int main(void)
 {
   /* USER CODE BEGIN 1 */
 	uint8_t error_cnt = 0;
+
+	/* OTA: Die App liegt hinter dem Bootloader (0x08008000). Vektortabelle
+	 * dorthin umbiegen, bevor Interrupts aktiv werden. */
+	SCB->VTOR = DFU_APP_ADDR;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -1853,6 +1858,16 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		save_EEPROM(&EEPROM_values);
 		EEPROM_values.max_val = std_press;
 		BLE_SendString("OK CALRESET\n");
+	}
+	else if (strncasecmp(cmd, "DFU", 3) == 0)
+	{
+		/* Update-Modus anfordern: Magic ins reservierte RAM schreiben und neu
+		 * starten. Der Bootloader erkennt es und geht in den Empfangsmodus. */
+		BLE_SendString("OK DFU\n");
+		HAL_Delay(100);
+		*DFU_REQ_ADDR = DFU_REQ_MAGIC;
+		__disable_irq();
+		NVIC_SystemReset();
 	}
 	else if (strncasecmp(cmd, "NAME ", 5) == 0)
 	{
