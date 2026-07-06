@@ -1,0 +1,48 @@
+# ===== STM32 / STM32CubeIDE (Firmware) =====
+/Debug/
+/Release/
+*.o
+*.d
+*.su
+*.cyclo
+*.elf
+*.map
+*.list
+*.bin
+*.hex
+.settings/
+# .project, .cproject, .ioc und .launch werden bewusst mitversioniert,
+# damit das CubeIDE-Projekt direkt geöffnet werden kann.
+
+# ===== Python (PC_Tools) =====
+__pycache__/
+*.pyc
+*.pyo
+build/
+dist/
+*.spec
+
+# ===== Flutter (App_Fuellstand) =====
+App_Fuellstand/.dart_tool/
+App_Fuellstand/.flutter-plugins
+App_Fuellstand/.flutter-plugins-dependencies
+App_Fuellstand/build/
+App_Fuellstand/.pub/
+App_Fuellstand/android/.gradle/
+App_Fuellstand/android/app/debug/
+App_Fuellstand/android/app/profile/
+App_Fuellstand/android/app/release/
+App_Fuellstand/android/local.properties
+App_Fuellstand/android/key.properties
+App_Fuellstand/ios/Pods/
+App_Fuellstand/ios/.symlinks/
+App_Fuellstand/ios/Flutter/Flutter.framework/
+App_Fuellstand/**/GeneratedPluginRegistrant.*
+*.iml
+
+# ===== Sicherungskopien / IDE / OS =====
+*.bak
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

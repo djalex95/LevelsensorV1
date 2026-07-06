@@ -1,0 +1,12 @@
+# Git normalisiert Textdateien automatisch (LF im Repo, nativ beim Auschecken).
+* text=auto
+
+# Binärdateien niemals konvertieren
+*.png  binary
+*.pdf  binary
+*.bin  binary
+*.hex  binary
+*.elf  binary
+*.ico  binary
+*.jar  binary
+*.keystore binary
