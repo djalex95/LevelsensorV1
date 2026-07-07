@@ -1738,7 +1738,7 @@ void init_Sensor()
 
 /*
  * Sendet den aktuellen Sensorzustand als maschinenlesbare Zeile an die App.
- * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>\n
+ * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>;HW=<rev>\n
  * L: Füllstand in %, T: Temperatur in Grad C, F: Fluidtyp (0..15),
  * C: Kapazität (Liter), I: Instanz, CAL: 1 = kalibriert.
  */
@@ -1757,10 +1757,10 @@ void ble_send_status()
 
 	int cal = (EEPROM_values.calib_availible == 0x00) ? 1 : 0;
 
-	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s\n",
+	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HW=%d\n",
 			 p_int, p_frac, tsign, ta / 100, ta % 100,
 			 dev_info_par.fluidType, dev_info_par.cap, dev_info_par.devInstance, cal,
-			 FW_VERSION);
+			 FW_VERSION, HW_REV);
 
 	BLE_SendString(line);
 }

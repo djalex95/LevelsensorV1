@@ -29,7 +29,7 @@ periodischen Status als TX-Notification empfangen. Jede Nachricht endet mit `\n`
 ### Status (automatisch ca. jede Sekunde, solange verbunden)
 
 ```
-STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0
+STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0;HW=1000
 ```
 
 | Feld | Bedeutung | Einheit / Wertebereich |
@@ -41,6 +41,7 @@ STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0
 | `I` | Geräteinstanz | 0..15 |
 | `CAL` | 100%-Kalibrierung vorhanden | 0 oder 1 |
 | `V` | Firmware-Version | z. B. `1.2.0` |
+| `HW` | Hardware-Revision | 4-stellig, z. B. `1000` |
 
 Damit hat die App aus dem Stream bereits alle Anzeige- und Konfigurationswerte.
 
@@ -84,6 +85,10 @@ ERR ?             unbekanntes Kommando
 Der Modulname wird über den Proteus-Befehl `CMD_SET_REQ` (Settings-Index 2,
 `RF_DeviceName`) im Modul-Flash gespeichert und bleibt nach einem Neustart
 erhalten. Nach `NAME …` muss neu verbunden werden.
+
+Im **Bootloader-Modus** (während des OTA-Updates) beantwortet der Bootloader
+zusätzlich `VER` mit `BLV;x.y.z` (seiner eigenen Version). Die App fragt das beim
+Update ab und zeigt die Bootloader-Version an.
 
 Kommandos sind case-insensitive. Alle gesetzten Werte werden dauerhaft im
 Sensor gespeichert (überstehen einen Neustart und Stromausfall).
