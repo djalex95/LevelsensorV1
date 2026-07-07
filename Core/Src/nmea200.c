@@ -148,7 +148,19 @@ uint8_t init_p_struct(NMEA_parameter_Product *p_info_struct)
 	memcpy(p_info_struct->ModelID, filled_string,32);
 	strcpy(p_info_struct->ModelID, "Simple Level Monitor");
 	memcpy(p_info_struct->ModelSerialCode, filled_string,32);
-	strcpy(p_info_struct->ModelSerialCode, "00000002");
+	/* Seriennummer aus der 96-bit-Chip-UID als 8-stelliger Hex-String. */
+	{
+		uint32_t uid = *(volatile uint32_t *)(UID_BASE + 0U)
+		             ^ *(volatile uint32_t *)(UID_BASE + 4U)
+		             ^ *(volatile uint32_t *)(UID_BASE + 8U);
+		static const char hexd[] = "0123456789ABCDEF";
+		char *s = (char *)p_info_struct->ModelSerialCode;
+		for (int i = 0; i < 8; i++)
+		{
+			s[i] = hexd[(uid >> ((7 - i) * 4)) & 0xF];
+		}
+		s[8] = '\0';
+	}
 	memcpy(p_info_struct->ModelVersion, filled_string,32);
 	strcpy(p_info_struct->ModelVersion, "Rev " HW_REV_STR);
 	memcpy(p_info_struct->SwCode, filled_string,32);

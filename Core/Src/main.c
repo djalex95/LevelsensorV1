@@ -370,7 +370,15 @@ int main(void)
 
   dev_info_par.srcAdr = get_adr_eeprom();	/* zuletzt geclaimte Adresse, Fallback 0x21 */
 
-  dev_info_par.UniqueNumber = 1090;
+  /* Unique Number aus der 96-bit-Chip-UID ableiten -> jede Platine ist ohne
+   * manuelles Zutun eindeutig (21-bit-Feld im NMEA2000-NAME; 0 wird vermieden). */
+  {
+    uint32_t uid = *(volatile uint32_t *)(UID_BASE + 0U)
+                 ^ *(volatile uint32_t *)(UID_BASE + 4U)
+                 ^ *(volatile uint32_t *)(UID_BASE + 8U);
+    uint32_t u21 = (uid ^ (uid >> 21)) & 0x1FFFFF;
+    dev_info_par.UniqueNumber = (u21 == 0U) ? 1U : u21;
+  }
   dev_info_par.MFRcode = 2046;	/* 2046 = ueblicher DIY/Open-Source-Code (6 ist ein registrierter Hersteller) */
   dev_info_par.DeviceFunction = 170; //150
   dev_info_par.DeviceClass = 80; // 75
