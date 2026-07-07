@@ -50,10 +50,11 @@ jobs:
           flutter pub get
           flutter build apk --release
 
-      - name: APK einsammeln
+      - name: APK einsammeln (mit Version im Namen)
         run: |
           mkdir -p dist
-          cp App_Fuellstand/build/app/outputs/flutter-apk/*.apk dist/
+          cp App_Fuellstand/build/app/outputs/flutter-apk/app-release.apk \
+             "dist/Fuellstandsensor-v${{ steps.ver.outputs.fw }}-release.apk"
 
       # ---------- Release ----------
       - name: Release veröffentlichen
