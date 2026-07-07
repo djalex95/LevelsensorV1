@@ -1,12 +1,12 @@
 name: Build & Release Firmware
 
-# Bei jedem Push auf main die Firmware (.bin) bauen und an ein GitHub-Release
-# hängen. Version kommt aus Core/Inc/version.h (FW_VERSION).
-# Die Handy-App liegt in einem eigenen Repo mit eigener CI.
+# Release wird durch einen Versions-Tag ausgelöst (z. B. v1.2.2).
+# Push auf main baut KEIN Release mehr.
+# Tag muss zur FW_VERSION in Core/Inc/version.h passen.
 
 on:
   push:
-    branches: [ main ]
+    tags: [ 'v*' ]
   workflow_dispatch:
 
 permissions:
@@ -19,12 +19,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Firmware-Version ermitteln
+      - name: Version ermitteln
         id: ver
         run: |
           fw=$(grep -oP '^#define\s+FW_VERSION\s+"\K[^"]+' Core/Inc/version.h | head -n1)
           echo "fw=$fw" >> "$GITHUB_OUTPUT"
           echo "Firmware-Version: $fw"
+
+      - name: Tag == version.h prüfen
+        if: github.ref_type == 'tag'
+        run: |
+          test "${GITHUB_REF_NAME#v}" = "${{ steps.ver.outputs.fw }}" \
+            || { echo "::error::Tag ${GITHUB_REF_NAME} passt nicht zu FW_VERSION ${{ steps.ver.outputs.fw }}"; exit 1; }
 
       - name: ARM-Toolchain installieren
         uses: carlosperate/arm-none-eabi-gcc-action@v1
@@ -34,8 +40,10 @@ jobs:
       - name: Firmware bauen
         run: make -j4
 
-      - name: .bin mit Version benennen
-        run: python3 tools/stamp_bin.py build/CAN_FuellstandsensorBLE.bin
+      - name: .bin benennen
+        run: |
+          mkdir -p dist
+          cp build/CAN_FuellstandsensorBLE.bin "dist/Fuellstandsensor_v${{ steps.ver.outputs.fw }}.bin"
 
       - name: Release veröffentlichen
         uses: softprops/action-gh-release@v2
@@ -43,6 +51,6 @@ jobs:
           tag_name: v${{ steps.ver.outputs.fw }}
           name: Firmware v${{ steps.ver.outputs.fw }}
           body: |
-            Automatisch gebaut aus main.
+            Automatisch gebaut.
             - Firmware: Fuellstandsensor_v${{ steps.ver.outputs.fw }}.bin (OTA-tauglich)
           files: dist/Fuellstandsensor_v*.bin
