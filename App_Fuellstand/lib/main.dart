@@ -1,11 +1,14 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'ble_service.dart';
+import 'dfu.dart';
 import 'protocol.dart';
 
 void main() => runApp(const FuellstandApp());
@@ -49,6 +52,7 @@ class _HomePageState extends State<HomePage> {
   bool _isScanning = false;
   bool _connected = false;
   String _deviceName = '';
+  BluetoothDevice? _device;
   SensorStatus? _status;
   final List<String> _log = [];
 
@@ -129,6 +133,7 @@ class _HomePageState extends State<HomePage> {
     await FlutterBluePlus.stopScan();
     try {
       await _ble.connect(device);
+      _device = device;
       _configInit = false;
       _deviceName = device.platformName;
       _nameCtrl.text = _deviceName;
@@ -612,8 +617,125 @@ class _HomePageState extends State<HomePage> {
             FilledButton(onPressed: _changeName, child: const Text('Ändern')),
           ],
         ),
+        const Divider(height: 24),
+        const Text('Firmware-Update (OTA)',
+            style: TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        const Text(
+          'Neue Firmware (.bin) auswählen und über Bluetooth übertragen. Der '
+          'Sensor startet dazu neu und ist währenddessen nicht messbereit.',
+          style: TextStyle(color: Colors.grey, fontSize: 13),
+        ),
+        const SizedBox(height: 8),
+        FilledButton.tonalIcon(
+          icon: const Icon(Icons.system_update, size: 18),
+          label: const Text('Firmware-Datei wählen & aktualisieren'),
+          onPressed: _startFirmwareUpdate,
+        ),
       ],
     );
+  }
+
+  // Bildschirm während des OTA anlassen (Method-Channel zur MainActivity,
+  // kein Zusatz-Plugin). Auf iOS/ohne Handler einfach wirkungslos.
+  static const MethodChannel _screenChannel = MethodChannel('app/screen');
+  Future<void> _keepScreenOn(bool on) async {
+    try {
+      await _screenChannel.invokeMethod(on ? 'keepOn' : 'allowOff');
+    } catch (_) {}
+  }
+
+  Future<void> _startFirmwareUpdate() async {
+    if (_device == null) return;
+    final result = await FilePicker.platform.pickFiles(withData: true);
+    if (result == null || result.files.single.bytes == null) return;
+    final fw = result.files.single.bytes!;
+    final name = result.files.single.name;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Firmware-Update'),
+        content: Text('Datei: $name\nGröße: ${fw.length} Byte\n\n'
+            'Der Sensor startet neu und ist während des Updates nicht '
+            'messbereit. Fortfahren?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Abbrechen')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Update starten')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    final status = ValueNotifier<String>('Start …');
+    final progress = ValueNotifier<double>(0);
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          title: const Text('Firmware-Update'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ValueListenableBuilder<String>(
+                  valueListenable: status,
+                  builder: (_, v, __) => Text(v, textAlign: TextAlign.center)),
+              const SizedBox(height: 14),
+              ValueListenableBuilder<double>(
+                  valueListenable: progress,
+                  builder: (_, v, __) =>
+                      LinearProgressIndicator(value: v > 0 ? v : null)),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    String? error;
+    await _keepScreenOn(true); // Display während des Updates anlassen
+    try {
+      await DfuTransfer(
+        ble: _ble,
+        device: _device!,
+        firmware: fw,
+        onProgress: (s, p) {
+          status.value = s;
+          progress.value = p;
+        },
+      ).run();
+    } catch (e) {
+      error = '$e';
+    } finally {
+      await _keepScreenOn(false);
+    }
+
+    if (mounted) Navigator.pop(context); // Fortschrittsdialog schließen
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(error == null ? 'Update erfolgreich' : 'Update fehlgeschlagen'),
+          content: Text(error == null
+              ? 'Die neue Firmware wurde übertragen. Der Sensor startet neu – '
+                  'bitte anschließend neu verbinden.'
+              : 'Fehler: $error\n\nDer Sensor bleibt im Bootloader (weißes '
+                  'Blinken); das Update kann erneut gestartet werden.'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context), child: const Text('OK')),
+          ],
+        ),
+      );
+    }
+    status.dispose();
+    progress.dispose();
   }
 
   Widget _logBody() {

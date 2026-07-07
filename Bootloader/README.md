@@ -15,22 +15,29 @@ siehe `DESIGN.md`.
 
 ## Bootloader-Projekt in STM32CubeIDE anlegen
 
-Am einfachsten das App-Projekt als Vorlage kopieren, damit HAL, Startup, System-
-Datei und das MSP (USART2-/GPIO-Init) schon passen:
+Ein direktes „Import existing project" ist nicht möglich – hier liegen nur die
+Quelldateien, kein komplettes CubeIDE-Projekt (Startup, System-Datei, HAL,
+`.project`/`.cproject` fehlen). Am einfachsten das **App-Projekt duplizieren**,
+damit diese Infrastruktur schon passt:
 
-1. Neues Projekt für **STM32G0B1KBUxN** anlegen (oder das App-Projekt kopieren).
-2. Als Linker-Skript **`STM32G0B1KBUXN_BOOT.ld`** eintragen (Projekt-Properties →
-   C/C++ Build → Settings → MCU GCC Linker → General → Linker Script).
-3. In `Core/Src`/`Core/Inc` diese Dateien verwenden: `main.c`, `boot_proteus.*`,
-   `boot_dfu.*` sowie `dfu_common.*` (aus dem App-`Core/`).
-4. App-spezifische Module **aus dem Build nehmen** (nmea200, ee, config_store,
-   ble, hal_msp-Anteile für DAC/FDCAN/I2C/TIM werden nicht gebraucht) – wichtig,
-   damit der Bootloader in 32 KB passt. `stm32g0xx_hal_msp.c` (nur UART/GPIO) und
-   `stm32g0xx_it.c` können bleiben; die UART wird per Polling gelesen, der
-   USART2-Interrupt stört nicht.
-5. Die `main.h` des Bootloaders braucht nur die BLE-Pin-Defines
-   (`BLE_RESET_Pin` PA5, `BLE_MODE_Pin` PB9, `BLE_BUSY_Pin` PB1) und
-   `#include "stm32g0xx_hal.h"`.
+1. In CubeIDE im Project Explorer das App-Projekt **kopieren und einfügen**
+   (Rechtsklick → Copy, dann Paste) und einen neuen Namen vergeben, z. B.
+   `CAN_Fuellstandsensor_Boot`.
+2. Im Duplikat das Linker-Skript auf **`STM32G0B1KBUXN_BOOT.ld`** setzen
+   (Properties → C/C++ Build → Settings → MCU GCC Linker → General → Linker
+   Script) – oder in der vorhandenen `.ld` die FLASH-Region auf
+   `ORIGIN = 0x08000000, LENGTH = 32K` ändern.
+3. Diese Dateien aus `Bootloader/Core/` ins Duplikat übernehmen (die
+   gleichnamigen App-Dateien ersetzen bzw. ergänzen):
+   `Core/Src/main.c`, `Core/Src/stm32g0xx_it.c`, `Core/Inc/main.h`,
+   `boot_dfu.*`, `boot_proteus.*` sowie `dfu_common.*` (aus dem App-`Core/`).
+4. Die App-only-Module **aus dem Build nehmen** (Rechtsklick auf die Datei →
+   Resource Configurations → Exclude from Build): `nmea200.c`, `ee.c`,
+   `config_store.c`, `ble.c`. `stm32g0xx_hal_msp.c` bleibt (liefert die
+   UART-/GPIO-MspInit); die nicht genutzten MspInit-Teile (DAC/FDCAN/I2C/TIM)
+   stören nicht.
+5. Bauen. Der Bootloader nutzt keine Peripherie-Interrupts (UART per Polling),
+   deshalb reicht das minimale `stm32g0xx_it.c` aus diesem Ordner.
 
 ## Erst-Inbetriebnahme per SWD (einmalig)
 

@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.example.fuellstand_app"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36   // aktuelle Plugins verlangen 36; wird an die Plugin-Module weitergereicht
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

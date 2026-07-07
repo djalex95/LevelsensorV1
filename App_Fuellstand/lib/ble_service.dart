@@ -41,6 +41,11 @@ class ProteusBle {
   Future<void> connect(BluetoothDevice device) async {
     _device = device;
 
+    /* evtl. alte Subscriptions lösen (z. B. beim Neuverbinden im DFU) */
+    await _stateSub?.cancel();
+    await _notifySub?.cancel();
+    _buffer = '';
+
     _stateSub = device.connectionState.listen((state) {
       if (state == BluetoothConnectionState.disconnected) {
         _cleanup();
@@ -80,7 +85,12 @@ class ProteusBle {
     _buffer += utf8.decode(data, allowMalformed: true);
     int idx;
     while ((idx = _buffer.indexOf('\n')) >= 0) {
-      final line = _buffer.substring(0, idx).trim();
+      // Steuerzeichen entfernen – u. a. den 0x01-Datenheader, den das
+      // Proteus-Modul jeder Notification voranstellt.
+      final line = _buffer
+          .substring(0, idx)
+          .replaceAll(RegExp(r'[\x00-\x1F]'), '')
+          .trim();
       _buffer = _buffer.substring(idx + 1);
       if (line.isNotEmpty) _lineController.add(line);
     }
@@ -100,6 +110,18 @@ class ProteusBle {
     final payload = <int>[0x01, ...utf8.encode('$cmd\n')];
     final bool withResponse = rx.properties.write;
     await rx.write(payload, withoutResponse: !withResponse);
+  }
+
+  /// Sendet rohe Nutzdaten (mit Proteus-Header 0x01, ohne Zeilenende).
+  /// Für das binäre DFU-Transferprotokoll.
+  Future<void> sendData(List<int> payload) async {
+    final rx = _rx;
+    if (rx == null) {
+      throw Exception('RX-Charakteristik nicht verfügbar (nicht verbunden?)');
+    }
+    final bytes = <int>[0x01, ...payload];
+    final bool withResponse = rx.properties.write;
+    await rx.write(bytes, withoutResponse: !withResponse);
   }
 
   Future<void> disconnect() async {

@@ -77,6 +77,7 @@ ERR ?             unbekanntes Kommando
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
 | `CALRESET` | Kalibrierung auf Werkswert zurücksetzen | `OK CALRESET` |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
+| `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 
 Der Modulname wird über den Proteus-Befehl `CMD_SET_REQ` (Settings-Index 2,
 `RF_DeviceName`) im Modul-Flash gespeichert und bleibt nach einem Neustart
