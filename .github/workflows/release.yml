@@ -1,0 +1,70 @@
+name: Build & Release
+
+# Bei jedem Push auf main: Firmware (.bin) und App (.apk) bauen und an ein
+# GitHub-Release hängen. Version kommt aus Core/Inc/version.h (FW_VERSION).
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:   # manuelles Auslösen im Actions-Tab
+
+permissions:
+  contents: write      # nötig, um Releases zu erstellen
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------- Version lesen ----------
+      - name: Firmware-Version ermitteln
+        id: ver
+        run: |
+          fw=$(grep -oP 'FW_VERSION\s+"\K[^"]+' Core/Inc/version.h)
+          echo "fw=$fw" >> "$GITHUB_OUTPUT"
+          echo "Firmware-Version: $fw"
+
+      # ---------- Firmware (.bin) ----------
+      - name: ARM-Toolchain installieren
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '13.2.Rel1'
+
+      - name: Firmware bauen
+        run: make -j4
+
+      - name: .bin mit Version benennen
+        run: python3 tools/stamp_bin.py build/CAN_FuellstandsensorBLE.bin
+
+      # ---------- App (.apk) ----------
+      - name: Flutter einrichten
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: APK bauen
+        working-directory: App_Fuellstand
+        run: |
+          flutter pub get
+          flutter build apk --release
+
+      - name: APK einsammeln
+        run: |
+          mkdir -p dist
+          cp App_Fuellstand/build/app/outputs/flutter-apk/*.apk dist/
+
+      # ---------- Release ----------
+      - name: Release veröffentlichen
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.ver.outputs.fw }}
+          name: Firmware & App v${{ steps.ver.outputs.fw }}
+          body: |
+            Automatisch gebaut aus main.
+            - Firmware: Fuellstandsensor_v${{ steps.ver.outputs.fw }}.bin (OTA-tauglich)
+            - App: Fuellstandsensor-v${{ steps.ver.outputs.fw }}-release.apk
+          files: |
+            dist/Fuellstandsensor_v*.bin
+            dist/*.apk
