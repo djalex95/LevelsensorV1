@@ -1,15 +1,16 @@
-name: Build & Release
+name: Build & Release Firmware
 
-# Bei jedem Push auf main: Firmware (.bin) und App (.apk) bauen und an ein
-# GitHub-Release hängen. Version kommt aus Core/Inc/version.h (FW_VERSION).
+# Bei jedem Push auf main die Firmware (.bin) bauen und an ein GitHub-Release
+# hängen. Version kommt aus Core/Inc/version.h (FW_VERSION).
+# Die Handy-App liegt in einem eigenen Repo mit eigener CI.
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:   # manuelles Auslösen im Actions-Tab
+  workflow_dispatch:
 
 permissions:
-  contents: write      # nötig, um Releases zu erstellen
+  contents: write
 
 jobs:
   build:
@@ -18,7 +19,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---------- Version lesen ----------
       - name: Firmware-Version ermitteln
         id: ver
         run: |
@@ -26,7 +26,6 @@ jobs:
           echo "fw=$fw" >> "$GITHUB_OUTPUT"
           echo "Firmware-Version: $fw"
 
-      # ---------- Firmware (.bin) ----------
       - name: ARM-Toolchain installieren
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
@@ -38,34 +37,12 @@ jobs:
       - name: .bin mit Version benennen
         run: python3 tools/stamp_bin.py build/CAN_FuellstandsensorBLE.bin
 
-      # ---------- App (.apk) ----------
-      - name: Flutter einrichten
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-
-      - name: APK bauen
-        working-directory: App_Fuellstand
-        run: |
-          flutter pub get
-          flutter build apk --release
-
-      - name: APK einsammeln (mit Version im Namen)
-        run: |
-          mkdir -p dist
-          cp App_Fuellstand/build/app/outputs/flutter-apk/app-release.apk \
-             "dist/Fuellstandsensor-v${{ steps.ver.outputs.fw }}-release.apk"
-
-      # ---------- Release ----------
       - name: Release veröffentlichen
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.fw }}
-          name: Firmware & App v${{ steps.ver.outputs.fw }}
+          name: Firmware v${{ steps.ver.outputs.fw }}
           body: |
             Automatisch gebaut aus main.
             - Firmware: Fuellstandsensor_v${{ steps.ver.outputs.fw }}.bin (OTA-tauglich)
-            - App: Fuellstandsensor-v${{ steps.ver.outputs.fw }}-release.apk
-          files: |
-            dist/Fuellstandsensor_v*.bin
-            dist/*.apk
+          files: dist/Fuellstandsensor_v*.bin
