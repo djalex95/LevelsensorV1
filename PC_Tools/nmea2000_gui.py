@@ -14,13 +14,22 @@ Voraussetzungen:
 Aufruf:  python nmea2000_gui.py
 """
 
+import os
 import queue
 import struct
+import sys
 import threading
 import time
 import tkinter as tk
 from collections import deque
 from tkinter import ttk
+
+
+def resource_path(name):
+    """Pfad zu einer mitgelieferten Datei – funktioniert im Skript und in der
+    von PyInstaller entpackten .exe (sys._MEIPASS)."""
+    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(base, name)
 
 import can
 
@@ -611,5 +620,20 @@ class App:
 
 if __name__ == "__main__":
     root = tk.Tk()
+
+    # Fenster-/Taskleisten-Symbol setzen (statt der Tk-Feder)
+    try:
+        root.iconbitmap(resource_path("icon.ico"))
+    except Exception:
+        pass
+    # Windows: eigene Taskleisten-Gruppe, damit das Fenstersymbol genutzt wird
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "LevelSense.NMEA2000.GUI")
+        except Exception:
+            pass
+
     App(root)
     root.mainloop()
