@@ -9,6 +9,7 @@ class SensorStatus {
   final int? capacity; // Liter
   final int? instance; // 0..15
   final bool? calibrated; // 100%-Kalibrierung vorhanden
+  final String? version; // Firmware-Version, z. B. "1.2.0"
 
   const SensorStatus({
     this.level,
@@ -17,6 +18,7 @@ class SensorStatus {
     this.capacity,
     this.instance,
     this.calibrated,
+    this.version,
   });
 
   /// Parst `STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1`. Gibt null bei anderer Zeile.
@@ -36,6 +38,7 @@ class SensorStatus {
       capacity: int.tryParse(map['C'] ?? ''),
       instance: int.tryParse(map['I'] ?? ''),
       calibrated: map['CAL'] == '1',
+      version: map['V'],
     );
   }
 }

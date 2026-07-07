@@ -7,6 +7,7 @@
 
 #include "nmea200.h"
 #include "main.h"		/* fuer Error_Handler() */
+#include "version.h"	/* zentrale Firmware-Version */
 
 typedef union nmea_int16_convert{
 	uint8_t small_arr[2];
@@ -149,9 +150,9 @@ uint8_t init_p_struct(NMEA_parameter_Product *p_info_struct)
 	memcpy(p_info_struct->ModelSerialCode, filled_string,32);
 	strcpy(p_info_struct->ModelSerialCode, "00000002");
 	memcpy(p_info_struct->ModelVersion, filled_string,32);
-	strcpy(p_info_struct->ModelVersion, "1.1.0 (2024-06-02)");
+	strcpy(p_info_struct->ModelVersion, HW_VERSION_STR);
 	memcpy(p_info_struct->SwCode, filled_string,32);
-	strcpy(p_info_struct->SwCode, "1.0.0 (2024-06-02)");
+	strcpy(p_info_struct->SwCode, FW_VERSION_STR);
 
 	p_info_struct->ProductCode=102;
 

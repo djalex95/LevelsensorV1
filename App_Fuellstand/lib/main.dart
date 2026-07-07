@@ -590,9 +590,20 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _moduleBody() {
+    final cs = Theme.of(context).colorScheme;
+    final fw = _status?.version;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        Row(
+          children: [
+            Icon(Icons.memory, size: 18, color: cs.primary),
+            const SizedBox(width: 6),
+            Text('Firmware-Version: ${fw ?? '–'}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+          ],
+        ),
+        const Divider(height: 24),
         const Text(
           'Der Name wird dauerhaft im Modul gespeichert. Nach dem Ändern startet '
           'das Modul neu und die Verbindung trennt sich – danach neu verbinden.',

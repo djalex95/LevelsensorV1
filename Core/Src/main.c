@@ -23,6 +23,7 @@
 /* USER CODE BEGIN Includes */
 #include "config_store.h"
 #include "dfu_common.h"
+#include "version.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1737,13 +1738,13 @@ void init_Sensor()
 
 /*
  * Sendet den aktuellen Sensorzustand als maschinenlesbare Zeile an die App.
- * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>\n
+ * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>\n
  * L: Füllstand in %, T: Temperatur in Grad C, F: Fluidtyp (0..15),
  * C: Kapazität (Liter), I: Instanz, CAL: 1 = kalibriert.
  */
 void ble_send_status()
 {
-	char line[80];
+	char line[96];
 
 	/* percent_val: 100,00 % = 10000 */
 	int p_int = percent_val / 100;
@@ -1756,9 +1757,10 @@ void ble_send_status()
 
 	int cal = (EEPROM_values.calib_availible == 0x00) ? 1 : 0;
 
-	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d\n",
+	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s\n",
 			 p_int, p_frac, tsign, ta / 100, ta % 100,
-			 dev_info_par.fluidType, dev_info_par.cap, dev_info_par.devInstance, cal);
+			 dev_info_par.fluidType, dev_info_par.cap, dev_info_par.devInstance, cal,
+			 FW_VERSION);
 
 	BLE_SendString(line);
 }
@@ -1780,6 +1782,7 @@ static void ble_send_lin()
 /*
  * Verarbeitet ein Textkommando von der App (CMD_DATA_IND).
  * Unterstützt (Groß-/Kleinschreibung egal):
+ *   VER            Firmware-Version senden (VER;x.y.z)
  *   GET            aktuellen Status sofort senden
  *   CAL100         aktuellen Druck als 100 % kalibrieren
  *   CALRESET       Kalibrierung auf Werkswert zurücksetzen
@@ -1801,7 +1804,11 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		cmd[--n] = '\0';
 	}
 
-	if (strncasecmp(cmd, "GET", 3) == 0)
+	if (strncasecmp(cmd, "VER", 3) == 0)
+	{
+		BLE_SendString("VER;" FW_VERSION "\n");
+	}
+	else if (strncasecmp(cmd, "GET", 3) == 0)
 	{
 		ble_send_status();
 	}

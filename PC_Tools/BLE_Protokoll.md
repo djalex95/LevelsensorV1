@@ -29,7 +29,7 @@ periodischen Status als TX-Notification empfangen. Jede Nachricht endet mit `\n`
 ### Status (automatisch ca. jede Sekunde, solange verbunden)
 
 ```
-STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1
+STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0
 ```
 
 | Feld | Bedeutung | Einheit / Wertebereich |
@@ -40,6 +40,7 @@ STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1
 | `C` | Tankkapazität | Liter |
 | `I` | Geräteinstanz | 0..15 |
 | `CAL` | 100%-Kalibrierung vorhanden | 0 oder 1 |
+| `V` | Firmware-Version | z. B. `1.2.0` |
 
 Damit hat die App aus dem Stream bereits alle Anzeige- und Konfigurationswerte.
 
@@ -68,6 +69,7 @@ ERR ?             unbekanntes Kommando
 
 | Kommando | Wirkung | Antwort |
 |---|---|---|
+| `VER` | Firmware-Version abfragen | `VER;x.y.z` |
 | `GET` | sofort eine `STAT`-Zeile senden | `STAT;…` |
 | `LIN` | aktuelle Kennlinie abfragen | `LIN;…` |
 | `LIN v0,v1,…,v10` | Kennlinie setzen (11 Werte 0..100, steigend) | `OK LIN` / `ERR LIN` |
