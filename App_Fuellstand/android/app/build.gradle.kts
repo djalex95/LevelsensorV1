@@ -32,6 +32,15 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+
+    // APK-Dateiname mit Versionsnummer, z. B. Fuellstandsensor-v1.2.0-release.apk
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "Fuellstandsensor-v${variant.versionName}-${variant.name}.apk"
+        }
+    }
 }
 
 kotlin {
