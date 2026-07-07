@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'ble_service.dart';
 import 'dfu.dart';
@@ -56,6 +57,14 @@ class _HomePageState extends State<HomePage> {
   SensorStatus? _status;
   final List<String> _log = [];
 
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  bool _showSettings = false;
+  bool _autoConnecting = false;
+
+  // Merker für den zuletzt verbundenen Sensor (SharedPreferences).
+  static const _prefLastId = 'last_device_id';
+  static const _prefLastName = 'last_device_name';
+
   int _fluidSel = 1;
   final TextEditingController _capCtrl = TextEditingController();
   final TextEditingController _instCtrl = TextEditingController();
@@ -72,12 +81,44 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _subs.add(_ble.lines.listen(_onLine));
-    _subs.add(_ble.connected.listen((c) => setState(() => _connected = c)));
+    _subs.add(_ble.connected.listen((c) => setState(() {
+          _connected = c;
+          if (!c) _showSettings = false; // bei Trennung zurück zur Startseite
+        })));
     _subs.add(FlutterBluePlus.scanResults
         .listen((r) => setState(() => _scanResults = r)));
     _subs.add(FlutterBluePlus.isScanning
         .listen((s) => setState(() => _isScanning = s)));
-    _requestPermissions();
+    _init();
+  }
+
+  Future<void> _init() async {
+    await _requestPermissions();
+    await _tryAutoConnect();
+  }
+
+  /// Beim Start versuchen, sich mit dem zuletzt verbundenen Sensor zu verbinden.
+  Future<void> _tryAutoConnect() async {
+    final prefs = await SharedPreferences.getInstance();
+    final id = prefs.getString(_prefLastId);
+    if (id == null || id.isEmpty) return;
+    final name = prefs.getString(_prefLastName) ?? '';
+    setState(() => _autoConnecting = true);
+    try {
+      final device = BluetoothDevice.fromId(id);
+      _addLog('Verbinde automatisch mit ${name.isNotEmpty ? name : id}…');
+      await _connect(device, fallbackName: name);
+    } catch (e) {
+      _addLog('Auto-Verbinden fehlgeschlagen: $e');
+    } finally {
+      if (mounted) setState(() => _autoConnecting = false);
+    }
+  }
+
+  Future<void> _saveLastDevice(BluetoothDevice device, String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefLastId, device.remoteId.str);
+    await prefs.setString(_prefLastName, name);
   }
 
   Future<void> _requestPermissions() async {
@@ -129,15 +170,21 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _connect(BluetoothDevice device) async {
+  Future<void> _connect(BluetoothDevice device, {String? fallbackName}) async {
     await FlutterBluePlus.stopScan();
     try {
       await _ble.connect(device);
       _device = device;
       _configInit = false;
-      _deviceName = device.platformName;
+      final pn = device.platformName;
+      _deviceName = pn.isNotEmpty
+          ? pn
+          : (fallbackName != null && fallbackName.isNotEmpty
+              ? fallbackName
+              : device.remoteId.str);
       _nameCtrl.text = _deviceName;
       _addLog('Verbunden mit $_deviceName');
+      await _saveLastDevice(device, _deviceName); // Sensor merken
     } catch (e) {
       _addLog('Verbindung fehlgeschlagen: $e');
       if (mounted) {
@@ -243,101 +290,192 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    return _showSettings ? _buildSettingsScaffold() : _buildHomeScaffold();
+  }
+
+  // ---------------- Startseite (Live-Anzeige) ----------------
+
+  Widget _buildHomeScaffold() {
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
         title: Text(_connected ? _deviceName : 'Füllstandsensor'),
         actions: [
-          if (_connected)
-            IconButton(
-              icon: const Icon(Icons.link_off),
-              tooltip: 'Trennen',
-              onPressed: () => _ble.disconnect(),
-            ),
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: 'Einstellungen',
+            onPressed:
+                _connected ? () => setState(() => _showSettings = true) : null,
+          ),
         ],
       ),
-      body: _connected ? _buildDashboard() : _buildScanView(),
+      drawer: _buildDeviceDrawer(),
+      body: _connected ? _buildHomeBody() : _buildDisconnectedHint(),
     );
   }
 
-  // ---------------- Scan-Ansicht ----------------
-
-  Widget _buildScanView() {
-    final devices =
-        _scanResults.where((r) => r.device.platformName.isNotEmpty).toList();
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              icon: Icon(_isScanning ? Icons.hourglass_top : Icons.bluetooth_searching),
-              label: Text(_isScanning ? 'Suche läuft…' : 'Nach Sensor suchen'),
-              onPressed: _isScanning ? null : _startScan,
-            ),
-          ),
-        ),
-        if (devices.isEmpty)
-          Expanded(
-            child: Center(
-              child: Text(
-                _isScanning ? 'Suche nach Geräten…' : 'Noch keine Geräte gefunden',
-                style: TextStyle(color: Theme.of(context).hintColor),
-              ),
-            ),
-          )
-        else
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              children: devices
-                  .map((r) => Card(
-                        child: ListTile(
-                          leading: const CircleAvatar(child: Icon(Icons.sensors)),
-                          title: Text(r.device.platformName),
-                          subtitle: Text(r.device.remoteId.str),
-                          trailing: Text('${r.rssi} dBm'),
-                          onTap: () => _connect(r.device),
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // ---------------- Dashboard ----------------
-
-  Widget _buildDashboard() {
+  Widget _buildHomeBody() {
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      children: [
-        _levelCard(),
-        const SizedBox(height: 12),
-        _configCard(),
-        const SizedBox(height: 12),
-        _section(
-          icon: Icons.tune,
-          title: 'Kalibrierung',
-          child: _calibBody(),
+      children: [_levelCard()],
+    );
+  }
+
+  Widget _buildDisconnectedHint() {
+    final hint = Theme.of(context).hintColor;
+    if (_autoConnecting) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text('Verbinde mit letztem Sensor…',
+                style: TextStyle(color: hint)),
+          ],
         ),
-        _section(
-          icon: Icons.water_drop_outlined,
-          title: 'Tankform',
-          child: _tankFormBody(),
+      );
+    }
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.bluetooth_disabled, size: 48, color: hint),
+            const SizedBox(height: 12),
+            Text('Kein Gerät verbunden',
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 6),
+            Text('Öffne links das Menü und wähle deinen Sensor.',
+                textAlign: TextAlign.center, style: TextStyle(color: hint)),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              icon: const Icon(Icons.menu),
+              label: const Text('Geräte-Menü öffnen'),
+              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+            ),
+          ],
         ),
-        _section(
-          icon: Icons.bluetooth,
-          title: 'Modul',
-          child: _moduleBody(),
+      ),
+    );
+  }
+
+  // ---------------- Geräte-Menü (Drawer) ----------------
+
+  Widget _buildDeviceDrawer() {
+    final devices =
+        _scanResults.where((r) => r.device.platformName.isNotEmpty).toList();
+    final cs = Theme.of(context).colorScheme;
+    final hint = Theme.of(context).hintColor;
+    return Drawer(
+      child: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child:
+                  Text('Geräte', style: Theme.of(context).textTheme.titleLarge),
+            ),
+            if (_connected)
+              ListTile(
+                leading: CircleAvatar(
+                    backgroundColor: cs.primaryContainer,
+                    child: const Icon(Icons.sensors)),
+                title: Text(_deviceName),
+                subtitle: const Text('verbunden'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.link_off),
+                  tooltip: 'Trennen',
+                  onPressed: () => _ble.disconnect(),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: FilledButton.icon(
+                icon: Icon(_isScanning
+                    ? Icons.hourglass_top
+                    : Icons.bluetooth_searching),
+                label: Text(_isScanning ? 'Suche läuft…' : 'Nach Sensor suchen'),
+                onPressed: _isScanning ? null : _startScan,
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: devices.isEmpty
+                  ? Center(
+                      child: Text(
+                          _isScanning ? 'Suche…' : 'Keine Geräte gefunden',
+                          style: TextStyle(color: hint)))
+                  : ListView(
+                      children: devices
+                          .map((r) => ListTile(
+                                leading: const Icon(Icons.sensors),
+                                title: Text(r.device.platformName),
+                                subtitle: Text(r.device.remoteId.str),
+                                trailing: Text('${r.rssi} dBm'),
+                                onTap: () {
+                                  Navigator.of(context).pop();
+                                  _connect(r.device);
+                                },
+                              ))
+                          .toList(),
+                    ),
+            ),
+          ],
         ),
-        _section(
-          icon: Icons.article_outlined,
-          title: 'Log',
-          child: _logBody(),
+      ),
+    );
+  }
+
+  // ---------------- Einstellungen ----------------
+
+  Widget _buildSettingsScaffold() {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) setState(() => _showSettings = false);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => setState(() => _showSettings = false),
+          ),
+          title: const Text('Einstellungen'),
         ),
-      ],
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+          children: [
+            _section(
+              icon: Icons.settings_outlined,
+              title: 'Konfiguration',
+              child: _configBody(),
+            ),
+            _section(
+              icon: Icons.tune,
+              title: 'Kalibrierung',
+              child: _calibBody(),
+            ),
+            _section(
+              icon: Icons.water_drop_outlined,
+              title: 'Tankform',
+              child: _tankFormBody(),
+            ),
+            _section(
+              icon: Icons.bluetooth,
+              title: 'Modul',
+              child: _moduleBody(),
+            ),
+            _section(
+              icon: Icons.article_outlined,
+              title: 'Log',
+              child: _logBody(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -421,42 +559,34 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _configCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _configBody() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            const Text('Konfiguration',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Text('Fluidtyp'),
-                const Spacer(),
-                DropdownButton<int>(
-                  value: _fluidSel,
-                  items: fluidNames.entries
-                      .map((e) => DropdownMenuItem(
-                          value: e.key, child: Text(e.value)))
-                      .toList(),
-                  onChanged: (v) => setState(() => _fluidSel = v ?? 1),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.tonal(
-                  onPressed: () => _send('FLUID $_fluidSel'),
-                  child: const Text('Senden'),
-                ),
-              ],
+            const Text('Fluidtyp'),
+            const Spacer(),
+            DropdownButton<int>(
+              value: _fluidSel,
+              items: fluidNames.entries
+                  .map((e) =>
+                      DropdownMenuItem(value: e.key, child: Text(e.value)))
+                  .toList(),
+              onChanged: (v) => setState(() => _fluidSel = v ?? 1),
             ),
-            _fieldRow(_capCtrl, 'Kapazität (L)',
-                () => _send('CAP ${_capCtrl.text.trim()}')),
-            _fieldRow(_instCtrl, 'Instanz (0..15)',
-                () => _send('INST ${_instCtrl.text.trim()}')),
+            const SizedBox(width: 8),
+            FilledButton.tonal(
+              onPressed: () => _send('FLUID $_fluidSel'),
+              child: const Text('Senden'),
+            ),
           ],
         ),
-      ),
+        _fieldRow(_capCtrl, 'Kapazität (L)',
+            () => _send('CAP ${_capCtrl.text.trim()}')),
+        _fieldRow(_instCtrl, 'Instanz (0..15)',
+            () => _send('INST ${_instCtrl.text.trim()}')),
+      ],
     );
   }
 
