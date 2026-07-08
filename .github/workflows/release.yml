@@ -50,7 +50,5 @@ jobs:
         with:
           tag_name: v${{ steps.ver.outputs.fw }}
           name: Firmware v${{ steps.ver.outputs.fw }}
-          body: |
-            Automatisch gebaut.
-            - Firmware: Fuellstandsensor_v${{ steps.ver.outputs.fw }}.bin (OTA-tauglich)
+          body_path: RELEASE_NOTES.md
           files: dist/Fuellstandsensor_v*.bin
