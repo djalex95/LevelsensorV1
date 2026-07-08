@@ -33,13 +33,13 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 typedef struct calib_data{
-	uint8_t calib_availible;
+	uint8_t calib_available;
 	uint32_t max_val;
 	int16_t offset;
 }calib_data;
 
 typedef struct dac_calib_data{
-	uint8_t calib_availible;	// soll auch genutzt werden, um min und max daten am Ausgang zu sehen !
+	uint8_t calib_available;	// soll auch genutzt werden, um min und max daten am Ausgang zu sehen !
 	int32_t dac_mx;
 	int32_t dac_c;
 }dac_calib_data;
@@ -49,16 +49,6 @@ typedef struct prod_param{
 	uint8_t tank_cap;
 	uint8_t lin_point[11];
 }prod_param;
-
-typedef union int_convert{
-	uint8_t small_arr[4];
-	uint32_t max_val;
-}int_convert;
-
-typedef union int16_convert{
-	uint8_t small_arr[2];
-	uint16_t max_val;
-}int16_convert;
 
 typedef struct sensor_data{
 	int32_t pressure;
@@ -137,7 +127,7 @@ void handle_prop_config();
 uint8_t lin_table_valid(uint8_t *t);
 uint16_t linearize_percent(uint16_t raw);
 void reset_EEPROM(calib_data *values);
-void set_led(int32_t red, uint32_t green, int32_t blue, int32_t brightness);
+void set_led(int32_t red, int32_t green, int32_t blue, int32_t brightness);
 
 void ble_send_status();
 void ble_handle_command(const uint8_t *data, uint16_t len);
@@ -156,25 +146,9 @@ void init_Sensor();
 volatile uint8_t error_mode = 0;
 uint8_t led_jump = 0;
 
-FDCAN_FilterTypeDef sFilterConfig;
- FDCAN_TxHeaderTypeDef TxHeader, TxHeader2;
-// FDCAN_RxHeaderTypeDef RxHeader;
- uint8_t TxData0[8] = {0x10, 0x32, 0x54, 0x76, 0x98, 0x00, 0x11, 0x22};
- uint8_t TxData1[8];
- //uint8_t RxData[8];
- uint8_t i2cRX[4];
- uint32_t TxMailbox;
-
- uint8_t blink_times = 0;
-
- volatile uint8_t run_mode = 1;
+volatile uint8_t run_mode = 1;
  volatile uint8_t setup_mode = 0;
- volatile uint8_t try_tx = 0;
-
- uint32_t extID = 0x033;
- uint32_t mask = 0x7FC;
-
- volatile int32_t raw_press = 0;	/* wird auch im EXTI-Callback gelesen;
+volatile int32_t raw_press = 0;	/* wird auch im EXTI-Callback gelesen;
 									   32 bit -> atomarer Zugriff auf dem M0+ (kein Torn Read) */
 
  //EEprom struct
@@ -182,10 +156,7 @@ FDCAN_FilterTypeDef sFilterConfig;
  dac_calib_data DAC_EEPROM_values;
  prod_param device_param;
 
- int_convert int_arr;
- int16_convert int16_arr;
-
- uint32_t time_el = 0, last_run = 0, last_run_nmea=0;
+uint32_t time_el = 0, last_run = 0, last_run_nmea=0;
  uint32_t tx_time = 100, nmea_time = 2500;	/* PGN 127505: Norm-Intervall 2,5 s */
  uint32_t last_run_temp = 0, temp_time = 2000;	/* PGN 130312: Norm-Intervall 2 s */
  uint32_t last_run_hb = 0, hb_time = 60000;	/* PGN 126993 Heartbeat: 60 s */
@@ -215,8 +186,6 @@ FDCAN_FilterTypeDef sFilterConfig;
  uint16_t percent_val = 0;	//100,00 Prozent = 10000
 
  volatile int16_t level_led = 0;
-
-HAL_StatusTypeDef tx_state;
 
 sensor_mess sensor_data_rx;
 
@@ -291,38 +260,12 @@ int main(void)
 	 }
 
 
-	 if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_TX_COMPLETE, 0xFFFFFFFF) != HAL_OK)
-	 	 {
-		 	 Error_Handler();
-	 	 }
-
 	 /* Bus-Off-Interrupt aktivieren -> Recovery in HAL_FDCAN_ErrorStatusCallback */
 	 if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_BUS_OFF, 0) != HAL_OK)
 	 {
 		 Error_Handler();
 	 }
 
-
-    /* Prepare Tx message Header */
-     TxHeader.Identifier = 0x150;
-     TxHeader.IdType = FDCAN_STANDARD_ID;
-     TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-     TxHeader.DataLength = FDCAN_DLC_BYTES_6;
-     TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-     TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-     TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
-     TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-     TxHeader.MessageMarker = 0;
-
-	TxHeader2.Identifier = 0x151;
-	TxHeader2.IdType = FDCAN_STANDARD_ID;
-	TxHeader2.TxFrameType = FDCAN_DATA_FRAME;
-	TxHeader2.DataLength = FDCAN_DLC_BYTES_5;
-	TxHeader2.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-	TxHeader2.BitRateSwitch = FDCAN_BRS_OFF;
-	TxHeader2.FDFormat = FDCAN_CLASSIC_CAN;
-	TxHeader2.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-	TxHeader2.MessageMarker = 0;
 
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 	HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);
@@ -356,7 +299,7 @@ int main(void)
   	  /* Unbekannter Wert (z.B. Flash-Korruption): wie "keine Kalibrierung"
   	   * behandeln und mit Defaults weiterbooten. Vorher: Endlosschleife mit
   	   * DAC-Debugausgabe -> Geraet startete nie (CAN/BLE tot). */
-  	  DAC_EEPROM_values.calib_availible = 0xFF;
+  	  DAC_EEPROM_values.calib_available = 0xFF;
   	  DAC_EEPROM_values.dac_c = 0;
   	  DAC_EEPROM_values.dac_mx = 6205;	//alt:12409
     }
@@ -449,67 +392,26 @@ int main(void)
 
 	  		sensor_data_rx = get_value();
 
-	  		int_arr.max_val = sensor_data_rx.pressure;
-
-	  		TxData0[0] = int_arr.small_arr[3];
-	  		TxData0[1] = int_arr.small_arr[2];
-	  		TxData0[2] = int_arr.small_arr[1];
-	  		TxData0[3] = int_arr.small_arr[0];
-
-	  		int16_arr.max_val = sensor_data_rx.temp;
-
-	  		TxData0[4] = int16_arr.small_arr[1];
-	  		TxData0[5] = int16_arr.small_arr[0];
-
 	  		/* EMA-Filter: 'wertung'/1000 = Anteil des ALTEN gefilterten Werts.
 	  		 * wertung=50 -> 95 % neuer Messwert, 5 % alter Wert (Verhalten wie bisher,
 	  		 * fuer staerkere Glaettung wertung erhoehen, z.B. 900). */
 	  		raw_press = (int32_t)(((int64_t)sensor_data_rx.pressure * (1000-wertung) + (int64_t)raw_press*wertung)/1000);
 	  		sensor_data_rx.pressure = (int32_t)raw_press;
 
-	  		int_arr.max_val = (int32_t)raw_press;
-
 	  		if(run_mode == 1){
-	  			try_tx ++;
-
-
-	  			TxData1[0] = int_arr.small_arr[3];
-	  			TxData1[1] = int_arr.small_arr[2];
-	  			TxData1[2] = int_arr.small_arr[1];
-	  			TxData1[3] = int_arr.small_arr[0];
-
 	  			/* Fuellhoehe (linear aus Druck) -> Volumen ueber Stuetzstellen-Tabelle */
 	  			percent_val = linearize_percent(calc_percent(&EEPROM_values, raw_press));
 	  			set_volt(percent_val, &DAC_EEPROM_values);
-	  			TxData1[4] = (percent_val*255)/10000;
-
-
-//	  			 if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader, TxData0) != HAL_OK)
-//	  			  {
-//	  				Error_Handler();
-//	  			  }
-//	  			 while (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) != 3) {}
-//
-//	  			 if (HAL_FDCAN_AddMessageToTxFifoQ(&hfdcan1, &TxHeader2, TxData1) != HAL_OK)
-//	  			  {
-//	  				Error_Handler();
-//	  			  }
-//	  			 while (HAL_FDCAN_GetTxFifoFreeLevel(&hfdcan1) != 3) {}
-
-	  			 if (try_tx > 2)
-	  			 {
-	  				 //error_mode |= ERROR_TX_CAN;
-	  			 }
 	  			switch (setup_mode) {
 	  				case 1: if (raw_press>=100){	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
 	  							EEPROM_values.max_val = raw_press/100;
-	  							EEPROM_values.calib_availible = 0x00;
+	  							EEPROM_values.calib_available = 0x00;
 	  							save_EEPROM(&EEPROM_values);
 	  						}
 	  						setup_mode = 0;
 	  						break;
 	  				case 2:	setup_mode = 0;
-	  						EEPROM_values.calib_availible = 0xFF;
+	  						EEPROM_values.calib_available = 0xFF;
 	  						save_EEPROM(&EEPROM_values);
 	  						EEPROM_values.max_val = std_press;
 	  						break;
@@ -527,7 +429,7 @@ int main(void)
 	  	if(((time_el-last_run_nmea)>=nmea_time) && ((time_el-claim_time)>=250))
 	  	{
 	  		last_run_nmea = time_el;
-	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, ((float)percent_val)/100, dev_info_par.cap);
+	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, percent_val, dev_info_par.cap);
 	  	}
 	  	if(((time_el-last_run_temp)>=temp_time) && ((time_el-claim_time)>=250))
 	  	{
@@ -542,7 +444,7 @@ int main(void)
 	  	if(fluid_req != 0)	/* ISO Request auf 127505 -> sofort antworten */
 	  	{
 	  		fluid_req = 0;
-	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, ((float)percent_val)/100, dev_info_par.cap);
+	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, percent_val, dev_info_par.cap);
 	  		last_run_nmea = time_el;
 	  	}
 	  	if(pgnlist_req != 0)	/* ISO Request auf 126464 -> TX/RX-PGN-Listen senden */
@@ -1136,13 +1038,6 @@ static void MX_GPIO_Init(void)
 //********************* Interrupt Callbacks **********************
 
 
-void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t BufferIndexes)
-{
-	try_tx = 0;
-	error_mode &= ~ERROR_TX_CAN;
-}
-
-
 /* Bus-Off (z.B. Kurzschluss oder massive Stoerung auf dem Bus): Fehler-LED
  * setzen und die Recovery anstossen. Durch Loeschen des INIT-Bits wartet der
  * FDCAN die vorgeschriebenen 128 x 11 rezessiven Bits ab und nimmt danach
@@ -1246,7 +1141,7 @@ uint8_t check_EEPROM()
 
 void get_EEPROM(calib_data *values)
 {
-	values->calib_availible = cfg_data[0];
+	values->calib_available = cfg_data[0];
 	values->max_val = ((uint32_t)cfg_data[4]<<24)|((uint32_t)cfg_data[3]<<16)|((uint32_t)cfg_data[2]<<8)|(cfg_data[1]);
 	values->offset = std_offset;
 }
@@ -1256,7 +1151,7 @@ void save_EEPROM(calib_data *values)
 	/* Nur die Kalibrierbytes im RAM-Cache aendern; config_save() schreibt
 	 * den kompletten Block atomar (Ping-Pong, CRC). Bei Fehlschlag bleibt
 	 * der alte Datensatz im Flash gueltig - kein Error_Handler noetig. */
-	cfg_data[0] = values->calib_availible;
+	cfg_data[0] = values->calib_available;
 	cfg_data[1] = (uint8_t)(values->max_val & 0xFF);
 	cfg_data[2] = (uint8_t)((values->max_val >> 8) & 0xFF);
 	cfg_data[3] = (uint8_t)((values->max_val >> 16) & 0xFF);
@@ -1273,7 +1168,7 @@ uint8_t check_dac_EEPROM()
 
 void get_dac_EEPROM(dac_calib_data *values)
 {
-	values->calib_availible = cfg_data[8];
+	values->calib_available = cfg_data[8];
 	values->dac_mx = ((uint32_t)cfg_data[12]<<24)|((uint32_t)cfg_data[11]<<16)|((uint32_t)cfg_data[10]<<8)|(cfg_data[9]);
 	values->dac_c = ((uint32_t)cfg_data[16]<<24)|((uint32_t)cfg_data[15]<<16)|((uint32_t)cfg_data[14]<<8)|(cfg_data[13]);
 }
@@ -1341,7 +1236,7 @@ void handle_group_function()
 
 	if (fn == 0)		/* Request: einmal sofort senden */
 	{
-		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, ((float)percent_val)/100, dev_info_par.cap);
+		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, percent_val, dev_info_par.cap);
 	}
 	else if (fn == 1)	/* Command */
 	{
@@ -1513,7 +1408,7 @@ void handle_prop_config()
 		if (raw_press >= 100)	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
 		{
 			EEPROM_values.max_val = raw_press / 100;
-			EEPROM_values.calib_availible = 0x00;
+			EEPROM_values.calib_available = 0x00;
 			save_EEPROM(&EEPROM_values);
 			ok = 1;
 		}
@@ -1524,7 +1419,7 @@ void handle_prop_config()
 	else if (gf_buf[2] == PROP_CMD_RESET)
 	{
 		/* Kalibrierung verwerfen -> Werkswert (std_press) beim naechsten Boot */
-		EEPROM_values.calib_availible = 0xFF;
+		EEPROM_values.calib_available = 0xFF;
 		save_EEPROM(&EEPROM_values);
 		EEPROM_values.max_val = std_press;
 		reply[2] = 0x84;
@@ -1558,7 +1453,7 @@ void set_adr_eeprom(uint8_t adr)
 }
 
 
-void set_led(int32_t red, uint32_t green, int32_t blue, int32_t brightness)
+void set_led(int32_t red, int32_t green, int32_t blue, int32_t brightness)
 {
 	if (red < 0){
 		red = 0;
@@ -1744,12 +1639,10 @@ sensor_mess get_value()
 	sensor_mess mess_data;
 	uint8_t rxBuffer[5] = {0};
 	uint8_t start_Reg = 0x06;
-	float k = 12.8;		//25.6 -> 20kpa 12.8 40kpa
 	uint8_t tx_arr[2];
 	tx_arr[0] = 0x30;
 	tx_arr[1] = 0x0A;
-	double raw_pressure;
-	float raw_temp;
+	int32_t raw24, t16;
 	uint8_t i2c_ok = 1;
 
 	/* Fix: Timeout 25 ms statt 2500 ms - blockiert die Hauptschleife
@@ -1776,27 +1669,23 @@ sensor_mess get_value()
 		return last_good;
 	}
 
-	if(rxBuffer[0]&0x80)
+	raw24 = ((int32_t)rxBuffer[0] << 16) | ((int32_t)rxBuffer[1] << 8) | rxBuffer[2];
+	if (rxBuffer[0] & 0x80)
 	{
-		raw_pressure = ((double)((rxBuffer[0]<<16) | (rxBuffer[1]<<8) | (rxBuffer[2]))-16777216)/k;
+		raw24 -= 16777216;	/* 24-bit-Zweierkomplement */
 	}
-	else
+	t16 = ((int32_t)rxBuffer[3] << 8) | rxBuffer[4];
+	if (rxBuffer[3] & 0x80)
 	{
-		raw_pressure = (double)((rxBuffer[0]<<16) | (rxBuffer[1]<<8) | (rxBuffer[2]))/k;
-	}
-
-
-	if(rxBuffer[3]&0x80)
-	{
-		raw_temp = ((float)((rxBuffer[3]<<8) | (rxBuffer[4]))-65536)/256;
-	}
-	else
-	{
-		raw_temp = (float)((rxBuffer[3]<<8) | (rxBuffer[4]))/256;
+		t16 -= 65536;		/* 16-bit-Zweierkomplement */
 	}
 
-	mess_data.pressure = raw_pressure-EEPROM_values.offset;
-	mess_data.temp = (int16_t)(raw_temp * 100);	/* jetzt in 0,01 Grad C (fuer PGN 130312) */
+	/* Druck: raw/k mit k = 12,8 (40-kPa-Sensor) -> Integer: raw*10/128.
+	 * (20-kPa-Sensor: k = 25,6 -> raw*10/256.) Vorher double -> zog die
+	 * Soft-Float-Lib in den Flash, der M0+ hat keine FPU. */
+	mess_data.pressure = (int32_t)(((int64_t)raw24 * 10) / 128) - EEPROM_values.offset;
+	/* Temperatur: raw/256 Grad C -> 0,01 Grad C: raw*100/256 = raw*25/64 */
+	mess_data.temp = (int16_t)((t16 * 25) / 64);
 
 	last_good = mess_data;
 
@@ -1844,7 +1733,7 @@ void ble_send_status()
 	const char *tsign = (t < 0) ? "-" : "";
 	int ta = (t < 0) ? -t : t;
 
-	int cal = (EEPROM_values.calib_availible == 0x00) ? 1 : 0;
+	int cal = (EEPROM_values.calib_available == 0x00) ? 1 : 0;
 
 	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HW=%d\n",
 			 p_int, p_frac, tsign, ta / 100, ta % 100,
@@ -1939,7 +1828,7 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		if (raw_press >= 100)	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
 		{
 			EEPROM_values.max_val = raw_press / 100;
-			EEPROM_values.calib_availible = 0x00;
+			EEPROM_values.calib_available = 0x00;
 			save_EEPROM(&EEPROM_values);
 			BLE_SendString("OK CAL100\n");
 		}
@@ -1950,7 +1839,7 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 	}
 	else if (strncasecmp(cmd, "CALRESET", 8) == 0)
 	{
-		EEPROM_values.calib_availible = 0xFF;
+		EEPROM_values.calib_available = 0xFF;
 		save_EEPROM(&EEPROM_values);
 		EEPROM_values.max_val = std_press;
 		BLE_SendString("OK CALRESET\n");

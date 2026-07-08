@@ -1,11 +1,11 @@
 /*
- * nmea200.c
+ * nmea2000.c
  *
  *  Created on: May 22, 2024
  *      Author: a_hae
  */
 
-#include "nmea200.h"
+#include "nmea2000.h"
 #include "main.h"		/* fuer Error_Handler() */
 #include "version.h"	/* zentrale Firmware-Version */
 
@@ -381,25 +381,17 @@ uint8_t NMEA2000_AdrClaim(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, unsi
 	return 1;
 }
 
-uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t FluidType, float Level, uint8_t Capacity)
+uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t FluidType, uint16_t level_percent100, uint8_t Capacity)
 {
 	uint8_t tx_data[8];
 	uint32_t PGN = 127505;
 	uint8_t Priority = 6;
-	double vd = 0;
-	int16_t vi = 0;
-	int32_t vii = 0;
+	int32_t lvl;
+	uint32_t capv;
 	nmea_int16_convert convert_n;
 	nmea_int32_convert convert_m;
 
 	FDCAN_TxHeaderTypeDef TxHeader;
-
-
-
-
-	//Generierung der ID
-
-
 
 	TxHeader.Identifier = (uint32_t)N2ktoCanID( (unsigned char)Priority, (unsigned long) PGN, (unsigned long)src_adr, 0xFF);
 	TxHeader.IdType = FDCAN_EXTENDED_ID;
@@ -411,21 +403,22 @@ uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr
 	TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
 	TxHeader.MessageMarker = 0;
 
-	//Generierung der Daten zum Senden
-
 	tx_data[0]=((Instance&0x0f) | ((FluidType&0x0f)<<4));
-	//Level berechnen
-	//vd=round((Level/0.004));
-	vd=round((Level*250));
-	vi = (vd>=N2kInt16Min && vd<N2kInt16OR)?(int16_t)vd:N2kInt16OR;
-	convert_n.max_val = vi;
+
+	/* Fuellstand: PGN-Aufloesung 0,004 % -> level_percent100 (0,01 %) * 5 / 2.
+	 * Integer statt float/round(): keine Soft-Float-Lib noetig (M0+ ohne FPU). */
+	lvl = ((int32_t)level_percent100 * 5) / 2;
+	if (lvl >= N2kInt16OR)
+	{
+		lvl = N2kInt16OR;
+	}
+	convert_n.max_val = (uint16_t)(int16_t)lvl;
 	tx_data[1]=convert_n.small_arr[0];
 	tx_data[2]=convert_n.small_arr[1];
 
-	//Capacity berechnen
-	vd=round((Capacity/0.1));
-	vii = (vd>=0 && vd<N2kUInt32OR)?(uint32_t)vd:N2kUInt32OR;
-	convert_m.max_val = vii;
+	/* Kapazitaet: Liter -> 0,1-L-Schritte */
+	capv = (uint32_t)Capacity * 10U;
+	convert_m.max_val = capv;
 	tx_data[3]=convert_m.small_arr[0];
 	tx_data[4]=convert_m.small_arr[1];
 	tx_data[5]=convert_m.small_arr[2];
