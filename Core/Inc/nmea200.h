@@ -79,6 +79,16 @@ extern uint32_t gf_pgn;		/* PGN der empfangenen Fast-Packet-Nachricht (126208 od
 
 uint8_t NMEA2000_SendProprietaryFP(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t dest, uint8_t *payload, uint8_t len);
 
+/* Heartbeat (PGN 126993, alle 60 s) und PGN-Liste (126464, auf ISO Request) */
+uint8_t NMEA2000_SendHeartbeat(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint16_t interval_ms);
+uint8_t NMEA2000_SendPGNList(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr);
+
+/* ISO-Request-Flags (PGN 59904, im RX-Interrupt gesetzt):
+ * fluid_req   -> 127505 sofort senden
+ * pgnlist_req -> 126464 (TX/RX-Listen) senden */
+extern volatile uint8_t fluid_req;
+extern volatile uint8_t pgnlist_req;
+
 unsigned long N2ktoCanID(unsigned char priority, unsigned long PGN, unsigned long Source, unsigned char Destination);
 
 

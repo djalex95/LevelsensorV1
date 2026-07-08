@@ -185,7 +185,9 @@ FDCAN_FilterTypeDef sFilterConfig;
  int16_convert int16_arr;
 
  uint32_t time_el = 0, last_run = 0, last_run_nmea=0;
- uint32_t tx_time = 100, nmea_time = 200;
+ uint32_t tx_time = 100, nmea_time = 2500;	/* PGN 127505: Norm-Intervall 2,5 s */
+ uint32_t last_run_temp = 0, temp_time = 2000;	/* PGN 130312: Norm-Intervall 2 s */
+ uint32_t last_run_hb = 0, hb_time = 60000;	/* PGN 126993 Heartbeat: 60 s */
 
  volatile uint8_t adr_claim = 0;
  volatile uint8_t adr_lost = 0;		/* Adress-Arbitrierung verloren (ISR -> Hauptschleife) */
@@ -344,12 +346,12 @@ int main(void)
 	  DAC_EEPROM_values.dac_mx = 6205;	//alt:12409
   }
     else{
-  	  while(1)
-  	  {
-  		  DAC_EEPROM_values.dac_c = 0;
-  		  DAC_EEPROM_values.dac_mx = 6205;	//alt:12409
-  		  set_volt_raw(EEPROM_result * 16 , &DAC_EEPROM_values);
-  	  }
+  	  /* Unbekannter Wert (z.B. Flash-Korruption): wie "keine Kalibrierung"
+  	   * behandeln und mit Defaults weiterbooten. Vorher: Endlosschleife mit
+  	   * DAC-Debugausgabe -> Geraet startete nie (CAN/BLE tot). */
+  	  DAC_EEPROM_values.calib_availible = 0xFF;
+  	  DAC_EEPROM_values.dac_c = 0;
+  	  DAC_EEPROM_values.dac_mx = 6205;	//alt:12409
     }
 
   if (check_EEPROM())
@@ -396,12 +398,27 @@ int main(void)
 
 
 
+  /* Watchdog (IWDG): LSI/64, Reload 4095 -> ca. 8 s Timeout. Faengt haengende
+   * Zustaende ab (Error_Handler, blockierte Peripherie/Busse) und loest dann
+   * einen Reset aus. Wird in der Hauptschleife aufgefrischt und laeuft nach
+   * dem Start unabschaltbar (Register-Zugriff, kein HAL-IWDG-Modul noetig). */
+  IWDG->KR  = 0x0000CCCCUL;	/* Watchdog starten */
+  IWDG->KR  = 0x00005555UL;	/* Register-Zugriff freigeben */
+  IWDG->PR  = 0x04UL;			/* Prescaler /64 -> ~500 Hz */
+  IWDG->RLR = 4095UL;			/* max. Reload -> ~8,2 s */
+  {	/* warten bis die Register uebernommen sind (mit Timeout) */
+  	uint32_t iwdg_t0 = HAL_GetTick();
+  	while ((IWDG->SR != 0U) && ((HAL_GetTick() - iwdg_t0) < 50U)) {}
+  }
+  IWDG->KR  = 0x0000AAAAUL;	/* Zaehler laden */
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  IWDG->KR = 0x0000AAAAUL;	/* Watchdog fuettern */
 	  time_el = HAL_GetTick();
 
 
@@ -467,7 +484,7 @@ int main(void)
 	  				 //error_mode |= ERROR_TX_CAN;
 	  			 }
 	  			switch (setup_mode) {
-	  				case 1: if (raw_press>0){
+	  				case 1: if (raw_press>=100){	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
 	  							EEPROM_values.max_val = raw_press/100;
 	  							EEPROM_values.calib_availible = 0x00;
 	  							save_EEPROM(&EEPROM_values);
@@ -487,13 +504,34 @@ int main(void)
 
 	  	//Hier Senderoutine einfügen für NMEA2000
 
+	  	/* Sendezyklen nach NMEA2000-Norm: 127505 alle 2,5 s, 130312 alle 2 s,
+	  	 * Heartbeat 126993 alle 60 s. Vorher wurde alles im 200-ms-Takt gesendet
+	  	 * (~12-fache Buslast ohne Nutzen). */
 	  	if(((time_el-last_run_nmea)>=nmea_time) && ((time_el-claim_time)>=250))
 	  	{
 	  		last_run_nmea = time_el;
-
 	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, ((float)percent_val)/100, dev_info_par.cap);
+	  	}
+	  	if(((time_el-last_run_temp)>=temp_time) && ((time_el-claim_time)>=250))
+	  	{
+	  		last_run_temp = time_el;
 	  		NMEA2000_SendTemperature(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, TEMP_SOURCE_NMEA, sensor_data_rx.temp);
-
+	  	}
+	  	if(((time_el-last_run_hb)>=hb_time) && ((time_el-claim_time)>=250))
+	  	{
+	  		last_run_hb = time_el;
+	  		NMEA2000_SendHeartbeat(&hfdcan1, dev_info_par.srcAdr, (uint16_t)hb_time);
+	  	}
+	  	if(fluid_req != 0)	/* ISO Request auf 127505 -> sofort antworten */
+	  	{
+	  		fluid_req = 0;
+	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, ((float)percent_val)/100, dev_info_par.cap);
+	  		last_run_nmea = time_el;
+	  	}
+	  	if(pgnlist_req != 0)	/* ISO Request auf 126464 -> TX/RX-PGN-Listen senden */
+	  	{
+	  		pgnlist_req = 0;
+	  		NMEA2000_SendPGNList(&hfdcan1, dev_info_par.srcAdr);
 	  	}
 	  	if(adr_lost != 0)
 	  	{
@@ -794,7 +832,7 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV1;
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
   hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
-  hfdcan1.Init.AutoRetransmission = DISABLE;
+  hfdcan1.Init.AutoRetransmission = ENABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
   hfdcan1.Init.NominalPrescaler = 4;
@@ -1433,7 +1471,7 @@ void handle_prop_config()
 		/* Wie der Taster-Kalibriermodus: aktuellen Druck als 100 % setzen.
 		 * Nur bei positivem Druck (Sensor plausibel angeschlossen). */
 		uint8_t ok = 0;
-		if (raw_press > 0)
+		if (raw_press >= 100)	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
 		{
 			EEPROM_values.max_val = raw_press / 100;
 			EEPROM_values.calib_availible = 0x00;
@@ -1539,6 +1577,10 @@ void set_volt_raw(uint16_t volt, dac_calib_data * datas)
 uint16_t calc_percent(calib_data *datas, int64_t mw)
 {
 
+	if (datas->max_val == 0)
+	{
+		return 0;	/* Schutz: nie durch 0 teilen (defekte/leere Kalibrierung) */
+	}
 	if(mw > datas->max_val*100)
 	{
 		mw = datas->max_val*100;
@@ -1855,7 +1897,7 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 	}
 	else if (strncasecmp(cmd, "CAL100", 6) == 0)
 	{
-		if (raw_press > 0)
+		if (raw_press >= 100)	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
 		{
 			EEPROM_values.max_val = raw_press / 100;
 			EEPROM_values.calib_availible = 0x00;
