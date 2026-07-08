@@ -174,7 +174,8 @@ FDCAN_FilterTypeDef sFilterConfig;
  uint32_t extID = 0x033;
  uint32_t mask = 0x7FC;
 
- volatile int64_t raw_press = 0;	/* wird auch im EXTI-Callback gelesen */
+ volatile int32_t raw_press = 0;	/* wird auch im EXTI-Callback gelesen;
+									   32 bit -> atomarer Zugriff auf dem M0+ (kein Torn Read) */
 
  //EEprom struct
  calib_data EEPROM_values;
@@ -294,6 +295,12 @@ int main(void)
 	 	 {
 		 	 Error_Handler();
 	 	 }
+
+	 /* Bus-Off-Interrupt aktivieren -> Recovery in HAL_FDCAN_ErrorStatusCallback */
+	 if (HAL_FDCAN_ActivateNotification(&hfdcan1, FDCAN_IT_BUS_OFF, 0) != HAL_OK)
+	 {
+		 Error_Handler();
+	 }
 
 
     /* Prepare Tx message Header */
@@ -430,6 +437,16 @@ int main(void)
 
 	  		error_mode &= ~ERROR_I2C;
 
+	  		/* Bus-Off-Anzeige zuruecknehmen, sobald der Controller wieder auf dem
+	  		 * Bus ist (Recovery wird in HAL_FDCAN_ErrorStatusCallback angestossen) */
+	  		{
+	  			FDCAN_ProtocolStatusTypeDef psr;
+	  			if ((HAL_FDCAN_GetProtocolStatus(&hfdcan1, &psr) == HAL_OK) && (psr.BusOff == 0U))
+	  			{
+	  				error_mode &= ~ERROR_TX_CAN;
+	  			}
+	  		}
+
 	  		sensor_data_rx = get_value();
 
 	  		int_arr.max_val = sensor_data_rx.pressure;
@@ -447,7 +464,7 @@ int main(void)
 	  		/* EMA-Filter: 'wertung'/1000 = Anteil des ALTEN gefilterten Werts.
 	  		 * wertung=50 -> 95 % neuer Messwert, 5 % alter Wert (Verhalten wie bisher,
 	  		 * fuer staerkere Glaettung wertung erhoehen, z.B. 900). */
-	  		raw_press = ((int64_t)sensor_data_rx.pressure * (1000-wertung) + raw_press*wertung)/1000;
+	  		raw_press = (int32_t)(((int64_t)sensor_data_rx.pressure * (1000-wertung) + (int64_t)raw_press*wertung)/1000);
 	  		sensor_data_rx.pressure = (int32_t)raw_press;
 
 	  		int_arr.max_val = (int32_t)raw_press;
@@ -836,9 +853,9 @@ static void MX_FDCAN1_Init(void)
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
   hfdcan1.Init.NominalPrescaler = 4;
-  hfdcan1.Init.NominalSyncJumpWidth = 1;
-  hfdcan1.Init.NominalTimeSeg1 = 12;
-  hfdcan1.Init.NominalTimeSeg2 = 3;
+  hfdcan1.Init.NominalSyncJumpWidth = 4;
+  hfdcan1.Init.NominalTimeSeg1 = 11;
+  hfdcan1.Init.NominalTimeSeg2 = 4;
   hfdcan1.Init.DataPrescaler = 1;
   hfdcan1.Init.DataSyncJumpWidth = 1;
   hfdcan1.Init.DataTimeSeg1 = 1;
@@ -1123,6 +1140,28 @@ void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t Bu
 {
 	try_tx = 0;
 	error_mode &= ~ERROR_TX_CAN;
+}
+
+
+/* Bus-Off (z.B. Kurzschluss oder massive Stoerung auf dem Bus): Fehler-LED
+ * setzen und die Recovery anstossen. Durch Loeschen des INIT-Bits wartet der
+ * FDCAN die vorgeschriebenen 128 x 11 rezessiven Bits ab und nimmt danach
+ * automatisch wieder am Busverkehr teil. Vorher gab es keine Behandlung:
+ * nach einem Bus-Off sendete das Geraet nie wieder. */
+void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef *hfdcan, uint32_t ErrorStatusITs)
+{
+	if (ErrorStatusITs & FDCAN_IT_BUS_OFF)
+	{
+		FDCAN_ProtocolStatusTypeDef psr;
+		if (HAL_FDCAN_GetProtocolStatus(hfdcan, &psr) == HAL_OK)
+		{
+			if (psr.BusOff)
+			{
+				error_mode |= ERROR_TX_CAN;
+				CLEAR_BIT(hfdcan->Instance->CCCR, FDCAN_CCCR_INIT);
+			}
+		}
+	}
 }
 
 
