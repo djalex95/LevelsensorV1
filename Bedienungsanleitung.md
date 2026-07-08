@@ -87,6 +87,15 @@ Wird das Update unterbrochen (Abbruch, Stromausfall), bleibt der Sensor sicher
 im Bootloader (weißes Blinken) und das Update kann einfach erneut gestartet
 werden. Deine Kalibrierung und Einstellungen bleiben dabei erhalten.
 
+### Notfall-Update (erzwungener Bootloader)
+
+Sollte einmal eine Firmware laufen, die sich nicht mehr normal aktualisieren
+lässt, kannst du den Bootloader **erzwingen**: Sensor stromlos machen, den
+**Taster gedrückt halten** und dabei die Stromversorgung einschalten. Der Sensor
+bleibt dann im Bootloader (weißes Blinken) und ist per App aktualisierbar –
+auch wenn eine (unbrauchbare) App installiert ist. Nichts wird dabei gelöscht;
+lässt du den Taster los und startest neu, läuft die alte Firmware normal weiter.
+
 ## 7. Kurzreferenz
 
 | Ich möchte … | So geht's |
@@ -97,3 +106,4 @@ werden. Deine Kalibrierung und Einstellungen bleiben dabei erhalten.
 | Fluidtyp/Kapazität setzen | PC-Tool oder App |
 | Unregelmäßigen Tank einmessen | App → Tankform-Assistent |
 | Firmware aktualisieren | App → Firmware-Update |
+| Notfall-Update erzwingen | Taster halten **beim Einschalten** |
