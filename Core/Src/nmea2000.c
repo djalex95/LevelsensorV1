@@ -1,11 +1,11 @@
 /*
- * nmea200.c
+ * nmea2000.c
  *
  *  Created on: May 22, 2024
  *      Author: a_hae
  */
 
-#include "nmea200.h"
+#include "nmea2000.h"
 #include "main.h"		/* fuer Error_Handler() */
 #include "version.h"	/* zentrale Firmware-Version */
 
@@ -49,6 +49,11 @@ static uint8_t gf_frame_next = 0xFF;	/* 0xFF = keine Reassembly aktiv */
 static uint8_t gf_pos = 0;
 static uint8_t gf_total = 0;
 static uint32_t gf_rx_pgn = 0;
+
+/* ISO-Request-Flags (PGN 59904): im RX-Interrupt gesetzt, in der
+ * Hauptschleife abgearbeitet (gleiches Muster wie adr_claim/prod_info). */
+volatile uint8_t fluid_req = 0;
+volatile uint8_t pgnlist_req = 0;
 
 /* Verarbeitet einen Fast-Packet-Frame (PGN 126208/126720, ISR-Kontext, leichtgewichtig).
  * Frame 0: [SeqZaehler, Gesamtlaenge, 6 Datenbytes], Folgeframes: [Zaehler, 7 Datenbytes] */
@@ -99,6 +104,25 @@ static void gf_feed(uint32_t pgn, uint8_t src, uint8_t *frame)
 		gf_pgn = gf_rx_pgn;
 		gf_ready = 1;
 		gf_frame_next = 0xFF;
+	}
+}
+
+/* Wertet einen ISO Request (PGN 59904) aus: die angefragte PGN steht als
+ * 3 Bytes (LE) im Datenfeld. Setzt nur Flags - gesendet wird in der
+ * Hauptschleife. Wird fuer gerichtete Requests (RX-FIFO0) und
+ * Broadcast-Requests an 0xFF (RX-FIFO1) gleichermassen genutzt. */
+static void handle_iso_request(const uint8_t *d)
+{
+	uint32_t req_pgn = (uint32_t)d[0] | ((uint32_t)d[1] << 8) | ((uint32_t)d[2] << 16);
+
+	switch (req_pgn)
+	{
+	case 60928:  adr_claim++;   break;	/* ISO Address Claim */
+	case 126996: prod_info++;   break;	/* Product Information */
+	case 126998: dev_info++;    break;	/* Configuration Information */
+	case 127505: fluid_req++;   break;	/* Fluid Level */
+	case 126464: pgnlist_req++; break;	/* TX/RX-PGN-Liste */
+	default:     break;
 	}
 }
 
@@ -208,10 +232,13 @@ uint8_t NMEA2000_setPInfo(FDCAN_HandleTypeDef *can_handle, NMEA_parameter_Produc
 	memcpy(can_msg+37, p_parameter->SwCode,32);
 	memcpy(can_msg+69, p_parameter->ModelVersion,32);
 	memcpy(can_msg+101, p_parameter->ModelSerialCode,32);
-	can_msg[133] = 0x30;
-	can_msg[134] = 0x30;
-	can_msg[135] = 0x30;
-	can_msg[136] = 0x31;
+	/* Payload-Bytes 132/133: Certification Level und Load Equivalency (LEN).
+	 * Vorher wurden ASCII-Zeichen gesendet ('0' = 48) -> Plotter zeigten
+	 * LEN 48 = 2,4 A Strombedarf an. 0xFF = "nicht verfuegbar" (Geraet ist
+	 * nicht zertifiziert); LEN 2 = 2 x 50 mA = 100 mA - bei geaenderter
+	 * Hardware anpassen. Bytes dahinter bleiben 0xFF (Fast-Packet-Padding). */
+	can_msg[133] = 0xFF;	/* Certification Level: nicht verfuegbar */
+	can_msg[134] = 2;		/* Load Equivalency Number (LEN, 1 = 50 mA) */
 
 
 
@@ -354,25 +381,17 @@ uint8_t NMEA2000_AdrClaim(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, unsi
 	return 1;
 }
 
-uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t FluidType, float Level, uint8_t Capacity)
+uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t FluidType, uint16_t level_percent100, uint8_t Capacity)
 {
 	uint8_t tx_data[8];
 	uint32_t PGN = 127505;
 	uint8_t Priority = 6;
-	double vd = 0;
-	int16_t vi = 0;
-	int32_t vii = 0;
+	int32_t lvl;
+	uint32_t capv;
 	nmea_int16_convert convert_n;
 	nmea_int32_convert convert_m;
 
 	FDCAN_TxHeaderTypeDef TxHeader;
-
-
-
-
-	//Generierung der ID
-
-
 
 	TxHeader.Identifier = (uint32_t)N2ktoCanID( (unsigned char)Priority, (unsigned long) PGN, (unsigned long)src_adr, 0xFF);
 	TxHeader.IdType = FDCAN_EXTENDED_ID;
@@ -384,21 +403,22 @@ uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr
 	TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
 	TxHeader.MessageMarker = 0;
 
-	//Generierung der Daten zum Senden
-
 	tx_data[0]=((Instance&0x0f) | ((FluidType&0x0f)<<4));
-	//Level berechnen
-	//vd=round((Level/0.004));
-	vd=round((Level*250));
-	vi = (vd>=N2kInt16Min && vd<N2kInt16OR)?(int16_t)vd:N2kInt16OR;
-	convert_n.max_val = vi;
+
+	/* Fuellstand: PGN-Aufloesung 0,004 % -> level_percent100 (0,01 %) * 5 / 2.
+	 * Integer statt float/round(): keine Soft-Float-Lib noetig (M0+ ohne FPU). */
+	lvl = ((int32_t)level_percent100 * 5) / 2;
+	if (lvl >= N2kInt16OR)
+	{
+		lvl = N2kInt16OR;
+	}
+	convert_n.max_val = (uint16_t)(int16_t)lvl;
 	tx_data[1]=convert_n.small_arr[0];
 	tx_data[2]=convert_n.small_arr[1];
 
-	//Capacity berechnen
-	vd=round((Capacity/0.1));
-	vii = (vd>=0 && vd<N2kUInt32OR)?(uint32_t)vd:N2kUInt32OR;
-	convert_m.max_val = vii;
+	/* Kapazitaet: Liter -> 0,1-L-Schritte */
+	capv = (uint32_t)Capacity * 10U;
+	convert_m.max_val = capv;
 	tx_data[3]=convert_m.small_arr[0];
 	tx_data[4]=convert_m.small_arr[1];
 	tx_data[5]=convert_m.small_arr[2];
@@ -652,6 +672,147 @@ uint8_t NMEA2000_SendProprietaryFP(FDCAN_HandleTypeDef *can_handle, uint8_t src_
 	return 1;
 }
 
+/*
+ * Sendet PGN 126993 (Heartbeat). Norm: alle 60 s, Prioritaet 7. Viele MFDs
+ * nutzen den Heartbeat, um zu erkennen, dass ein Geraet noch am Bus ist.
+ * interval_ms: gemeldetes Sendeintervall in Millisekunden.
+ */
+uint8_t NMEA2000_SendHeartbeat(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint16_t interval_ms)
+{
+	static uint8_t seq = 0;
+	uint8_t tx_data[8];
+	uint32_t PGN = 126993;
+	uint8_t Priority = 7;
+
+	FDCAN_TxHeaderTypeDef TxHeader;
+
+	TxHeader.Identifier = (uint32_t)N2ktoCanID( (unsigned char)Priority, (unsigned long) PGN, (unsigned long)src_adr, 0xFF);
+	TxHeader.IdType = FDCAN_EXTENDED_ID;
+	TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+	TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+	TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+	TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+	TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+	TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+	TxHeader.MessageMarker = 0;
+
+	tx_data[0] = (uint8_t)(interval_ms & 0xFF);			/* Intervall (uint16 LE, ms) */
+	tx_data[1] = (uint8_t)((interval_ms >> 8) & 0xFF);
+	tx_data[2] = seq;									/* Sequenzzaehler 0..252 */
+	tx_data[3] = 0xFF;									/* Controller-/Equipment-Status: n/a */
+	tx_data[4] = 0xFF;
+	tx_data[5] = 0xFF;
+	tx_data[6] = 0xFF;
+	tx_data[7] = 0xFF;
+
+	seq = (uint8_t)((seq >= 252) ? 0 : (seq + 1));
+
+	if (HAL_FDCAN_AddMessageToTxFifoQ(can_handle, &TxHeader, tx_data) != HAL_OK)
+	{
+		return 0;
+	}
+	if (wait_tx_fifo_free(can_handle) == 0)
+	{
+		return 0;
+	}
+
+	return 1;
+}
+
+/* Generischer Fast-Packet-Sender: Frame 0 = [Zaehler, Gesamtlaenge, 6 Bytes],
+ * Folgeframes = [Zaehler, 7 Bytes], Rest mit 0xFF aufgefuellt. */
+static uint8_t fp_send(FDCAN_HandleTypeDef *can_handle, uint32_t PGN, uint8_t Priority, uint8_t src_adr, uint8_t dest, const uint8_t *payload, uint8_t len)
+{
+	uint8_t tx_msg[8];
+
+	FDCAN_TxHeaderTypeDef TxHeader;
+
+	TxHeader.Identifier = (uint32_t)N2ktoCanID( (unsigned char)Priority, (unsigned long) PGN, (unsigned long)src_adr, dest);
+	TxHeader.IdType = FDCAN_EXTENDED_ID;
+	TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+	TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+	TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+	TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+	TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
+	TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
+	TxHeader.MessageMarker = 0;
+
+	uint8_t nframes = 1;
+	if (len > 6)
+	{
+		nframes += (uint8_t)((len - 6 + 6) / 7);
+	}
+
+	for (uint8_t var = 0; var < nframes; ++var) {
+		memset(tx_msg, 0xFF, sizeof(tx_msg));
+		tx_msg[0] = var;
+		if (var == 0)
+		{
+			tx_msg[1] = len;
+			uint8_t chunk0 = (len < 6) ? len : 6;
+			memcpy(tx_msg + 2, payload, chunk0);
+		}
+		else
+		{
+			uint8_t off = (uint8_t)(6 + (var - 1) * 7);
+			uint8_t chunk = 7;
+			if ((uint8_t)(off + chunk) > len)
+			{
+				chunk = len - off;
+			}
+			memcpy(tx_msg + 1, payload + off, chunk);
+		}
+
+		if (HAL_FDCAN_AddMessageToTxFifoQ(can_handle, &TxHeader, tx_msg) != HAL_OK)
+		{
+			return 0;
+		}
+		if (wait_tx_fifo_free(can_handle) == 0)
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
+
+/*
+ * Sendet PGN 126464 (PGN-Liste) als Antwort auf einen ISO Request:
+ * erst die Liste der gesendeten PGNs (Funktionscode 0), dann die der
+ * empfangenen (Funktionscode 1). Antwort als Broadcast (Fast Packet).
+ */
+uint8_t NMEA2000_SendPGNList(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr)
+{
+	static const uint32_t tx_pgns[] = {60928, 126208, 126464, 126720, 126993, 126996, 126998, 127505, 130312};
+	static const uint32_t rx_pgns[] = {59904, 60928, 126208, 126720};
+	uint8_t payload[1 + 9 * 3];
+	uint8_t len;
+
+	/* Funktionscode 0: Transmit-PGN-Liste */
+	payload[0] = 0;
+	for (uint8_t i = 0; i < 9; i++)
+	{
+		payload[1 + i*3]     = (uint8_t)(tx_pgns[i] & 0xFF);
+		payload[1 + i*3 + 1] = (uint8_t)((tx_pgns[i] >> 8) & 0xFF);
+		payload[1 + i*3 + 2] = (uint8_t)((tx_pgns[i] >> 16) & 0xFF);
+	}
+	len = 1 + 9 * 3;
+	if (fp_send(can_handle, 126464, 6, src_adr, 0xFF, payload, len) == 0)
+	{
+		return 0;
+	}
+
+	/* Funktionscode 1: Receive-PGN-Liste */
+	payload[0] = 1;
+	for (uint8_t i = 0; i < 4; i++)
+	{
+		payload[1 + i*3]     = (uint8_t)(rx_pgns[i] & 0xFF);
+		payload[1 + i*3 + 1] = (uint8_t)((rx_pgns[i] >> 8) & 0xFF);
+		payload[1 + i*3 + 2] = (uint8_t)((rx_pgns[i] >> 16) & 0xFF);
+	}
+	len = 1 + 4 * 3;
+	return fp_send(can_handle, 126464, 6, src_adr, 0xFF, payload, len);
+}
+
 /* Wechselt die eigene Quelladresse: FDCAN stoppen, RX-Filter auf die neue
  * Adresse umkonfigurieren, wieder starten. */
 uint8_t NMEA2000_change_address(FDCAN_HandleTypeDef *can_handle, uint8_t new_adr)
@@ -686,91 +847,68 @@ unsigned long N2ktoCanID(unsigned char priority, unsigned long PGN, unsigned lon
 
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
+	if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
+	{
+		/* Frames an die eigene Adresse. Bei RX-Fehler: Frame verwerfen -
+		 * vorher lief hier Error_Handler() und das Geraet blieb dauerhaft
+		 * haengen (waere nur per Stromtrennung/IWDG zu retten). */
+		if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &RxHeader0, RxData0) != HAL_OK)
+		{
+			return;
+		}
 
-	const uint8_t req_pInfo[] = {0x14, 0xF0, 0x01};
-	const uint8_t req_dInfo[] = {0x16, 0xF0, 0x01};
-	const uint8_t adr_req[]   = {0x00, 0xEE, 0x00};
+		uint32_t pgn = canid_to_pgn(RxHeader0.Identifier);
 
-		if((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) != 0)
-		  {
-			/* Retrieve Rx messages from RX FIFO0 (Frames an die eigene Adresse) */
-			if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &RxHeader0, RxData0) != HAL_OK)
-			{
-			  Error_Handler();
-			}
-
-			else
-			{
-				uint32_t pgn = canid_to_pgn(RxHeader0.Identifier);
-
-				if(pgn == 59904)		/* ISO Request */
-				{
-					if(memcmp(RxData0, req_pInfo, 3) == 0)
-					{
-						prod_info++;
-					}
-
-					if(memcmp(RxData0, req_dInfo, 3) == 0)
-					{
-						dev_info++;
-					}
-
-					if(memcmp(RxData0, adr_req, 3) == 0)	/* gezielter Request fuer Address Claim */
-					{
-						adr_claim++;
-					}
-				}
-				else if((pgn == 126208) || (pgn == 126720))	/* Group Function / Proprietary (Fast Packet) */
-				{
-					gf_feed(pgn, (uint8_t)(RxHeader0.Identifier & 0xFF), RxData0);
-				}
-
-			}
-		  }
-
+		if(pgn == 59904)		/* ISO Request (gerichtet an uns) */
+		{
+			handle_iso_request(RxData0);
+		}
+		else if((pgn == 126208) || (pgn == 126720))	/* Group Function / Proprietary (Fast Packet) */
+		{
+			gf_feed(pgn, (uint8_t)(RxHeader0.Identifier & 0xFF), RxData0);
+		}
+	}
 }
 
 void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 {
-	const uint8_t adr_req[] = {0x00, 0xEE, 0x00};
-
 	if((RxFifo1ITs & FDCAN_IT_RX_FIFO1_NEW_MESSAGE) != 0)
-	  {
-		/* Retrieve Rx messages from RX FIFO1 (Broadcast-Frames) */
+	{
+		/* Broadcast-Frames. Bei RX-Fehler: Frame verwerfen (kein Error_Handler,
+		 * siehe RxFifo0Callback). */
 		if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO1, &RxHeader, RxData) != HAL_OK)
 		{
-		  Error_Handler();
+			return;
 		}
 
-		else
+		uint32_t pgn = canid_to_pgn(RxHeader.Identifier);
+		uint8_t rx_src = (uint8_t)(RxHeader.Identifier & 0xFF);
+
+		if((pgn == 60928) && (rx_src == dev_info_par.srcAdr))
 		{
-			uint32_t pgn = canid_to_pgn(RxHeader.Identifier);
-			uint8_t rx_src = (uint8_t)(RxHeader.Identifier & 0xFF);
-
-			if((pgn == 60928) && (rx_src == dev_info_par.srcAdr))
+			/* Adresskonflikt: fremder Claim auf unserer Adresse.
+			 * NAME-Vergleich nach ISO 11783-5: der NIEDRIGERE NAME gewinnt. */
+			uint64_t rx_name = 0;
+			for (int i = 7; i >= 0; i--)
 			{
-				/* Adresskonflikt: fremder Claim auf unserer Adresse.
-				 * NAME-Vergleich nach ISO 11783-5: der NIEDRIGERE NAME gewinnt. */
-				uint64_t rx_name = 0;
-				for (int i = 7; i >= 0; i--)
-				{
-					rx_name = (rx_name << 8) | RxData[i];
-				}
-
-				if (build_own_name() < rx_name)
-				{
-					adr_claim++;	/* gewonnen: eigenen Claim wiederholen */
-				}
-				else
-				{
-					adr_lost++;		/* verloren: Hauptschleife weicht auf neue Adresse aus */
-				}
-			}
-			else if((pgn == 59904) && (memcmp(RxData, adr_req, 3) == 0))
-			{
-				adr_claim++;		/* Broadcast-Request fuer Address Claim */
+				rx_name = (rx_name << 8) | RxData[i];
 			}
 
+			if (build_own_name() < rx_name)
+			{
+				adr_claim++;	/* gewonnen: eigenen Claim wiederholen */
+			}
+			else
+			{
+				adr_lost++;		/* verloren: Hauptschleife weicht auf neue Adresse aus */
+			}
 		}
-	  }
+		else if(pgn == 59904)
+		{
+			/* Broadcast-ISO-Request (an 0xFF): jetzt fuer alle unterstuetzten
+			 * PGNs beantwortet - vorher nur Address Claim, d.h. Broadcast-
+			 * Requests auf Product Info etc. blieben unbeantwortet. */
+			handle_iso_request(RxData);
+		}
+	}
 }

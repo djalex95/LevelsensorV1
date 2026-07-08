@@ -31,8 +31,7 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "ee.h"
-#include "nmea200.h"
+#include "nmea2000.h"
 #include "ble.h"
 /* USER CODE END Includes */
 

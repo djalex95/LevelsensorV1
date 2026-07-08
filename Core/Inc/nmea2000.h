@@ -1,15 +1,14 @@
 /*
- * nmea200.h
+ * nmea2000.h
  *
  *  Created on: May 22, 2024
  *      Author: a_hae
  */
 
-#ifndef INC_NMEA200_H_
-#define INC_NMEA200_H_
+#ifndef INC_NMEA2000_H_
+#define INC_NMEA2000_H_
 
 #include "stm32g0xx_hal.h"
-#include <math.h>
 #include <string.h>
 
 #define N2kInt8OR 0x7e
@@ -62,7 +61,8 @@ uint8_t NMEA2000_AdrClaim(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, unsi
         );
 uint8_t NMEA2000_config(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr);
 uint8_t NMEA2000_change_address(FDCAN_HandleTypeDef *can_handle, uint8_t new_adr);
-uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t FluidType, float Level, uint8_t Capacity);
+/* level_percent100: Fuellstand in 0,01-%-Schritten (10000 = 100,00 %) */
+uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t FluidType, uint16_t level_percent100, uint8_t Capacity);
 uint8_t NMEA2000_SendTemperature(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t Source, int16_t temp_centi_deg);
 uint8_t NMEA2000_SendLabel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr);
 uint8_t NMEA2000_SendGFAck(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t dest, uint32_t target_pgn, uint8_t pgn_err, uint8_t *param_errs, uint8_t n_params);
@@ -79,8 +79,18 @@ extern uint32_t gf_pgn;		/* PGN der empfangenen Fast-Packet-Nachricht (126208 od
 
 uint8_t NMEA2000_SendProprietaryFP(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t dest, uint8_t *payload, uint8_t len);
 
+/* Heartbeat (PGN 126993, alle 60 s) und PGN-Liste (126464, auf ISO Request) */
+uint8_t NMEA2000_SendHeartbeat(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint16_t interval_ms);
+uint8_t NMEA2000_SendPGNList(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr);
+
+/* ISO-Request-Flags (PGN 59904, im RX-Interrupt gesetzt):
+ * fluid_req   -> 127505 sofort senden
+ * pgnlist_req -> 126464 (TX/RX-Listen) senden */
+extern volatile uint8_t fluid_req;
+extern volatile uint8_t pgnlist_req;
+
 unsigned long N2ktoCanID(unsigned char priority, unsigned long PGN, unsigned long Source, unsigned char Destination);
 
 
 
-#endif /* INC_NMEA200_H_ */
+#endif /* INC_NMEA2000_H_ */

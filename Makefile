@@ -10,8 +10,9 @@
 TARGET    = CAN_FuellstandsensorBLE
 BUILD_DIR = build
 
-# Optimierung: -O0 entspricht dem getesteten CubeIDE-Debug-Build.
-OPT ?= -O0
+# Optimierung: -Og = optimiert, aber debugfreundlich. Fuer den alten
+# ungetesteten Debug-Stand: make OPT=-O0
+OPT ?= -Og
 DEBUG ?= 1
 
 ######################################
