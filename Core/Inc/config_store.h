@@ -6,7 +6,7 @@
  * bleibt gueltig, bis die neue vollstaendig und pruefsummenkorrekt im Flash
  * steht.
  *
- * Layout des 32-Byte-Config-Blocks (cfg_data, kompatibel zum Altformat):
+ * Layout des 64-Byte-Config-Blocks (cfg_data, Layout-Version 2):
  *   0      Kalibrierung vorhanden (0xFF = nein)
  *   1..4   max_val (uint32 LE)
  *   5..7   frei
@@ -17,6 +17,16 @@
  *   19..29 11 Linearisierungs-Stuetzstellen
  *   30     NMEA2000-Quelladresse
  *   31     Geraete-/Tank-Instanz
+ *   32     Layout-Version (2)
+ *   33..56 Sensorname (24 Byte, 0x00-terminiert/-gepolstert; 0xFF = nie gesetzt)
+ *   57..63 frei (0xFF)
+ *
+ * Bytes 0..31 sind identisch zum alten 32-Byte-Format (Layout-Version 1).
+ * Beim ersten Boot nach einem Update migriert config_load() einen
+ * vorhandenen v1-Datensatz automatisch - Kalibrierung, Tankform, Adresse
+ * usw. bleiben erhalten. Der alte Datensatz bleibt bis zum naechsten Save
+ * als Backup in seiner Page liegen. (Achtung: Einbahnstrasse - eine aeltere
+ * Firmware kann das v2-Format nicht lesen.)
  */
 
 #ifndef INC_CONFIG_STORE_H_
@@ -24,13 +34,18 @@
 
 #include <stdint.h>
 
-#define CFG_SIZE 32
+#define CFG_SIZE      64
+#define CFG_VER_OFF   32          /* Layout-Versionsbyte                    */
+#define CFG_LAYOUT_V  2
+#define CFG_NAME_OFF  33          /* Sensorname (Installation Description)  */
+#define CFG_NAME_LEN  24
 
 /* RAM-Cache der Konfiguration; Aenderungen hier eintragen, dann config_save() */
 extern uint8_t cfg_data[CFG_SIZE];
 
-/* Beim Boot aufrufen: laedt den neuesten gueltigen Datensatz (oder migriert
- * das Altformat aus Page 63). Rueckgabe 0 = nichts gefunden, cfg_data = 0xFF. */
+/* Beim Boot aufrufen: laedt den neuesten gueltigen Datensatz. Erkennt und
+ * migriert automatisch das v1-Format (32 Byte) sowie das Ur-Altformat aus
+ * Page 63. Rueckgabe 0 = nichts gefunden, cfg_data = 0xFF. */
 uint8_t config_load(void);
 
 /* Schreibt cfg_data als neuen Datensatz in die jeweils andere Page.
