@@ -151,6 +151,8 @@ static uint64_t build_own_name(void)
 	return name;
 }
 
+static uint8_t fp_send(FDCAN_HandleTypeDef *can_handle, uint32_t PGN, uint8_t Priority, uint8_t src_adr, uint8_t dest, const uint8_t *payload, uint8_t len);
+
 /* Wartet mit Timeout, bis die TX-FIFO leer ist (3 freie Plaetze).
  * Verhindert Endlos-Haenger bei Bus-Off / fehlendem ACK. */
 static uint8_t wait_tx_fifo_free(FDCAN_HandleTypeDef *can_handle)
@@ -257,45 +259,48 @@ uint8_t NMEA2000_setPInfo(FDCAN_HandleTypeDef *can_handle, NMEA_parameter_Produc
 	}
 	return 1;
 }
-uint8_t NMEA2000_setDevInfo(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr)
+uint8_t NMEA2000_setDevInfo(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, const char *inst_desc1)
 {
+	/*
+	 * PGN 126998 (Configuration Information), Fast Packet. Drei variable
+	 * Strings, jeweils [Laenge n+2][0x01 = ASCII][n Zeichen]:
+	 *   1) Installation Description 1 - Sensorname (per BLE "NAME ..." oder
+	 *      per Group Function vom Plotter gesetzt; Anzeige in der
+	 *      Geraeteliste vieler MFDs)
+	 *   2) Installation Description 2 - leer
+	 *   3) Manufacturer Information
+	 * Vorher wurde hier nur ein einzelner Roh-String gesendet.
+	 */
+	uint8_t payload[64];
+	uint8_t pos = 0;
+	static const char mfr[] = "DIY NMEA2000 Lib";
+	uint8_t n = 0;
 
-	uint8_t can_msg[70] = {[0 ... 69] = 0xFF};
-	uint8_t tx_msg[8];
-
-	uint32_t PGN = 126998;
-	uint8_t Priority = 6;
-
-
-	FDCAN_TxHeaderTypeDef TxHeader;
-
-	TxHeader.Identifier = (uint32_t)N2ktoCanID( (unsigned char)Priority, (unsigned long) PGN, (unsigned long)src_adr, 0xFF);
-	TxHeader.IdType = FDCAN_EXTENDED_ID;
-	TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-	TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-	TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-	TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-	TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
-	TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-	TxHeader.MessageMarker = 0;
-
-	strcpy(can_msg, "DIY NMEA2000 Lib");
-
-	for (uint8_t var = 0; var < 10; ++var) {
-		tx_msg[0] = var;
-		memcpy(tx_msg + 1, can_msg + (var*7), 7);
-
-		if (HAL_FDCAN_AddMessageToTxFifoQ(can_handle, &TxHeader, tx_msg) != HAL_OK)
+	if (inst_desc1 != NULL)
+	{
+		while ((inst_desc1[n] != '\0') && (n < 32))
 		{
-			return 0;
-		}
-		if (wait_tx_fifo_free(can_handle) == 0)
-		{
-			return 0;
+			n++;
 		}
 	}
+	payload[pos++] = (uint8_t)(n + 2);
+	payload[pos++] = 0x01;
+	if (n > 0)
+	{
+		memcpy(&payload[pos], inst_desc1, n);
+		pos += n;
+	}
 
-	return 1;
+	payload[pos++] = 2;			/* Installation Description 2: leer */
+	payload[pos++] = 0x01;
+
+	n = (uint8_t)(sizeof(mfr) - 1);
+	payload[pos++] = (uint8_t)(n + 2);
+	payload[pos++] = 0x01;
+	memcpy(&payload[pos], mfr, n);
+	pos += n;
+
+	return fp_send(can_handle, 126998, 6, src_adr, 0xFF, payload, pos);
 }
 
 uint8_t NMEA2000_config(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr)
@@ -481,46 +486,6 @@ uint8_t NMEA2000_SendTemperature(FDCAN_HandleTypeDef *can_handle, uint8_t src_ad
 	if (wait_tx_fifo_free(can_handle) == 0)
 	{
 		return 0;
-	}
-
-	return 1;
-}
-
-uint8_t NMEA2000_SendLabel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr)
-{
-	uint8_t can_msg[70] = {[0 ... 69] = 0xFF};
-	uint8_t tx_msg[8];
-
-	uint32_t PGN = 130060;
-	uint8_t Priority = 6;
-
-
-	FDCAN_TxHeaderTypeDef TxHeader;
-
-	TxHeader.Identifier = (uint32_t)N2ktoCanID( (unsigned char)Priority, (unsigned long) PGN, (unsigned long)src_adr, 0xFF);
-	TxHeader.IdType = FDCAN_EXTENDED_ID;
-	TxHeader.TxFrameType = FDCAN_DATA_FRAME;
-	TxHeader.DataLength = FDCAN_DLC_BYTES_8;
-	TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
-	TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
-	TxHeader.FDFormat = FDCAN_CLASSIC_CAN;
-	TxHeader.TxEventFifoControl = FDCAN_NO_TX_EVENTS;
-	TxHeader.MessageMarker = 0;
-
-	strcpy(can_msg, "TestSens");
-
-	for (uint8_t var = 0; var < 5; ++var) {
-		tx_msg[0] = var;
-		memcpy(tx_msg + 1, can_msg + (var*7), 7);
-
-		if (HAL_FDCAN_AddMessageToTxFifoQ(can_handle, &TxHeader, tx_msg) != HAL_OK)
-		{
-			return 0;
-		}
-		if (wait_tx_fifo_free(can_handle) == 0)
-		{
-			return 0;
-		}
 	}
 
 	return 1;

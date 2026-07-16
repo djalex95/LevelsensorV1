@@ -54,7 +54,9 @@ typedef struct
 uint8_t init_p_struct(NMEA_parameter_Product *p_info_struct);
 
 uint8_t NMEA2000_setPInfo(FDCAN_HandleTypeDef *can_handle, NMEA_parameter_Product *p_parameter, uint8_t src_adr);
-uint8_t NMEA2000_setDevInfo(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr);
+/* PGN 126998 (Configuration Information): Installation Description 1 =
+ * Sensorname (frei vergebener Text, darf NULL/leer sein). */
+uint8_t NMEA2000_setDevInfo(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, const char *inst_desc1);
 uint8_t NMEA2000_AdrClaim(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, unsigned long UniqueNumber, int ManufacturerCode,
         unsigned char DeviceFunction, unsigned char DeviceClass,
         unsigned char DeviceInstance, unsigned char SystemInstance, unsigned char IndustryGroup
@@ -64,13 +66,14 @@ uint8_t NMEA2000_change_address(FDCAN_HandleTypeDef *can_handle, uint8_t new_adr
 /* level_percent100: Fuellstand in 0,01-%-Schritten (10000 = 100,00 %) */
 uint8_t NMEA2000_SendFluidLevel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t FluidType, uint16_t level_percent100, uint8_t Capacity);
 uint8_t NMEA2000_SendTemperature(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t Instance, uint8_t Source, int16_t temp_centi_deg);
-uint8_t NMEA2000_SendLabel(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr);
 uint8_t NMEA2000_SendGFAck(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr, uint8_t dest, uint32_t target_pgn, uint8_t pgn_err, uint8_t *param_errs, uint8_t n_params);
 
 /* Empfangspuffer fuer PGN 126208 (Group Function, Fast Packet).
  * Wird im RX-Interrupt gefuellt; gf_ready signalisiert der Hauptschleife
  * eine vollstaendig empfangene Group Function. */
-#define GF_BUF_SIZE 24
+/* 48 statt 24: ein Kommando mit Installation Description (bis 24 Zeichen
+ * Name + Header) braucht mehr Platz als die bisherigen Zahlen-Kommandos. */
+#define GF_BUF_SIZE 48
 extern uint8_t gf_buf[GF_BUF_SIZE];
 extern volatile uint8_t gf_ready;
 extern uint8_t gf_src;

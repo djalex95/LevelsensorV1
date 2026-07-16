@@ -82,6 +82,12 @@ ERR ?             unbekanntes Kommando
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 
+**Hinweis zu `NAME`:** Der Name wird zusätzlich persistent im Sensor
+gespeichert und als *Installation Description 1* in PGN 126998
+(Configuration Information) auf dem NMEA2000-Bus gemeldet – er erscheint
+damit auch in der Geräteliste des Plotters und kann von dort per
+Group Function (126208 → 126998, Feld 1) geändert werden.
+
 Der Modulname wird über den Proteus-Befehl `CMD_SET_REQ` (Settings-Index 2,
 `RF_DeviceName`) im Modul-Flash gespeichert und bleibt nach einem Neustart
 erhalten. Nach `NAME …` muss neu verbunden werden.

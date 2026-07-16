@@ -121,6 +121,8 @@ void get_dac_EEPROM(dac_calib_data *values);
 void set_param_eeprom(NMEA_parameter_Device *nmea_param, prod_param *values);
 void get_param_eeprom(NMEA_parameter_Device *nmea_param, prod_param *values);
 uint8_t get_adr_eeprom();
+void get_name_eeprom(char *buf);
+void set_name_eeprom(const char *name);
 void set_adr_eeprom(uint8_t adr);
 void handle_group_function();
 void handle_prop_config();
@@ -190,6 +192,10 @@ uint32_t time_el = 0, last_run = 0, last_run_nmea=0;
 sensor_mess sensor_data_rx;
 
 NMEA_parameter_Product p_info;
+
+/* Sensorname (Installation Description 1 in PGN 126998); aus dem Config
+ * geladen, per BLE "NAME ..." oder Group Function vom Plotter aenderbar. */
+char sensor_name[CFG_NAME_LEN + 1] = "";
 
 NMEA_parameter_Device dev_info_par;
 
@@ -314,6 +320,7 @@ int main(void)
   }
 
   get_param_eeprom(&dev_info_par, &device_param);
+  get_name_eeprom(sensor_name);
 
 
   init_Sensor();
@@ -484,7 +491,7 @@ int main(void)
 	  	if(dev_info != 0)
 	  	{
 	  		dev_info = 0;
-	  		NMEA2000_setDevInfo(&hfdcan1, dev_info_par.srcAdr);
+	  		NMEA2000_setDevInfo(&hfdcan1, dev_info_par.srcAdr, sensor_name);
 	  	}
 
 	  	if(gf_ready != 0)
@@ -647,6 +654,39 @@ int main(void)
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
+}
+
+
+/* Sensorname aus dem Config lesen (Bytes 33..56): 0x00-terminiert,
+ * 0xFF = nie gesetzt -> leerer String. buf braucht CFG_NAME_LEN+1 Bytes. */
+void get_name_eeprom(char *buf)
+{
+	uint8_t i;
+	for (i = 0; i < CFG_NAME_LEN; i++)
+	{
+		uint8_t c = cfg_data[CFG_NAME_OFF + i];
+		if ((c == 0x00) || (c == 0xFF))
+		{
+			break;
+		}
+		buf[i] = (char)c;
+	}
+	buf[i] = '\0';
+}
+
+/* Sensorname persistent speichern (auf CFG_NAME_LEN gekuerzt). */
+void set_name_eeprom(const char *name)
+{
+	uint8_t i;
+	for (i = 0; (i < CFG_NAME_LEN) && (name[i] != '\0'); i++)
+	{
+		cfg_data[CFG_NAME_OFF + i] = (uint8_t)name[i];
+	}
+	for (; i < CFG_NAME_LEN; i++)
+	{
+		cfg_data[CFG_NAME_OFF + i] = 0x00;
+	}
+	config_save();
 }
 
 /**
@@ -1224,6 +1264,58 @@ void handle_group_function()
 {
 	uint8_t fn = gf_buf[0];
 	uint32_t target_pgn = gf_buf[1] | ((uint32_t)gf_buf[2] << 8) | ((uint32_t)gf_buf[3] << 16);
+
+	if (target_pgn == 126998)
+	{
+		/* Configuration Information: Feld 1 = Installation Description 1
+		 * (variabler String [Laenge n+2][0x01][n Zeichen]) -> Sensorname.
+		 * So koennen auch Plotter den Namen setzen. */
+		if (fn == 0)
+		{
+			dev_info++;		/* Request: 126998 senden */
+		}
+		else if (fn == 1)
+		{
+			uint8_t n = gf_buf[5];
+			uint8_t pos = 6;
+			uint8_t perr[8] = {0};
+			uint8_t changed = 0;
+
+			for (uint8_t i = 0; (i < n) && (i < 8) && (pos < gf_len); i++)
+			{
+				uint8_t field = gf_buf[pos++];
+				uint8_t sl = (pos < gf_len) ? gf_buf[pos] : 0;
+
+				if ((field == 1) && (sl >= 2) && ((uint16_t)(pos + sl) <= gf_len))
+				{
+					uint8_t cn = (uint8_t)(sl - 2);
+					char nm[CFG_NAME_LEN + 1];
+					if (cn > CFG_NAME_LEN)
+					{
+						cn = CFG_NAME_LEN;	/* zu lang -> kuerzen */
+					}
+					memcpy(nm, &gf_buf[pos + 2], cn);
+					nm[cn] = '\0';
+					set_name_eeprom(nm);
+					get_name_eeprom(sensor_name);
+					changed = 1;
+					pos = (uint8_t)(pos + sl);
+				}
+				else
+				{
+					perr[i] = 4;	/* Feld nicht unterstuetzt / defekt */
+					pos = gf_len;	/* Groesse unbekannt -> Abbruch */
+				}
+			}
+
+			if (changed)
+			{
+				dev_info++;		/* aktualisierte Info gleich verschicken */
+			}
+			NMEA2000_SendGFAck(&hfdcan1, dev_info_par.srcAdr, gf_src, target_pgn, 0, perr, n);
+		}
+		return;
+	}
 
 	if (target_pgn != 127505)
 	{
@@ -1854,11 +1946,23 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		__disable_irq();
 		NVIC_SystemReset();
 	}
+	else if ((strncasecmp(cmd, "NAME", 4) == 0) && (cmd[4] == '\0'))
+	{
+		/* Abfrage: gespeicherten Sensornamen melden (NAME;<text>).
+		 * Noetig, weil BLE-Modulname und Sensorname auseinanderlaufen
+		 * koennen (Name per Group Function vom Plotter gesetzt). */
+		snprintf(resp, sizeof(resp), "NAME;%s\n", sensor_name);
+		BLE_SendString(resp);
+	}
 	else if (strncasecmp(cmd, "NAME ", 5) == 0)
 	{
 		const char *name = cmd + 5;
 		if (*name != '\0')
 		{
+			/* Name persistent speichern -> erscheint als Installation
+			 * Description in PGN 126998 (Geraeteliste am Plotter). */
+			set_name_eeprom(name);
+			get_name_eeprom(sensor_name);
 			/* erst bestätigen, dann Modul umbenennen (Modul startet danach neu
 			 * und trennt die Verbindung). */
 			BLE_SendString("OK NAME\n");
