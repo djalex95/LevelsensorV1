@@ -21,16 +21,17 @@ sind per Taster oder über ein PC-Tool (PEAK PCAN-USB) möglich.
 
 ## Struktur
 
-Dieses Repository enthält alle drei Teile des Projekts:
+Dieses Repository enthält die Firmware und das PC-Tool. Die **Handy-App**
+(Flutter) und der **OTA-Bootloader** liegen in eigenen Repositories
+(`Fuellstandsensor-App` bzw. `BootloaderCube`).
 
 - `Core/`, `Drivers/` – **Firmware** (STM32CubeIDE-Projekt).
-  Kernquellen: main.c, nmea200.c (NMEA2000), ble.c (Proteus-e),
+  Kernquellen: main.c, nmea2000.c (NMEA2000), ble.c (Proteus-e),
   config_store.c (Flash-Speicher).
 - `PC_Tools/` – **PC-Programm** (Python, PEAK PCAN-USB)
   - `nmea2000_gui.py` – grafische Oberfläche (Live-Anzeige, Kalibrierung, Tankform)
   - `nmea2000_reader.py` – Dekodier-Bibliothek / Konsolen-Mitlese-Tool
   - `BLE_Protokoll.md` – Spezifikation des BLE-Textprotokolls
-- `App_Fuellstand/` – **Handy-App** (Flutter) mit denselben Funktionen über BLE
 - `Inbetriebnahme.md` – Kurzanleitung zur Inbetriebnahme
 
 ## Firmware bauen
