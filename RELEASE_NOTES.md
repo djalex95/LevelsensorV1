@@ -1,3 +1,24 @@
+## Firmware 1.2.5
+
+### Sensorname
+- Der Sensor kann jetzt einen frei vergebenen Namen speichern (bis 24 Zeichen).
+  Er wird als Installation Description 1 in PGN 126998 (Configuration
+  Information) gemeldet und erscheint in der Geräteliste vieler Plotter.
+- Setzbar über die App (Kommando NAME, ab App 1.4.4) oder direkt vom Plotter
+  per Group Function (126208 → 126998, Feld 1). NAME ohne Argument liefert
+  den gespeicherten Namen zurück.
+
+### Konfigurationsspeicher
+- Neues Speicherformat (v2, 64 Byte) mit automatischer Migration: Beim ersten
+  Start nach dem Update werden Kalibrierung, Tankform, Adresse und alle
+  Einstellungen unverändert übernommen – nichts muss neu eingestellt werden.
+- Achtung: Ein späteres Downgrade auf 1.2.4 oder älter kann das neue Format
+  nicht lesen und fällt auf Werkseinstellungen zurück (Kalibrierung dann neu).
+- Migration durch eine Host-Testsuite abgesichert (tests/, 27 Tests).
+
+### Update
+OTA über die App (DFU) oder SWD. `Fuellstandsensor_v1.2.5.bin` ist OTA-tauglich.
+
 ## Firmware 1.2.4 (2026-07-08)
 
 ### Zuverlässigkeit
