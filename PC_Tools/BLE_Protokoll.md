@@ -79,6 +79,7 @@ ERR ?             unbekanntes Kommando
 | `INST n` | Instanz setzen (0..15) | `OK INST n` / `ERR INST` |
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
 | `CALRESET` | Kalibrierung auf Werkswert zurücksetzen | `OK CALRESET` |
+| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (BLE-Modulname bleibt) | `OK FACTORYRESET`, dann Neustart |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 

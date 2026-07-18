@@ -209,7 +209,19 @@ int main(void)
 	CHECK(config_load() == 0);
 	CHECK(cfg_data[0] == 0xFF);
 
-	/* 7) Flash immer wieder gesperrt (Lock/Unlock ausgeglichen) */
+	/* 7) Werksreset: loescht beide Pages, danach Werkszustand */
+	flash_blank();
+	config_load();
+	cfg_data[0] = 0x00;
+	CHECK(config_save() == 1);
+	CHECK(config_factory_reset() == 1);
+	CHECK(record_valid((uintptr_t)PAGE_A, &seq) == 0);
+	CHECK(record_valid((uintptr_t)PAGE_B, &seq) == 0);
+	cur_page = 0xFF; cur_seq = 0;
+	CHECK(config_load() == 0);
+	CHECK(cfg_data[0] == 0xFF);
+
+	/* 8) Flash immer wieder gesperrt (Lock/Unlock ausgeglichen) */
 	CHECK(unlock_cnt == 0);
 
 	printf("%d Tests, %d Fehler\n", tests, failed);

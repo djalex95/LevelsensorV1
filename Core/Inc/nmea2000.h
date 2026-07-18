@@ -92,6 +92,10 @@ uint8_t NMEA2000_SendPGNList(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr);
 extern volatile uint8_t fluid_req;
 extern volatile uint8_t pgnlist_req;
 
+/* Eigener 64-bit-NAME (identisch zum Address-Claim-Inhalt) - u.a. fuer den
+ * Vergleich mit PGN 65240 (Commanded Address). */
+uint64_t NMEA2000_BuildOwnName(void);
+
 unsigned long N2ktoCanID(unsigned char priority, unsigned long PGN, unsigned long Source, unsigned char Destination);
 
 

@@ -78,6 +78,7 @@ typedef struct sensor_data{
 #define PROP_CMD_GET_LIN 0x02
 #define PROP_CMD_CALIB   0x03	/* aktuellen Druck als 100 % (max_val) kalibrieren */
 #define PROP_CMD_RESET   0x04	/* Kalibrierung auf Werkswert zuruecksetzen */
+#define PROP_CMD_FRESET  0x05	/* Werksreset: kompletten Config loeschen + Neustart */
 
 
 /* USER CODE END PD */
@@ -126,6 +127,7 @@ void set_name_eeprom(const char *name);
 void set_adr_eeprom(uint8_t adr);
 void handle_group_function();
 void handle_prop_config();
+void handle_commanded_address();
 uint8_t lin_table_valid(uint8_t *t);
 uint16_t linearize_percent(uint16_t raw);
 void reset_EEPROM(calib_data *values);
@@ -505,6 +507,10 @@ int main(void)
 	  		else if (gf_pgn == 126720)
 	  		{
 	  			handle_prop_config();
+	  		}
+	  		else if (gf_pgn == 65240)
+	  		{
+	  			handle_commanded_address();
 	  		}
 	  		gf_ready = 0;
 		}
@@ -1518,6 +1524,52 @@ void handle_prop_config()
 		reply[3] = 0;
 		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, reply, 4);
 	}
+	else if (gf_buf[2] == PROP_CMD_FRESET)
+	{
+		/* Werksreset: erst bestaetigen (damit das PC-Tool die Antwort sieht),
+		 * dann kompletten Config-Speicher loeschen und neu starten. Nach dem
+		 * Boot gelten Werkswerte: Adresse 0x21, unkalibriert, kein Name. */
+		reply[2] = 0x85;
+		reply[3] = 0;
+		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, reply, 4);
+		HAL_Delay(100);
+		config_factory_reset();
+		__disable_irq();
+		NVIC_SystemReset();
+	}
+}
+
+/*
+ * PGN 65240 Commanded Address (ISO 11783-5): 8 Byte NAME (LE) + 1 Byte neue
+ * Quelladresse. Gilt nur, wenn der NAME exakt unserer ist - so kann ein
+ * Bus-Tool gezielt einem Geraet eine Adresse zuweisen.
+ */
+void handle_commanded_address()
+{
+	uint64_t name = 0;
+
+	if (gf_len < 9)
+	{
+		return;
+	}
+	for (int8_t i = 7; i >= 0; i--)
+	{
+		name = (name << 8) | gf_buf[i];
+	}
+	if (name != NMEA2000_BuildOwnName())
+	{
+		return;			/* anderes Geraet gemeint */
+	}
+	if (gf_buf[8] > 251)
+	{
+		return;			/* 252..255 sind keine gueltigen Quelladressen */
+	}
+
+	dev_info_par.srcAdr = gf_buf[8];
+	NMEA2000_change_address(&hfdcan1, dev_info_par.srcAdr);
+	NMEA2000_AdrClaim(&hfdcan1, dev_info_par.srcAdr, dev_info_par.UniqueNumber, dev_info_par.MFRcode, dev_info_par.DeviceFunction, dev_info_par.DeviceClass, dev_info_par.devInstance, dev_info_par.sysInstance, dev_info_par.indGroup);
+	claim_time = HAL_GetTick();
+	set_adr_eeprom(dev_info_par.srcAdr);
 }
 
 
@@ -1935,6 +1987,17 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		save_EEPROM(&EEPROM_values);
 		EEPROM_values.max_val = std_press;
 		BLE_SendString("OK CALRESET\n");
+	}
+	else if (strncasecmp(cmd, "FACTORYRESET", 12) == 0)
+	{
+		/* Kompletten Config loeschen und neu starten (Adresse 0x21,
+		 * unkalibriert, kein Name). Der BLE-Modulname bleibt erhalten -
+		 * er ist im Funkmodul gespeichert (per NAME neu setzbar). */
+		BLE_SendString("OK FACTORYRESET\n");
+		HAL_Delay(100);
+		config_factory_reset();
+		__disable_irq();
+		NVIC_SystemReset();
 	}
 	else if (strncasecmp(cmd, "DFU", 3) == 0)
 	{

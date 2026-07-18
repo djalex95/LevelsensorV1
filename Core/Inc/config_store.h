@@ -58,4 +58,9 @@ uint8_t config_save(void);
  * Kehrt nur zurueck, wenn die Adresse ausserhalb des Config-Bereichs liegt. */
 void config_nmi_recover(uint32_t fail_addr);
 
+/* Werksreset: loescht beide Config-Pages. Nach dem naechsten Boot gelten
+ * Werkswerte (Adresse 0x21, unkalibriert, keine Tankform, kein Name).
+ * Rueckgabe 0 = Loeschfehler. */
+uint8_t config_factory_reset(void);
+
 #endif /* INC_CONFIG_STORE_H_ */

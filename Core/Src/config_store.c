@@ -247,6 +247,17 @@ uint8_t config_load(void)
 	return 0;
 }
 
+uint8_t config_factory_reset(void)
+{
+	uint8_t ok = erase_page_num(CFG_PAGE_A_NUM);
+	ok = (uint8_t)(ok & erase_page_num(CFG_PAGE_B_NUM));
+	memset(cfg_data, 0xFF, CFG_SIZE);
+	cfg_data[CFG_VER_OFF] = CFG_LAYOUT_V;
+	cur_page = 0xFF;
+	cur_seq = 0;
+	return ok;
+}
+
 void config_nmi_recover(uint32_t fail_addr)
 {
 	uintptr_t fa = fail_addr;

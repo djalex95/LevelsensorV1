@@ -140,7 +140,7 @@ static uint32_t canid_to_pgn(uint32_t id)
 
 /* Baut den eigenen 64-bit-NAME exakt so auf, wie ihn NMEA2000_AdrClaim sendet
  * (little endian). Wird fuer den Arbitrierungs-Vergleich benoetigt. */
-static uint64_t build_own_name(void)
+uint64_t NMEA2000_BuildOwnName(void)
 {
 	uint64_t name;
 	name  = (uint64_t)((dev_info_par.UniqueNumber & 0x1FFFFF) | (((uint32_t)(dev_info_par.MFRcode & 0x7FF)) << 21));
@@ -748,7 +748,7 @@ static uint8_t fp_send(FDCAN_HandleTypeDef *can_handle, uint32_t PGN, uint8_t Pr
 uint8_t NMEA2000_SendPGNList(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr)
 {
 	static const uint32_t tx_pgns[] = {60928, 126208, 126464, 126720, 126993, 126996, 126998, 127505, 130312};
-	static const uint32_t rx_pgns[] = {59904, 60928, 126208, 126720};
+	static const uint32_t rx_pgns[] = {59904, 60928, 65240, 126208, 126720};
 	uint8_t payload[1 + 9 * 3];
 	uint8_t len;
 
@@ -768,13 +768,13 @@ uint8_t NMEA2000_SendPGNList(FDCAN_HandleTypeDef *can_handle, uint8_t src_adr)
 
 	/* Funktionscode 1: Receive-PGN-Liste */
 	payload[0] = 1;
-	for (uint8_t i = 0; i < 4; i++)
+	for (uint8_t i = 0; i < 5; i++)
 	{
 		payload[1 + i*3]     = (uint8_t)(rx_pgns[i] & 0xFF);
 		payload[1 + i*3 + 1] = (uint8_t)((rx_pgns[i] >> 8) & 0xFF);
 		payload[1 + i*3 + 2] = (uint8_t)((rx_pgns[i] >> 16) & 0xFF);
 	}
-	len = 1 + 4 * 3;
+	len = 1 + 5 * 3;
 	return fp_send(can_handle, 126464, 6, src_adr, 0xFF, payload, len);
 }
 
@@ -859,7 +859,7 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 				rx_name = (rx_name << 8) | RxData[i];
 			}
 
-			if (build_own_name() < rx_name)
+			if (NMEA2000_BuildOwnName() < rx_name)
 			{
 				adr_claim++;	/* gewonnen: eigenen Claim wiederholen */
 			}
@@ -874,6 +874,12 @@ void HAL_FDCAN_RxFifo1Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo1ITs)
 			 * PGNs beantwortet - vorher nur Address Claim, d.h. Broadcast-
 			 * Requests auf Product Info etc. blieben unbeantwortet. */
 			handle_iso_request(RxData);
+		}
+		else if(pgn == 65240)
+		{
+			/* Commanded Address (ISO 11783-5): Fast Packet mit 8 Byte NAME
+			 * + 1 Byte Zieladresse - in der Hauptschleife auswerten. */
+			gf_feed(pgn, rx_src, RxData);
 		}
 	}
 }
