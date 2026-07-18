@@ -79,7 +79,7 @@ ERR ?             unbekanntes Kommando
 | `INST n` | Instanz setzen (0..15) | `OK INST n` / `ERR INST` |
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
 | `CALRESET` | Kalibrierung auf Werkswert zurücksetzen | `OK CALRESET` |
-| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (BLE-Modulname bleibt) | `OK FACTORYRESET`, dann Neustart |
+| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (BLE-Modulname fällt beim nächsten Boot auf `LevelSense-<UID>` zurück) | `OK FACTORYRESET`, dann Neustart |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 
@@ -92,6 +92,19 @@ Group Function (126208 → 126998, Feld 1) geändert werden.
 Der Modulname wird über den Proteus-Befehl `CMD_SET_REQ` (Settings-Index 2,
 `RF_DeviceName`) im Modul-Flash gespeichert und bleibt nach einem Neustart
 erhalten. Nach `NAME …` muss neu verbunden werden.
+
+**Namensabgleich:** Der im Sensor gespeicherte Name ist die einzige Quelle
+der Wahrheit. Bei jedem Boot liest die Firmware den Modulnamen aus
+(`CMD_GET_REQ`) und schreibt ihn **nur bei Abweichung** neu – so wird das
+Modul-Flash geschont und Umbenennungen vom Plotter (Group Function) landen
+spätestens beim nächsten Boot auch im BLE-Namen; zur Laufzeit werden sie
+sofort übernommen. Ist kein Name gesetzt (Werkszustand bzw. nach
+`FACTORYRESET`), heißt der Sensor `LevelSense-<UID>` – die UID ist die
+NMEA2000 Unique Number der Platine, damit sind mehrere fabrikneue Sensoren
+unterscheidbar. Wird `NAME` mit dem bereits gesetzten Namen erneut gesendet,
+antwortet der Sensor nur mit `OK NAME` (kein Modul-Neustart, Verbindung
+bleibt bestehen). Hinweis: Der Sensor speichert max. 24 Zeichen, das
+BLE-Modul zeigt davon max. 20.
 
 Im **Bootloader-Modus** (während des OTA-Updates) beantwortet der Bootloader
 zusätzlich `VER` mit `BLV;x.y.z` (seiner eigenen Version). Die App fragt das beim

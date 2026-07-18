@@ -33,6 +33,8 @@
 #define CMD_CHANNELOPEN_RSP     0xC6
 #define CMD_TXCOMPLETE_RSP      0xC4
 #define CMD_SET_REQ             0x11
+#define CMD_GET_REQ             0x10	/* Setting lesen                       */
+#define CMD_GET_CNF             0x50	/* Antwort: Status(1) + Wert           */
 #define CMD_DISCONNECT_REQ      0x07
 #define CFG_IDX_DEVICENAME      0x02	/* Settings-Index RF_DeviceName */
 
@@ -73,5 +75,14 @@ void BLE_ApplyPendingName(void);
 
 /* 1 = es liegt eine aufgeschobene Namensänderung vor (nach Trennung anwenden). */
 extern volatile uint8_t ble_setname_pending;
+
+/* Fragt den aktuell im Modul gespeicherten Gerätenamen ab (CMD_GET_REQ,
+ * RF_DeviceName). Die Antwort landet asynchron in ble_module_name;
+ * ble_name_ready wird dann 1. Rückgabe 0 = Sendefehler. */
+uint8_t BLE_RequestDeviceName(void);
+
+/* Ergebnis der Namensabfrage (gültig sobald ble_name_ready == 1). */
+extern volatile uint8_t ble_name_ready;
+extern char             ble_module_name[21];
 
 #endif /* INC_BLE_H_ */

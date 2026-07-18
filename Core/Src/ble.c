@@ -28,6 +28,10 @@ static uint8_t ble_mps = 19;
 volatile uint8_t ble_setname_pending = 0;
 static char ble_pending_name[21];
 
+/* Ergebnis einer Namensabfrage (BLE_RequestDeviceName) */
+volatile uint8_t ble_name_ready = 0;
+char             ble_module_name[21];
+
 /* --- Frame-Parser-Zustand --- */
 typedef enum { ST_STX = 0, ST_CMD, ST_LEN_L, ST_LEN_H, ST_PAYLOAD, ST_CS } parse_state;
 static parse_state pstate = ST_STX;
@@ -71,6 +75,24 @@ static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
 	case CMD_DISCONNECT_IND:
 		ble_connected = 0;
 		ble_channel_open = 0;
+		break;
+
+	case CMD_GET_CNF:
+		/* Antwort auf CMD_GET_REQ: Status(1, 0x00 = ok) + Einstellungswert.
+		 * Die CNF enthaelt den Settings-Index NICHT - da hier ausschliesslich
+		 * RF_DeviceName abgefragt wird, ist der Wert immer der Modulname.
+		 * (Bei weiteren GET-Abfragen: angefragten Index merken!) */
+		if (!ble_name_ready && len >= 1 && payload[0] == 0x00)
+		{
+			uint16_t nl = len - 1;
+			if (nl > 20)
+			{
+				nl = 20;
+			}
+			memcpy(ble_module_name, payload + 1, nl);
+			ble_module_name[nl] = '\0';
+			ble_name_ready = 1;
+		}
 		break;
 
 	case CMD_DATA_IND:
@@ -251,6 +273,28 @@ uint8_t BLE_SetDeviceName(const char *name)
 		ble_send_setname(ble_pending_name);
 	}
 	return 1;
+}
+
+/* Fragt den im Modul-Flash gespeicherten Geraetenamen ab (CMD_GET_REQ,
+ * RF_DeviceName). Lesen ist - anders als CMD_SET_REQ - jederzeit erlaubt.
+ * Die Antwort (CMD_GET_CNF) verarbeitet ble_dispatch() asynchron. */
+uint8_t BLE_RequestDeviceName(void)
+{
+	uint8_t frame[6];
+
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_name_ready = 0;
+	frame[0] = BLE_STX;
+	frame[1] = CMD_GET_REQ;
+	frame[2] = 1;					/* Len = 1: nur der Settings-Index */
+	frame[3] = 0;
+	frame[4] = CFG_IDX_DEVICENAME;
+	frame[5] = xor_cs(frame, 5);
+
+	return (HAL_UART_Transmit(ble_uart, frame, 6, 100) == HAL_OK) ? 1 : 0;
 }
 
 void BLE_ApplyPendingName(void)

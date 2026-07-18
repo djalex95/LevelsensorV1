@@ -124,6 +124,7 @@ void get_param_eeprom(NMEA_parameter_Device *nmea_param, prod_param *values);
 uint8_t get_adr_eeprom();
 void get_name_eeprom(char *buf);
 void set_name_eeprom(const char *name);
+static void ble_desired_name(char *buf);
 void set_adr_eeprom(uint8_t adr);
 void handle_group_function();
 void handle_prop_config();
@@ -205,6 +206,14 @@ NMEA_parameter_Device dev_info_par;
 
 /* BLE (Proteus-e): Status-Streaming-Zeitpunkt */
 uint32_t last_run_ble = 0, ble_time = 1000;
+
+/* Einmaliger Namensabgleich Modul <-> Config nach dem Boot:
+ * 0 = wartet (Modul bootet noch), 1 = Abfrage laeuft, 2 = fertig/aufgegeben.
+ * Es wird nur bei ABWEICHUNG geschrieben (CMD_SET_REQ kostet einen
+ * Flash-Zyklus im Modul und einen Modul-Neustart). */
+static uint8_t  ble_sync_state = 0;
+static uint32_t ble_sync_t0 = 0;
+static uint8_t  ble_sync_tries = 0;
 /* USER CODE END 0 */
 
 /**
@@ -534,6 +543,45 @@ int main(void)
 			BLE_ApplyPendingName();
 		}
 
+		/* --- Einmaliger Namensabgleich nach dem Boot: Modulname lesen und
+		 * nur bei Abweichung vom Config-Namen (bzw. Default) neu setzen.
+		 * Deckt ab: Erstinbetriebnahme (Default "LevelSense-<UID>"),
+		 * Umbenennung per Plotter im ausgeschalteten Zustand, Werksreset. */
+		if ((ble_sync_state == 0) && (time_el >= 1500))
+		{
+			/* Modul ist nach ~1,5 s sicher gebootet */
+			ble_sync_state = BLE_RequestDeviceName() ? 1 : 2;
+			ble_sync_t0 = time_el;
+		}
+		else if (ble_sync_state == 1)
+		{
+			if (ble_name_ready)
+			{
+				char want[21];
+				ble_desired_name(want);
+				if (strcmp(ble_module_name, want) != 0)
+				{
+					BLE_SetDeviceName(want);	/* Modul startet danach neu */
+				}
+				ble_name_ready = 0;
+				ble_sync_state = 2;
+			}
+			else if ((time_el - ble_sync_t0) >= 500)
+			{
+				/* keine Antwort -> bis zu 3 Versuche, dann aufgeben
+				 * (Sensor bleibt ohne Abgleich voll funktionsfaehig) */
+				if (++ble_sync_tries >= 3)
+				{
+					ble_sync_state = 2;
+				}
+				else
+				{
+					BLE_RequestDeviceName();
+					ble_sync_t0 = time_el;
+				}
+			}
+		}
+
 
 	  	if((time_el-last_run_led)>=led_time)
 	  	{
@@ -678,6 +726,25 @@ void get_name_eeprom(char *buf)
 		buf[i] = (char)c;
 	}
 	buf[i] = '\0';
+}
+
+/* Gewuenschter BLE-Modulname (max. 20 Zeichen, Proteus-Limit):
+ * der Sensorname aus dem Config ist die einzige Quelle der Wahrheit.
+ * Ist keiner gesetzt (Werkszustand), gilt der Default "LevelSense-<UID>"
+ * aus der NMEA2000 Unique Number - damit ist jede Platine ab Werk
+ * eindeutig unterscheidbar. buf braucht mind. 21 Bytes. */
+static void ble_desired_name(char *buf)
+{
+	if (sensor_name[0] != '\0')
+	{
+		strncpy(buf, sensor_name, 20);
+		buf[20] = '\0';
+	}
+	else
+	{
+		/* 21-bit Unique Number -> max. 6 Hex-Zeichen, gesamt <= 17 Zeichen */
+		snprintf(buf, 21, "LevelSense-%05lX", (unsigned long)dev_info_par.UniqueNumber);
+	}
 }
 
 /* Sensorname persistent speichern (auf CFG_NAME_LEN gekuerzt). */
@@ -1302,9 +1369,19 @@ void handle_group_function()
 					}
 					memcpy(nm, &gf_buf[pos + 2], cn);
 					nm[cn] = '\0';
-					set_name_eeprom(nm);
-					get_name_eeprom(sensor_name);
-					changed = 1;
+					if (strcmp(nm, sensor_name) != 0)
+					{
+						set_name_eeprom(nm);
+						get_name_eeprom(sensor_name);
+						/* BLE-Modulname sofort mitziehen (trennt ggf. eine
+						 * bestehende BLE-Verbindung, Modul startet neu) */
+						{
+							char want[21];
+							ble_desired_name(want);
+							BLE_SetDeviceName(want);
+						}
+						changed = 1;
+					}
 					pos = (uint8_t)(pos + sl);
 				}
 				else
@@ -2022,15 +2099,27 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		const char *name = cmd + 5;
 		if (*name != '\0')
 		{
-			/* Name persistent speichern -> erscheint als Installation
-			 * Description in PGN 126998 (Geraeteliste am Plotter). */
-			set_name_eeprom(name);
-			get_name_eeprom(sensor_name);
-			/* erst bestätigen, dann Modul umbenennen (Modul startet danach neu
-			 * und trennt die Verbindung). */
-			BLE_SendString("OK NAME\n");
-			HAL_Delay(50);
-			BLE_SetDeviceName(name);
+			if (strcmp(name, sensor_name) == 0)
+			{
+				/* unveraendert -> kein Flash-Schreibzugriff, kein
+				 * Modul-Neustart (die Verbindung bleibt bestehen) */
+				BLE_SendString("OK NAME\n");
+			}
+			else
+			{
+				char want[21];
+				/* Name persistent speichern -> erscheint als Installation
+				 * Description in PGN 126998 (Geraeteliste am Plotter). */
+				set_name_eeprom(name);
+				get_name_eeprom(sensor_name);
+				/* erst bestätigen, dann Modul umbenennen (Modul startet danach
+				 * neu und trennt die Verbindung). Der Modulname folgt dem
+				 * gespeicherten (ggf. auf 24 Zeichen gekuerzten) Sensornamen. */
+				BLE_SendString("OK NAME\n");
+				HAL_Delay(50);
+				ble_desired_name(want);
+				BLE_SetDeviceName(want);
+			}
 		}
 		else
 		{
