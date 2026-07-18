@@ -43,6 +43,15 @@ from nmea2000_reader import (
 )
 from tkinter import messagebox
 
+PGN_NAMES = {
+    59392: "ISO Acknowledge", 59904: "ISO Request", 60928: "Address Claim",
+    65240: "Commanded Address", 126208: "Group Function", 126464: "PGN-Liste",
+    126720: "Proprietär", 126993: "Heartbeat", 126996: "Product Info",
+    126998: "Config Info", 127505: "Fluid Level", 130312: "Temperatur",
+}
+
+MONITOR_MAX_LINES = 2000   # Zeilen-Limit des NMEA-Log-Fensters
+
 HISTORY_SECONDS = 300      # Zeitfenster des Verlaufsgraphen
 POLL_MS = 100              # GUI-Poll-Intervall für die RX-Queue
 
@@ -70,6 +79,7 @@ class RxThread(threading.Thread):
         self.out = out
         self.stop_flag = threading.Event()
         self.fp = FastPacketAssembler()
+        self.monitor = threading.Event()   # NMEA-Log-Fenster offen?
 
     def run(self):
         while not self.stop_flag.is_set():
@@ -81,8 +91,11 @@ class RxThread(threading.Thread):
                 continue
             if msg is None or not msg.is_extended_id:
                 continue
-            _, pgn, dest, src = decode_can_id(msg.arbitration_id)
+            prio, pgn, dest, src = decode_can_id(msg.arbitration_id)
             data = bytes(msg.data)
+
+            if self.monitor.is_set():
+                self.out.put(("frame", (time.time(), prio, pgn, dest, src, data)))
 
             if pgn == 127505:
                 lvl = parse_fluid_level(data)
@@ -140,6 +153,7 @@ class App:
         self.tank_cap = None            # Kapazität aus PGN 127505 (Liter)
         self.claim_count = 0            # gesehene Address Claims (alle Geräte)
         self.last_hb = None             # (timestamp, src, seq, interval_ms)
+        self.level_times = deque(maxlen=12)   # Zeitstempel der letzten Messungen
 
         # ---- Verbindungszeile ----
         top = ttk.Frame(root, padding=8)
@@ -157,6 +171,8 @@ class App:
         self.btn_calib = ttk.Button(top, text="Kalibrierung…",
                                     command=self.open_calib_window, state="disabled")
         self.btn_calib.pack(side="left")
+        self.btn_mon = ttk.Button(top, text="NMEA-Log…", command=self.open_monitor)
+        self.btn_mon.pack(side="left", padx=(8, 0))
         self.status = ttk.Label(top, text="getrennt", foreground="red")
         self.status.pack(side="right")
 
@@ -168,6 +184,8 @@ class App:
         self.lbl_addr = ttk.Label(row1, text="Sensor-Adresse: –",
                                   font=("Segoe UI", 9, "bold"))
         self.lbl_addr.pack(side="left")
+        self.lbl_rx = ttk.Label(row1, text="Messung: –", foreground="#555")
+        self.lbl_rx.pack(side="left", padx=(16, 0))
         self.lbl_hb = ttk.Label(row1, text="Heartbeat: –", foreground="#555")
         self.lbl_hb.pack(side="left", padx=(16, 0))
         self.btn_claim = ttk.Button(row1, text="Address Claim anfordern",
@@ -259,6 +277,7 @@ class App:
 
         root.after(POLL_MS, self.poll)
         root.after(1000, self.watchdog)
+        root.after(250, self.update_rx_label)
 
     # ---------------- Verbindung ----------------
 
@@ -280,6 +299,10 @@ class App:
             self.btn_lin_read.config(state="normal")
             self.btn_lin_write.config(state="normal")
             self.btn_claim.config(state="normal")
+            self.lbl_hb.config(text="Heartbeat: warte auf ersten (≤ 60 s) …",
+                               foreground="#555")
+            if getattr(self, "_mon_win", None) and self._mon_win.winfo_exists():
+                self.rx.monitor.set()
             self.status.config(text=f"verbunden ({self.channel.get()})", foreground="green")
             self.log_line(f"Verbunden: {self.channel.get()} @ {BITRATE // 1000} kbit/s")
         else:
@@ -557,7 +580,9 @@ class App:
         try:
             while True:
                 kind, payload = self.q.get_nowait()
-                if kind == "level":
+                if kind == "frame":
+                    self._mon_frame(payload)
+                elif kind == "level":
                     self.show_level(payload)
                 elif kind == "temp":
                     self.lbl_temp.config(text=f"Temperatur: {payload:.2f} °C")
@@ -604,6 +629,7 @@ class App:
 
     def show_level(self, d):
         self.last_rx = time.time()
+        self.level_times.append(self.last_rx)
         self.sensor_addr = d["src"]     # Sensor kann nach Arbitrierung umziehen
         self.lbl_addr.config(text=f"Sensor-Adresse: 0x{d['src']:02X}")
         self._last_level = d["level"]   # für »Übernehmen« im Kalibrier-Fenster
@@ -657,6 +683,104 @@ class App:
             y = h - pad - (h - 2 * pad) * max(0.0, min(100.0, lvl)) / 100
             pts += [x, y]
         c.create_line(*pts, fill="#0066cc", width=2)
+
+    def update_rx_label(self):
+        """Zeigt an, wie lange die letzte Tankmessung her ist und in welchem
+        Takt sie kommen. Gruen = alles im Rhythmus (Norm: alle 2,5 s),
+        orange = Messungen bleiben aus."""
+        if self.level_times:
+            lst = list(self.level_times)
+            age = time.time() - lst[-1]
+            if len(lst) >= 2:
+                diffs = [b - a for a, b in zip(lst, lst[1:])]
+                avg = sum(diffs) / len(diffs)
+                txt = f"Messung: vor {age:.1f} s (Ø alle {avg:.1f} s)"
+            else:
+                txt = f"Messung: vor {age:.1f} s"
+            self.lbl_rx.config(text=txt,
+                               foreground="#cc6600" if age > 6 else "#007700")
+        self.root.after(250, self.update_rx_label)
+
+    # ---------------- NMEA-Log-Fenster ----------------
+
+    def open_monitor(self):
+        """Debug-Ansicht: alle empfangenen Frames mit Zeitstempel, PGN-Name,
+        Quelle/Ziel, Priorität und Rohdaten."""
+        if getattr(self, "_mon_win", None) and self._mon_win.winfo_exists():
+            self._mon_win.lift()
+            return
+        win = tk.Toplevel(self.root)
+        self._mon_win = win
+        win.title("NMEA2000-Log")
+        win.protocol("WM_DELETE_WINDOW", self._mon_close)
+
+        bar = ttk.Frame(win, padding=(6, 6, 6, 0))
+        bar.pack(fill="x")
+        self.mon_pause = tk.BooleanVar(value=False)
+        ttk.Checkbutton(bar, text="Pause (verwirft)",
+                        variable=self.mon_pause).pack(side="left")
+        self.mon_scroll = tk.BooleanVar(value=True)
+        ttk.Checkbutton(bar, text="Autoscroll",
+                        variable=self.mon_scroll).pack(side="left", padx=(10, 0))
+        ttk.Label(bar, text="PGN-Filter:").pack(side="left", padx=(14, 2))
+        self.mon_filter = ttk.Entry(bar, width=22)
+        self.mon_filter.pack(side="left")
+        ttk.Label(bar, text="(leer = alle; z. B. 127505,126993)",
+                  foreground="#888", font=("Segoe UI", 7)).pack(side="left", padx=(4, 0))
+        ttk.Button(bar, text="Leeren",
+                   command=lambda: self._mon_text_set("")).pack(side="right")
+
+        frame = ttk.Frame(win, padding=6)
+        frame.pack(fill="both", expand=True)
+        self.mon_text = tk.Text(frame, width=100, height=24, state="disabled",
+                                font=("Consolas", 9), wrap="none")
+        sb = ttk.Scrollbar(frame, command=self.mon_text.yview)
+        self.mon_text.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        self.mon_text.pack(side="left", fill="both", expand=True)
+
+        if self.rx:
+            self.rx.monitor.set()
+
+    def _mon_close(self):
+        if self.rx:
+            self.rx.monitor.clear()
+        self._mon_win.destroy()
+
+    def _mon_text_set(self, content):
+        self.mon_text.config(state="normal")
+        self.mon_text.delete("1.0", "end")
+        if content:
+            self.mon_text.insert("end", content)
+        self.mon_text.config(state="disabled")
+
+    def _mon_frame(self, payload):
+        if not (getattr(self, "_mon_win", None) and self._mon_win.winfo_exists()):
+            return
+        if self.mon_pause.get():
+            return
+        ts, prio, pgn, dest, src, data = payload
+        flt = self.mon_filter.get().strip()
+        if flt:
+            try:
+                allowed = {int(x) for x in flt.replace(";", ",").split(",") if x.strip()}
+                if pgn not in allowed:
+                    return
+            except ValueError:
+                pass                    # unlesbarer Filter -> alles zeigen
+        t = time.strftime("%H:%M:%S", time.localtime(ts)) + f".{int(ts * 1000) % 1000:03d}"
+        name = PGN_NAMES.get(pgn, "?")
+        dest_s = "FF " if dest == 0xFF else f"{dest:02X} "
+        line = (f"{t}  {pgn:6d} {name:<15.15}  {src:02X}→{dest_s} p{prio}  "
+                f"{data.hex(' ')}\n")
+        self.mon_text.config(state="normal")
+        self.mon_text.insert("end", line)
+        lines = int(self.mon_text.index("end-1c").split(".")[0])
+        if lines > MONITOR_MAX_LINES:
+            self.mon_text.delete("1.0", f"{lines - MONITOR_MAX_LINES}.0")
+        self.mon_text.config(state="disabled")
+        if self.mon_scroll.get():
+            self.mon_text.see("end")
 
     def update_hb_label(self):
         """Heartbeat-Zeile aktualisieren; Farbe kippt auf orange, wenn der
