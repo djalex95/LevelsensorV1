@@ -84,6 +84,38 @@ def decode_address_claim(data: bytes, src: int):
             f"function={func}  class={dev_class}")
 
 
+def parse_address_claim(data: bytes):
+    """Zerlegt den 64-bit-NAME eines Address Claims in seine Felder."""
+    if len(data) < 8:
+        return None
+    name = struct.unpack("<Q", data)[0]
+    return {
+        "unique": name & 0x1FFFFF,
+        "mfr": (name >> 21) & 0x7FF,
+        "dev_instance": (name >> 32) & 0xFF,
+        "function": (name >> 40) & 0xFF,
+        "dev_class": (name >> 49) & 0x7F,
+    }
+
+
+def decode_heartbeat(data: bytes, src: int):
+    """PGN 126993 Heartbeat: Intervall (uint16 LE, ms) + Sequenzzaehler."""
+    if len(data) < 3:
+        return None
+    return {"src": src,
+            "interval_ms": struct.unpack_from("<H", data, 0)[0],
+            "seq": data[2]}
+
+
+def decode_iso_request(data: bytes, dest: int, src: int):
+    """PGN 59904 ISO Request: 3 Bytes = angefragte PGN (LE)."""
+    if len(data) < 3:
+        return None
+    pgn = data[0] | (data[1] << 8) | (data[2] << 16)
+    dest_s = "Broadcast" if dest == 0xFF else f"0x{dest:02X}"
+    return f"[0x{src:02X}] ISO Request PGN {pgn} an {dest_s}"
+
+
 TEMP_SOURCES = {
     0: "Sea", 1: "Outside", 2: "Inside", 3: "Engine Room", 4: "Main Cabin",
     5: "Live Well", 6: "Bait Well", 7: "Refrigeration", 8: "Heating",

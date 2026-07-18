@@ -37,8 +37,9 @@ from nmea2000_reader import (
     BITRATE, FLUID_TYPES, PC_SOURCE_ADDR, PROP_PGN, SENSOR_ADDR,
     FastPacketAssembler, build_calib_max, build_calib_reset,
     build_gf_command_127505, build_lin_table_read, build_lin_table_write,
-    decode_address_claim, decode_can_id, decode_gf, decode_product_info,
-    decode_prop, encode_can_id, send_fast_packet,
+    decode_address_claim, decode_can_id, decode_gf, decode_heartbeat,
+    decode_iso_request, decode_product_info, decode_prop, encode_can_id,
+    parse_address_claim, send_fast_packet,
 )
 from tkinter import messagebox
 
@@ -80,7 +81,7 @@ class RxThread(threading.Thread):
                 continue
             if msg is None or not msg.is_extended_id:
                 continue
-            _, pgn, _, src = decode_can_id(msg.arbitration_id)
+            _, pgn, dest, src = decode_can_id(msg.arbitration_id)
             data = bytes(msg.data)
 
             if pgn == 127505:
@@ -93,7 +94,17 @@ class RxThread(threading.Thread):
                 if raw not in (0xFFFF, 0xFFFE):
                     self.out.put(("temp", raw / 100.0 - 273.15))
             elif pgn == 60928:
-                txt = decode_address_claim(data, src)
+                fields = parse_address_claim(data)
+                if fields:
+                    fields["src"] = src
+                    self.out.put(("claim", fields))
+                    self.out.put(("log", decode_address_claim(data, src)))
+            elif pgn == 126993:
+                hb = decode_heartbeat(data, src)
+                if hb:
+                    self.out.put(("hb", hb))
+            elif pgn == 59904:
+                txt = decode_iso_request(data, dest, src)
                 if txt:
                     self.out.put(("log", txt))
             elif pgn in (126996, 126998, 126208, PROP_PGN):
@@ -127,6 +138,8 @@ class App:
         self.last_rx = None
         self.sensor_addr = SENSOR_ADDR  # wird dynamisch aktualisiert (Adress-Arbitrierung!)
         self.tank_cap = None            # Kapazität aus PGN 127505 (Liter)
+        self.claim_count = 0            # gesehene Address Claims (alle Geräte)
+        self.last_hb = None             # (timestamp, src, seq, interval_ms)
 
         # ---- Verbindungszeile ----
         top = ttk.Frame(root, padding=8)
@@ -146,6 +159,23 @@ class App:
         self.btn_calib.pack(side="left")
         self.status = ttk.Label(top, text="getrennt", foreground="red")
         self.status.pack(side="right")
+
+        # ---- NMEA2000-Bus: Adresse, Address Claim, Heartbeat ----
+        busf = ttk.LabelFrame(root, text="NMEA2000-Bus", padding=6)
+        busf.pack(fill="x", padx=8, pady=(4, 0))
+        row1 = ttk.Frame(busf)
+        row1.pack(fill="x")
+        self.lbl_addr = ttk.Label(row1, text="Sensor-Adresse: –",
+                                  font=("Segoe UI", 9, "bold"))
+        self.lbl_addr.pack(side="left")
+        self.lbl_hb = ttk.Label(row1, text="Heartbeat: –", foreground="#555")
+        self.lbl_hb.pack(side="left", padx=(16, 0))
+        self.btn_claim = ttk.Button(row1, text="Address Claim anfordern",
+                                    command=self.request_claim, state="disabled")
+        self.btn_claim.pack(side="right")
+        self.lbl_claim = ttk.Label(busf, text="Letzter Address Claim: –",
+                                   foreground="#555")
+        self.lbl_claim.pack(anchor="w", pady=(2, 0))
 
         # ---- Füllstandsanzeige ----
         mid = ttk.Frame(root, padding=8)
@@ -249,6 +279,7 @@ class App:
             self.btn_calib.config(state="normal")
             self.btn_lin_read.config(state="normal")
             self.btn_lin_write.config(state="normal")
+            self.btn_claim.config(state="normal")
             self.status.config(text=f"verbunden ({self.channel.get()})", foreground="green")
             self.log_line(f"Verbunden: {self.channel.get()} @ {BITRATE // 1000} kbit/s")
         else:
@@ -268,6 +299,7 @@ class App:
         self.btn_calib.config(state="disabled")
         self.btn_lin_read.config(state="disabled")
         self.btn_lin_write.config(state="disabled")
+        self.btn_claim.config(state="disabled")
         self.status.config(text="getrennt", foreground="red")
         self.log_line("Getrennt.")
 
@@ -283,6 +315,22 @@ class App:
                 self.log_line(f">> ISO Request PGN {pgn} an 0x{dest:02X}")
             except can.CanError as e:
                 self.log_line(f"Senden fehlgeschlagen: {e}")
+
+    def request_claim(self):
+        """ISO Request auf PGN 60928 (Broadcast): alle Geräte melden ihren
+        Address Claim – so sieht man sofort, wer mit welcher Adresse und
+        welchem NAME am Bus hängt."""
+        if not self.bus:
+            return
+        self.claim_count = 0
+        can_id = encode_can_id(6, 59904, 0xFF, PC_SOURCE_ADDR)
+        data = bytes([60928 & 0xFF, (60928 >> 8) & 0xFF, (60928 >> 16) & 0xFF])
+        try:
+            self.bus.send(can.Message(arbitration_id=can_id, data=data,
+                                      is_extended_id=True))
+            self.log_line(">> Address Claim angefordert (Broadcast) …")
+        except can.CanError as e:
+            self.log_line(f"Senden fehlgeschlagen: {e}")
 
     def send_config(self):
         """Sendet die Konfiguration als Command Group Function (PGN 126208)."""
@@ -519,6 +567,19 @@ class App:
                         e.insert(0, str(v))
                     self.update_lin_liters()
                     self.log_line(f"Stützstellen vom Sensor gelesen: {payload}")
+                elif kind == "claim":
+                    self.claim_count += 1
+                    mine = " (Sensor)" if payload["src"] == self.sensor_addr else ""
+                    self.lbl_claim.config(
+                        text=f"Letzter Address Claim: 0x{payload['src']:02X}{mine}  "
+                             f"unique={payload['unique']}  mfr={payload['mfr']}  "
+                             f"fn={payload['function']}  class={payload['dev_class']}  "
+                             f"inst={payload['dev_instance']}  "
+                             f"({self.claim_count} seit Anfrage)")
+                elif kind == "hb":
+                    self.last_hb = (time.time(), payload["src"], payload["seq"],
+                                    payload["interval_ms"])
+                    self.update_hb_label()
                 elif kind == "lin_ack":
                     self.log_line(payload)
                 elif kind == "calib_ack":
@@ -544,6 +605,7 @@ class App:
     def show_level(self, d):
         self.last_rx = time.time()
         self.sensor_addr = d["src"]     # Sensor kann nach Arbitrierung umziehen
+        self.lbl_addr.config(text=f"Sensor-Adresse: 0x{d['src']:02X}")
         self._last_level = d["level"]   # für »Übernehmen« im Kalibrier-Fenster
         cap_changed = d["cap"] is not None and d["cap"] != self.tank_cap
         if cap_changed:
@@ -596,6 +658,19 @@ class App:
             pts += [x, y]
         c.create_line(*pts, fill="#0066cc", width=2)
 
+    def update_hb_label(self):
+        """Heartbeat-Zeile aktualisieren; Farbe kippt auf orange, wenn der
+        letzte Heartbeat älter als das 1,5-fache Intervall ist."""
+        if self.last_hb is None:
+            return
+        ts, src, seq, interval = self.last_hb
+        age = time.time() - ts
+        overdue = age > (interval / 1000.0) * 1.5 if interval else age > 90
+        self.lbl_hb.config(
+            text=f"Heartbeat: 0x{src:02X}  Seq {seq}  vor {age:.0f} s "
+                 f"(Intervall {interval / 1000.0:.0f} s)",
+            foreground="#cc6600" if overdue else "#007700")
+
     def watchdog(self):
         """Warnt, wenn 3 s keine Fluid-Level-Frames mehr kommen."""
         if self.bus is not None:
@@ -604,6 +679,7 @@ class App:
             elif self.last_rx:
                 self.status.config(text=f"verbunden ({self.channel.get()})",
                                    foreground="green")
+        self.update_hb_label()
         self.root.after(1000, self.watchdog)
 
     def log_line(self, text):
