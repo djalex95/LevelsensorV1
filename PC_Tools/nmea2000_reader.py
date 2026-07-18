@@ -235,6 +235,17 @@ def build_gf_command_127505(instance=None, fluid_type=None, capacity_liters=None
                   0xFF, n]) + pairs
 
 
+def build_gf_command_name(name: str) -> bytes:
+    """Command Group Function (PGN 126208) auf PGN 126998, Feld 1 =
+    Installation Description 1 (Sensorname) - derselbe Weg, ueber den auch
+    ein Plotter den Namen setzt. Stringformat: [Laenge n+2][0x01=ASCII][Zeichen].
+    Leerer String loescht den Namen (der BLE-Name faellt beim naechsten Boot
+    auf LevelSense-<UID> zurueck); die Firmware kuerzt auf 24 Zeichen."""
+    raw = name.encode("ascii", "replace")[:24]
+    return (bytes([1, 126998 & 0xFF, (126998 >> 8) & 0xFF, (126998 >> 16) & 0xFF,
+                   0xFF, 1, 1, len(raw) + 2, 0x01]) + raw)
+
+
 def decode_gf(data: bytes, src: int):
     """Dekodiert eine reassemblierte Group Function (v.a. Acknowledge)."""
     if len(data) < 6:

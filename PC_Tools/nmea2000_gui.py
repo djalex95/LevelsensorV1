@@ -37,7 +37,7 @@ from nmea2000_reader import (
     BITRATE, FLUID_TYPES, PC_SOURCE_ADDR, PROP_PGN, SENSOR_ADDR,
     FastPacketAssembler, build_calib_max, build_calib_reset,
     build_gf_command_127505, build_lin_table_read, build_lin_table_write,
-    build_commanded_address, build_factory_reset,
+    build_commanded_address, build_factory_reset, build_gf_command_name,
     decode_address_claim, decode_can_id, decode_config_info,
     decode_gf, decode_heartbeat,
     decode_iso_request, decode_product_info, decode_prop, encode_can_id,
@@ -213,6 +213,17 @@ class App:
         self.btn_cmdaddr = ttk.Button(row2, text="Adresse zuweisen…",
                                       command=self.assign_address, state="disabled")
         self.btn_cmdaddr.pack(side="right", padx=(0, 6))
+        row3 = ttk.Frame(busf)
+        row3.pack(fill="x", pady=(2, 0))
+        ttk.Label(row3, text="Name:").pack(side="left")
+        self.name_entry = ttk.Entry(row3, width=26)
+        self.name_entry.pack(side="left", padx=(4, 6))
+        self.btn_name = ttk.Button(row3, text="Name setzen",
+                                   command=self.set_sensor_name, state="disabled")
+        self.btn_name.pack(side="left")
+        ttk.Label(row3, text="(Installation Description wie vom Plotter, "
+                             "max. 24 Zeichen – leer = Name löschen)",
+                  foreground="#555").pack(side="left", padx=(8, 0))
 
         # ---- Füllstandsanzeige ----
         mid = ttk.Frame(root, padding=8)
@@ -320,6 +331,7 @@ class App:
             self.btn_claim.config(state="normal")
             self.btn_cmdaddr.config(state="normal")
             self.btn_freset.config(state="normal")
+            self.btn_name.config(state="normal")
             self.lbl_hb.config(text="Heartbeat: warte auf ersten (≤ 60 s) …",
                                foreground="#555")
             if getattr(self, "_mon_win", None) and self._mon_win.winfo_exists():
@@ -346,6 +358,7 @@ class App:
         self.btn_claim.config(state="disabled")
         self.btn_cmdaddr.config(state="disabled")
         self.btn_freset.config(state="disabled")
+        self.btn_name.config(state="disabled")
         self.status.config(text="getrennt", foreground="red")
         self.log_line("Getrennt.")
 
@@ -663,6 +676,12 @@ class App:
                     dev["name"] = fields[0]
                     dev["last"] = time.time()
                     self._refresh_combo()
+                    # Namensfeld nachziehen (nur wenn der Nutzer dort nicht
+                    # gerade tippt), damit es den gespeicherten Stand zeigt.
+                    if (c_src == self.sel_src
+                            and self.root.focus_get() is not self.name_entry):
+                        self.name_entry.delete(0, "end")
+                        self.name_entry.insert(0, fields[0])
                     self.log_line(f"[0x{c_src:02X}] Config Info: "
                                   f"Name='{fields[0] or '–'}'"
                                   + (f"  ({fields[2]})" if fields[2] else ""))
@@ -768,6 +787,13 @@ class App:
         parts = [f"0x{src:02X}"]
         if dev.get("name"):
             parts.append(dev["name"])
+        elif dev.get("unique") is not None:
+            # Werkszustand: kein Name gesetzt -> UID zeigen (hex, wie im
+            # BLE-Default-Namen LevelSense-<UID>), so sind auch zwei
+            # fabrikneue Sensoren unterscheidbar.
+            parts.append(f"(ohne Namen, UID {dev['unique']:05X})")
+        else:
+            parts.append("(ohne Namen)")
         if dev.get("instance") is not None:
             parts.append(f"Inst {dev['instance']}")
         return " – ".join(parts)
@@ -801,6 +827,8 @@ class App:
         self.lbl_addr.config(text=f"Adresse: 0x{src:02X}")
         self.lbl_hb.config(text="Heartbeat: –", foreground="#555")
         self.lbl_rx.config(text="Messung: –", foreground="#555")
+        self.name_entry.delete(0, "end")
+        self.name_entry.insert(0, self.devices.get(src, {}).get("name", ""))
         self.log_line(f"Sensor 0x{src:02X} ausgewählt – Anzeige und Kommandos "
                       f"gelten jetzt für dieses Gerät.")
 
@@ -849,6 +877,33 @@ class App:
             send_fast_packet(self.bus, 65240, 0xFF, PC_SOURCE_ADDR, payload)
             self.log_line(f">> Commanded Address: 0x{self.sel_src:02X} → "
                           f"0x{new_addr:02X} – warte auf neuen Claim …")
+        except can.CanError as e:
+            self.log_line(f"Senden fehlgeschlagen: {e}")
+
+    def set_sensor_name(self):
+        """Sensornamen per Group Function setzen (126208 → 126998 Feld 1) –
+        exakt der Weg, den auch ein Plotter nutzt. Die Firmware speichert den
+        Namen, zieht den BLE-Modulnamen mit und sendet die aktualisierte
+        Config Info gleich zurück (aktualisiert Dropdown und Log)."""
+        if not self.bus or self.sel_src is None:
+            return
+        name = self.name_entry.get().strip()
+        if len(name) > 24:
+            self.log_line("Name zu lang (max. 24 Zeichen).")
+            return
+        if not name and not messagebox.askyesno(
+                "Name löschen",
+                f"Namen von Sensor 0x{self.sel_src:02X} wirklich löschen?\n\n"
+                "Der Bluetooth-Name fällt beim nächsten Neustart auf "
+                "LevelSense-<UID> zurück."):
+            return
+        payload = build_gf_command_name(name)
+        try:
+            send_fast_packet(self.bus, 126208, self.sel_src, PC_SOURCE_ADDR,
+                             payload)
+            self.log_line(f">> Name an 0x{self.sel_src:02X}: "
+                          f"'{name}'" if name else
+                          f">> Name von 0x{self.sel_src:02X} löschen")
         except can.CanError as e:
             self.log_line(f"Senden fehlgeschlagen: {e}")
 
