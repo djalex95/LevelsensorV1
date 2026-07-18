@@ -608,4 +608,32 @@ class App:
 
     def log_line(self, text):
         self.log.config(state="normal")
-        self.log.insert("end", f"{time.str
+        self.log.insert("end", f"{time.strftime('%H:%M:%S')}  {text}\n")
+        self.log.see("end")
+        self.log.config(state="disabled")
+
+    def on_close(self):
+        if self.bus is not None:
+            self.disconnect()
+        self.root.destroy()
+
+
+if __name__ == "__main__":
+    root = tk.Tk()
+
+    # Fenster-/Taskleisten-Symbol setzen (statt der Tk-Feder)
+    try:
+        root.iconbitmap(resource_path("icon.ico"))
+    except Exception:
+        pass
+    # Windows: eigene Taskleisten-Gruppe, damit das Fenstersymbol genutzt wird
+    if sys.platform == "win32":
+        try:
+            import ctypes
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "LevelSense.NMEA2000.GUI")
+        except Exception:
+            pass
+
+    App(root)
+    root.mainloop()
