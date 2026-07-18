@@ -1,3 +1,36 @@
+## Firmware 1.2.6
+
+### Bluetooth-Name
+- Der BLE-Modulname folgt jetzt automatisch dem gespeicherten Sensornamen:
+  Beim Boot wird der Modulname ausgelesen und nur bei Abweichung neu
+  geschrieben (schont das Modul-Flash, kein unnötiger Modul-Neustart).
+- Fabrikneue oder zurückgesetzte Sensoren heißen beim BLE-Scan jetzt
+  `LevelSense-<UID>` – mehrere Sensoren sind damit unterscheidbar.
+- Umbenennen vom Plotter (Group Function) zieht den Bluetooth-Namen sofort
+  mit; ein NAME-Kommando mit unverändertem Namen löst keinen Modul-Neustart
+  mehr aus (Verbindung bleibt bestehen).
+
+### Werksreset & Adressverwaltung
+- Neu: Werksreset per BLE-Kommando `FACTORYRESET` (App ab 1.4.5) oder per
+  proprietärem PGN 126720 (PC-Tool). Löscht Kalibrierung, Tankform,
+  Konfiguration, Name und gespeicherte Adresse; der Sensor startet neu.
+- Neu: Commanded Address (PGN 65240) – Plotter oder PC-Tool können dem
+  Sensor eine feste Quelladresse zuweisen.
+
+### PC-Tool
+- Mehrsensor-Betrieb: Auswahlliste mit Wiedererkennung nach Adresswechsel
+  (Unique Number), Address-Claim-, Heartbeat- und Mess-Takt-Anzeige,
+  NMEA-Logfenster mit Filter.
+- Sensorname direkt aus dem Tool setzbar (wie vom Plotter, per Group
+  Function); unbenannte Sensoren zeigen ihre UID im Dropdown.
+- Werksreset und Adress-Zuweisung per Knopf.
+
+### Intern
+- Host-Testsuite auf 33 Tests erweitert (u. a. Werksreset).
+
+### Update
+OTA über die App (DFU) oder SWD. `Fuellstandsensor_v1.2.6.bin` ist OTA-tauglich.
+
 ## Firmware 1.2.5
 
 ### Sensorname
