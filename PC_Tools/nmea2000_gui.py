@@ -37,12 +37,13 @@ from nmea2000_reader import (
     BITRATE, FLUID_TYPES, PC_SOURCE_ADDR, PROP_PGN, SENSOR_ADDR,
     FastPacketAssembler, build_calib_max, build_calib_reset,
     build_gf_command_127505, build_lin_table_read, build_lin_table_write,
+    build_commanded_address, build_factory_reset,
     decode_address_claim, decode_can_id, decode_config_info,
     decode_gf, decode_heartbeat,
     decode_iso_request, decode_product_info, decode_prop, encode_can_id,
     parse_address_claim, send_fast_packet,
 )
-from tkinter import messagebox
+from tkinter import messagebox, simpledialog
 
 PGN_NAMES = {
     59392: "ISO Acknowledge", 59904: "ISO Request", 60928: "Address Claim",
@@ -111,6 +112,7 @@ class RxThread(threading.Thread):
                 fields = parse_address_claim(data)
                 if fields:
                     fields["src"] = src
+                    fields["name8"] = bytes(data[:8])
                     self.out.put(("claim", fields))
                     self.out.put(("log", decode_address_claim(data, src)))
             elif pgn == 126993:
@@ -200,9 +202,17 @@ class App:
         self.btn_claim = ttk.Button(row1, text="Address Claim anfordern",
                                     command=self.request_claim, state="disabled")
         self.btn_claim.pack(side="right")
-        self.lbl_claim = ttk.Label(busf, text="Letzter Address Claim: –",
+        row2 = ttk.Frame(busf)
+        row2.pack(fill="x", pady=(2, 0))
+        self.lbl_claim = ttk.Label(row2, text="Letzter Address Claim: –",
                                    foreground="#555")
-        self.lbl_claim.pack(anchor="w", pady=(2, 0))
+        self.lbl_claim.pack(side="left")
+        self.btn_freset = ttk.Button(row2, text="Werksreset…",
+                                     command=self.factory_reset, state="disabled")
+        self.btn_freset.pack(side="right")
+        self.btn_cmdaddr = ttk.Button(row2, text="Adresse zuweisen…",
+                                      command=self.assign_address, state="disabled")
+        self.btn_cmdaddr.pack(side="right", padx=(0, 6))
 
         # ---- Füllstandsanzeige ----
         mid = ttk.Frame(root, padding=8)
@@ -308,6 +318,8 @@ class App:
             self.btn_lin_read.config(state="normal")
             self.btn_lin_write.config(state="normal")
             self.btn_claim.config(state="normal")
+            self.btn_cmdaddr.config(state="normal")
+            self.btn_freset.config(state="normal")
             self.lbl_hb.config(text="Heartbeat: warte auf ersten (≤ 60 s) …",
                                foreground="#555")
             if getattr(self, "_mon_win", None) and self._mon_win.winfo_exists():
@@ -332,6 +344,8 @@ class App:
         self.btn_lin_read.config(state="disabled")
         self.btn_lin_write.config(state="disabled")
         self.btn_claim.config(state="disabled")
+        self.btn_cmdaddr.config(state="disabled")
+        self.btn_freset.config(state="disabled")
         self.status.config(text="getrennt", foreground="red")
         self.log_line("Getrennt.")
 
@@ -605,10 +619,35 @@ class App:
                     self.log_line(f"Stützstellen vom Sensor gelesen: {payload}")
                 elif kind == "claim":
                     self.claim_count += 1
-                    mine = " (Sensor)" if payload["src"] == self.sensor_addr else ""
+                    c_src = payload["src"]
+                    uniq = payload["unique"]
+                    # Wiedererkennung: gleiches Gerät (unique) unter neuer
+                    # Adresse? Dann folgt der Registry-Eintrag samt Name dem
+                    # Sensor - und die Auswahl zieht automatisch mit um.
+                    moved_from = None
+                    for old_src, dv in list(self.devices.items()):
+                        if old_src != c_src and dv.get("unique") == uniq:
+                            moved_from = old_src
+                            self.devices[c_src] = dv
+                            del self.devices[old_src]
+                            break
+                    dev = self.devices.setdefault(
+                        c_src, {"name": "", "instance": None, "fluid": None})
+                    dev["unique"] = uniq
+                    dev["name8"] = payload["name8"]
+                    dev["last"] = time.time()
+                    if moved_from is not None:
+                        self.log_line(f"Sensor umgezogen: 0x{moved_from:02X} → "
+                                      f"0x{c_src:02X} (unique {uniq})")
+                        if self.sel_src == moved_from:
+                            self.sel_src = c_src
+                            self.sensor_addr = c_src
+                            self.lbl_addr.config(text=f"Adresse: 0x{c_src:02X}")
+                    self._refresh_combo()
+                    mine = " (Sensor)" if c_src == self.sensor_addr else ""
                     self.lbl_claim.config(
-                        text=f"Letzter Address Claim: 0x{payload['src']:02X}{mine}  "
-                             f"unique={payload['unique']}  mfr={payload['mfr']}  "
+                        text=f"Letzter Address Claim: 0x{c_src:02X}{mine}  "
+                             f"unique={uniq}  mfr={payload['mfr']}  "
                              f"fn={payload['function']}  class={payload['dev_class']}  "
                              f"inst={payload['dev_instance']}  "
                              f"({self.claim_count} seit Anfrage)")
@@ -777,6 +816,54 @@ class App:
                                       is_extended_id=True))
         except can.CanError:
             pass
+
+    def assign_address(self):
+        """PGN 65240 Commanded Address: dem gewählten Sensor per NAME eine
+        neue Quelladresse zuweisen. Dank Unique-Number-Wiedererkennung folgt
+        die Tool-Auswahl dem Sensor automatisch auf die neue Adresse."""
+        if not self.bus or self.sel_src is None:
+            return
+        dev = self.devices.get(self.sel_src, {})
+        name8 = dev.get("name8")
+        if not name8:
+            messagebox.showinfo(
+                "NAME unbekannt",
+                "Für die Adresszuweisung wird der 64-bit-NAME des Sensors "
+                "benötigt.\nErst »Address Claim anfordern«, dann erneut "
+                "versuchen.")
+            return
+        val = simpledialog.askstring(
+            "Adresse zuweisen",
+            f"Neue Adresse für 0x{self.sel_src:02X} "
+            f"(dezimal oder hex mit 0x, Bereich 0–251):",
+            parent=self.root)
+        if not val:
+            return
+        try:
+            new_addr = int(val.strip(), 0)
+            payload = build_commanded_address(name8, new_addr)
+        except ValueError as e:
+            self.log_line(f"Ungültige Adresse: {e}")
+            return
+        try:
+            send_fast_packet(self.bus, 65240, 0xFF, PC_SOURCE_ADDR, payload)
+            self.log_line(f">> Commanded Address: 0x{self.sel_src:02X} → "
+                          f"0x{new_addr:02X} – warte auf neuen Claim …")
+        except can.CanError as e:
+            self.log_line(f"Senden fehlgeschlagen: {e}")
+
+    def factory_reset(self):
+        """Werksreset des gewählten Sensors (proprietäres Kommando)."""
+        if not self.bus or self.sel_src is None:
+            return
+        if not messagebox.askyesno(
+                "Werksreset",
+                f"Sensor 0x{self.sel_src:02X} wirklich auf Werkszustand "
+                f"zurücksetzen?\n\nLöscht Kalibrierung, Tankform, Instanz, "
+                f"Name und die gespeicherte Adresse. Der Sensor startet neu "
+                f"und meldet sich mit Adresse 0x21 (bzw. nach Arbitrierung)."):
+            return
+        self._send_prop(build_factory_reset(), "Werksreset angefordert")
 
     def update_rx_label(self):
         """Zeigt an, wie lange die letzte Tankmessung her ist und in welchem

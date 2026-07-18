@@ -264,6 +264,7 @@ PROP_CMD_SET_LIN = 0x01
 PROP_CMD_GET_LIN = 0x02
 PROP_CMD_CALIB = 0x03         # aktuellen Druck als 100 % kalibrieren
 PROP_CMD_RESET = 0x04         # Kalibrierung zurücksetzen
+PROP_CMD_FRESET = 0x05        # Werksreset: kompletten Config löschen + Neustart
 
 
 def build_lin_table_write(points) -> bytes:
@@ -282,6 +283,22 @@ def build_lin_table_read() -> bytes:
 def build_calib_max() -> bytes:
     """Aktuellen Füllstand am Sensor als 100 % (Maximalwert) kalibrieren."""
     return PROP_HEADER + bytes([PROP_CMD_CALIB])
+
+
+def build_factory_reset() -> bytes:
+    """Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und die
+    gespeicherte Adresse; der Sensor startet neu (Adresse 0x21)."""
+    return PROP_HEADER + bytes([PROP_CMD_FRESET])
+
+
+def build_commanded_address(name8: bytes, new_addr: int) -> bytes:
+    """PGN 65240 Commanded Address (ISO 11783-5): 8 Byte NAME des Zielgeräts
+    (aus dessen Address Claim) + 1 Byte neue Quelladresse (0..251)."""
+    if len(name8) != 8:
+        raise ValueError("NAME muss 8 Byte lang sein")
+    if not 0 <= new_addr <= 251:
+        raise ValueError("Adresse muss 0..251 sein")
+    return bytes(name8) + bytes([new_addr])
 
 
 def build_calib_reset() -> bytes:
@@ -306,6 +323,9 @@ def decode_prop(data: bytes, src: int):
                              + ("übernommen" if ok else "abgelehnt (kein gültiger Druck)"))
     if data[2] == 0x84 and len(data) >= 4:
         return ("calib_ack", f"[0x{src:02X}] Kalibrierung auf Werkswert zurückgesetzt")
+    if data[2] == 0x85 and len(data) >= 4:
+        return ("calib_ack", f"[0x{src:02X}] Werksreset bestätigt – Sensor startet neu "
+                             f"(neue Adresse 0x21)")
     return None
 
 
