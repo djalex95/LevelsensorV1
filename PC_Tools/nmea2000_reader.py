@@ -145,6 +145,30 @@ def decode_product_info(data: bytes, src: int):
             f"          ModelID='{s(4)}'  SW='{s(36)}'  Version='{s(68)}'  Serial='{s(100)}'")
 
 
+def decode_config_info(data: bytes, src: int):
+    """PGN 126998 Configuration Information: bis zu drei variable Strings
+    (je [Laenge n+2][0x01 = ASCII][n Zeichen]): Installation Description 1,
+    Installation Description 2, Manufacturer Information. Liefert immer eine
+    Liste mit 3 Strings; faellt beim Altformat (roher String, FW <= 1.2.4)
+    auf diesen als erstes Feld zurueck."""
+    fields = []
+    pos = 0
+    while pos + 2 <= len(data) and len(fields) < 3:
+        ln = data[pos]
+        if ln < 2 or pos + ln > len(data):
+            fields = []                       # unplausibel -> Altformat
+            break
+        raw = bytes(data[pos + 2:pos + ln])
+        fields.append(raw.decode("ascii", "replace").strip("\x00").strip())
+        pos += ln
+    if not fields:
+        txt = data.split(b"\xff")[0].decode("ascii", "replace").strip()
+        return [txt, "", ""]
+    while len(fields) < 3:
+        fields.append("")
+    return fields
+
+
 # ---------------------------------------------------------------- Fast Packet
 
 class FastPacketAssembler:

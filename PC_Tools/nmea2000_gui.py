@@ -37,7 +37,8 @@ from nmea2000_reader import (
     BITRATE, FLUID_TYPES, PC_SOURCE_ADDR, PROP_PGN, SENSOR_ADDR,
     FastPacketAssembler, build_calib_max, build_calib_reset,
     build_gf_command_127505, build_lin_table_read, build_lin_table_write,
-    decode_address_claim, decode_can_id, decode_gf, decode_heartbeat,
+    decode_address_claim, decode_can_id, decode_config_info,
+    decode_gf, decode_heartbeat,
     decode_iso_request, decode_product_info, decode_prop, encode_can_id,
     parse_address_claim, send_fast_packet,
 )
@@ -105,7 +106,7 @@ class RxThread(threading.Thread):
             elif pgn == 130312 and len(data) >= 5:
                 raw = struct.unpack_from("<H", data, 3)[0]
                 if raw not in (0xFFFF, 0xFFFE):
-                    self.out.put(("temp", raw / 100.0 - 273.15))
+                    self.out.put(("temp", (src, raw / 100.0 - 273.15)))
             elif pgn == 60928:
                 fields = parse_address_claim(data)
                 if fields:
@@ -134,8 +135,8 @@ class RxThread(threading.Thread):
                         if r:
                             self.out.put(r)   # ("lin_ack", text) oder ("lin_table", werte)
                     else:
-                        s = full.split(b"\xff")[0].decode("ascii", "replace")
-                        self.out.put(("log", f"[0x{src:02X}] Device Info: '{s}'"))
+                        fields = decode_config_info(full, src)
+                        self.out.put(("cfginfo", (src, fields)))
 
 
 class App:
@@ -154,6 +155,9 @@ class App:
         self.claim_count = 0            # gesehene Address Claims (alle Geräte)
         self.last_hb = None             # (timestamp, src, seq, interval_ms)
         self.level_times = deque(maxlen=12)   # Zeitstempel der letzten Messungen
+        self.devices = {}               # src -> {"name","instance","fluid","last"}
+        self.sel_src = None             # ausgewählter Sensor (None = auto)
+        self._combo_srcs = []           # Reihenfolge der Combobox-Einträge
 
         # ---- Verbindungszeile ----
         top = ttk.Frame(root, padding=8)
@@ -181,7 +185,12 @@ class App:
         busf.pack(fill="x", padx=8, pady=(4, 0))
         row1 = ttk.Frame(busf)
         row1.pack(fill="x")
-        self.lbl_addr = ttk.Label(row1, text="Sensor-Adresse: –",
+        ttk.Label(row1, text="Sensor:").pack(side="left")
+        self.sensor_combo = ttk.Combobox(row1, width=28, state="readonly",
+                                         values=[])
+        self.sensor_combo.pack(side="left", padx=(4, 10))
+        self.sensor_combo.bind("<<ComboboxSelected>>", self._on_sensor_selected)
+        self.lbl_addr = ttk.Label(row1, text="Adresse: –",
                                   font=("Segoe UI", 9, "bold"))
         self.lbl_addr.pack(side="left")
         self.lbl_rx = ttk.Label(row1, text="Messung: –", foreground="#555")
@@ -585,7 +594,9 @@ class App:
                 elif kind == "level":
                     self.show_level(payload)
                 elif kind == "temp":
-                    self.lbl_temp.config(text=f"Temperatur: {payload:.2f} °C")
+                    t_src, t_val = payload
+                    if t_src == self.sel_src:
+                        self.lbl_temp.config(text=f"Temperatur: {t_val:.2f} °C")
                 elif kind == "lin_table":
                     for e, v in zip(self.lin_entries, payload):
                         e.delete(0, "end")
@@ -602,9 +613,20 @@ class App:
                              f"inst={payload['dev_instance']}  "
                              f"({self.claim_count} seit Anfrage)")
                 elif kind == "hb":
-                    self.last_hb = (time.time(), payload["src"], payload["seq"],
-                                    payload["interval_ms"])
-                    self.update_hb_label()
+                    if payload["src"] == self.sel_src:
+                        self.last_hb = (time.time(), payload["src"],
+                                        payload["seq"], payload["interval_ms"])
+                        self.update_hb_label()
+                elif kind == "cfginfo":
+                    c_src, fields = payload
+                    dev = self.devices.setdefault(
+                        c_src, {"name": "", "instance": None, "fluid": None})
+                    dev["name"] = fields[0]
+                    dev["last"] = time.time()
+                    self._refresh_combo()
+                    self.log_line(f"[0x{c_src:02X}] Config Info: "
+                                  f"Name='{fields[0] or '–'}'"
+                                  + (f"  ({fields[2]})" if fields[2] else ""))
                 elif kind == "lin_ack":
                     self.log_line(payload)
                 elif kind == "calib_ack":
@@ -628,10 +650,26 @@ class App:
                 lbl.config(text="?")
 
     def show_level(self, d):
+        src = d["src"]
+        known = src in self.devices
+        dev = self.devices.setdefault(src, {"name": "", "instance": None,
+                                            "fluid": None})
+        dev["instance"] = d["instance"]
+        dev["fluid"] = d["fluid"]
+        dev["last"] = time.time()
+        if not known:
+            self._refresh_combo()
+            self.log_line(f"Neue Quelle entdeckt: 0x{src:02X} "
+                          f"(Instanz {d['instance']}) – frage Namen an …")
+            self._request_cfginfo(src)
+        if self.sel_src is None:
+            self._select_sensor(src)
+        if src != self.sel_src:
+            return          # anderer Sensor: nur Registry pflegen, keine Anzeige
         self.last_rx = time.time()
         self.level_times.append(self.last_rx)
-        self.sensor_addr = d["src"]     # Sensor kann nach Arbitrierung umziehen
-        self.lbl_addr.config(text=f"Sensor-Adresse: 0x{d['src']:02X}")
+        self.sensor_addr = src          # Ziel aller Kommandos (folgt der Auswahl)
+        self.lbl_addr.config(text=f"Adresse: 0x{src:02X}")
         self._last_level = d["level"]   # für »Übernehmen« im Kalibrier-Fenster
         cap_changed = d["cap"] is not None and d["cap"] != self.tank_cap
         if cap_changed:
@@ -683,6 +721,62 @@ class App:
             y = h - pad - (h - 2 * pad) * max(0.0, min(100.0, lvl)) / 100
             pts += [x, y]
         c.create_line(*pts, fill="#0066cc", width=2)
+
+    # ---------------- Sensor-Auswahl (Mehrsensor-Betrieb) ----------------
+
+    def _combo_label(self, src):
+        dev = self.devices.get(src, {})
+        parts = [f"0x{src:02X}"]
+        if dev.get("name"):
+            parts.append(dev["name"])
+        if dev.get("instance") is not None:
+            parts.append(f"Inst {dev['instance']}")
+        return " – ".join(parts)
+
+    def _refresh_combo(self):
+        self._combo_srcs = sorted(self.devices)
+        self.sensor_combo["values"] = [self._combo_label(s)
+                                       for s in self._combo_srcs]
+        if self.sel_src in self._combo_srcs:
+            self.sensor_combo.current(self._combo_srcs.index(self.sel_src))
+
+    def _on_sensor_selected(self, _ev=None):
+        i = self.sensor_combo.current()
+        if 0 <= i < len(self._combo_srcs):
+            self._select_sensor(self._combo_srcs[i])
+
+    def _select_sensor(self, src):
+        """Anzeige, Graph, Heartbeat und alle Kommandos auf 'src' umschalten."""
+        if src == self.sel_src:
+            self._refresh_combo()
+            return
+        self.sel_src = src
+        self.sensor_addr = src
+        self._refresh_combo()
+        self.history.clear()
+        self.level_times.clear()
+        self.last_hb = None
+        self.last_rx = None
+        self._last_level = None
+        self.draw_graph()
+        self.lbl_addr.config(text=f"Adresse: 0x{src:02X}")
+        self.lbl_hb.config(text="Heartbeat: –", foreground="#555")
+        self.lbl_rx.config(text="Messung: –", foreground="#555")
+        self.log_line(f"Sensor 0x{src:02X} ausgewählt – Anzeige und Kommandos "
+                      f"gelten jetzt für dieses Gerät.")
+
+    def _request_cfginfo(self, src):
+        """Config Info (PGN 126998, enthält den Sensornamen) anfordern."""
+        if not self.bus:
+            return
+        can_id = encode_can_id(6, 59904, src, PC_SOURCE_ADDR)
+        data = bytes([126998 & 0xFF, (126998 >> 8) & 0xFF,
+                      (126998 >> 16) & 0xFF])
+        try:
+            self.bus.send(can.Message(arbitration_id=can_id, data=data,
+                                      is_extended_id=True))
+        except can.CanError:
+            pass
 
     def update_rx_label(self):
         """Zeigt an, wie lange die letzte Tankmessung her ist und in welchem
