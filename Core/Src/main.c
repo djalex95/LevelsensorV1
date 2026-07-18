@@ -2068,8 +2068,8 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 	else if (strncasecmp(cmd, "FACTORYRESET", 12) == 0)
 	{
 		/* Kompletten Config loeschen und neu starten (Adresse 0x21,
-		 * unkalibriert, kein Name). Der BLE-Modulname bleibt erhalten -
-		 * er ist im Funkmodul gespeichert (per NAME neu setzbar). */
+		 * unkalibriert, kein Name). Der BLE-Modulname faellt beim naechsten
+		 * Boot per Namensabgleich auf "LevelSense-<UID>" zurueck. */
 		BLE_SendString("OK FACTORYRESET\n");
 		HAL_Delay(100);
 		config_factory_reset();
