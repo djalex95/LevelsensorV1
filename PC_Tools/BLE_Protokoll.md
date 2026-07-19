@@ -121,7 +121,10 @@ eine neue PIN: Der Sensor speichert sie, trennt die Verbindung, löscht alle
 Bonds im Modul und startet es neu – **jedes Handy muss sich danach neu
 koppeln** (ggf. vorher die alte Kopplung in den Bluetooth-Einstellungen des
 Handys entfernen). PIN vergessen? Werksreset über das PC-Tool per CAN stellt
-`123123` wieder her. Hinweis nach einem Firmware-Update von ≤ 1.2.6: Beim
+`123123` wieder her. Nach einem Werksreset (und einmalig nach dem Update auf
+1.2.7) bereinigt der Sensor beim nächsten Boot außerdem die Kopplungstabelle
+des Funkmoduls – hängengebliebene „Geister-Kopplungen" können das Pairing
+sonst blockieren. Hinweis nach einem Firmware-Update von ≤ 1.2.6: Beim
 ersten Verbinden ist einmalig die Neukopplung mit `123123` nötig.
 
 Im **Bootloader-Modus** (während des OTA-Updates) beantwortet der Bootloader

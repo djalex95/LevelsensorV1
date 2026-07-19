@@ -104,6 +104,15 @@ extern volatile uint16_t ble_get_len;
  * Zustand aufrufen (z. B. Boot-Abgleich). */
 uint8_t BLE_SetSecFlags(uint8_t flags);
 
+/* Löscht die komplette Bond-Tabelle im Modul (CMD_DELETEBONDS_REQ) und
+ * startet es neu. Räumt Geister-Kopplungen ab, die das Pairing blockieren
+ * (z. B. Handy hat seine Kopplung gelöscht, das Modul nicht). Nur im
+ * getrennten Zustand aufrufen. */
+uint8_t BLE_ClearBonds(void);
+
+/* Aktive Verbindung modulseitig trennen (CMD_DISCONNECT_REQ). */
+void BLE_Disconnect(void);
+
 /* Ändert den BLE-Passkey (RF_StaticPasskey, 6 Ziffern) dauerhaft im Modul,
  * löscht die Bonds und startet das Modul neu. Bei bestehender Verbindung
  * wird erst getrennt; die Hauptschleife wendet die PIN danach an

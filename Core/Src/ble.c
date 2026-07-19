@@ -334,6 +334,26 @@ uint8_t BLE_SetSecFlags(uint8_t flags)
 	return 1;
 }
 
+uint8_t BLE_ClearBonds(void)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_send_cmd0(CMD_DELETEBONDS_REQ);
+	HAL_Delay(50);
+	ble_send_cmd0(CMD_RESET_REQ);	/* sauberer Neuanlauf, frisches Advertising */
+	return 1;
+}
+
+void BLE_Disconnect(void)
+{
+	if (ble_uart != NULL)
+	{
+		ble_send_cmd0(CMD_DISCONNECT_REQ);
+	}
+}
+
 uint8_t BLE_SetPin(const char *pin)
 {
 	if (ble_uart == NULL)

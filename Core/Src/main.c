@@ -578,6 +578,7 @@ int main(void)
 			else if (ble_get_ready && (ble_get_index == sync_idx[ble_sync_step]))
 			{
 				uint32_t settle = 100;
+				uint8_t postpone = 0;	/* 1 = Schritt spaeter wiederholen */
 
 				if (ble_sync_step == 0)			/* Modulname */
 				{
@@ -586,7 +587,7 @@ int main(void)
 					if ((ble_get_len != strlen(want))
 							|| (memcmp(ble_get_value, want, ble_get_len) != 0))
 					{
-						BLE_SetDeviceName(want);
+						BLE_SetDeviceName(want);	/* behandelt 'verbunden' selbst */
 						settle = 2000;			/* Modul startet neu */
 					}
 				}
@@ -595,26 +596,73 @@ int main(void)
 					if ((ble_get_len != 1)
 							|| (ble_get_value[0] != BLE_SECFLAGS_TARGET))
 					{
-						BLE_SetSecFlags(BLE_SECFLAGS_TARGET);
-						settle = 2000;
+						if (ble_connected)
+						{
+							/* nicht mitten in eine aktive Verbindung (evtl.
+							 * laufendes Pairing) graetschen: erst trennen,
+							 * Schritt im Leerlauf wiederholen */
+							BLE_Disconnect();
+							postpone = 1;
+						}
+						else
+						{
+							BLE_SetSecFlags(BLE_SECFLAGS_TARGET);
+							settle = 2000;
+						}
 					}
 				}
 				else							/* Passkey (PIN) */
 				{
 					char pin[BLE_PIN_LEN + 1];
+					uint8_t wrote = 0;
 					get_pin_eeprom(pin);
 					if ((ble_get_len != BLE_PIN_LEN)
 							|| (memcmp(ble_get_value, pin, BLE_PIN_LEN) != 0))
 					{
-						BLE_SetPin(pin);
+						BLE_SetPin(pin);	/* loescht auch die Bonds;
+											 * behandelt 'verbunden' selbst */
+						wrote = 1;
 						settle = 2000;
+					}
+					/* Einmalig nach Werksreset/Firmware-Update: Bond-Tabelle
+					 * im Modul bereinigen, auch wenn PIN und SecFlags schon
+					 * stimmen. Sonst blockieren Geister-Kopplungen (Handy hat
+					 * seine Kopplung geloescht, das Modul nicht) das Pairing
+					 * - teils ohne sichtbare PIN-Abfrage. */
+					if (cfg_data[CFG_SECPROV_OFF] != CFG_SECPROV_MAGIC)
+					{
+						if (!wrote)
+						{
+							if (ble_connected)
+							{
+								BLE_Disconnect();
+								postpone = 1;
+							}
+							else
+							{
+								BLE_ClearBonds();
+								settle = 2000;
+							}
+						}
+						if (!postpone)
+						{
+							cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
+							config_save();
+						}
 					}
 				}
 				ble_get_ready = 0;
-				ble_sync_step++;
 				ble_sync_wait = 0;
-				ble_sync_tries = 0;
-				ble_sync_next = time_el + settle;
+				if (postpone)
+				{
+					ble_sync_next = time_el + 1500;	/* selber Schritt erneut */
+				}
+				else
+				{
+					ble_sync_step++;
+					ble_sync_tries = 0;
+					ble_sync_next = time_el + settle;
+				}
 			}
 			else
 			{
