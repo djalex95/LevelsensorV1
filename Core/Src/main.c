@@ -2021,6 +2021,10 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 				 * Description in PGN 126998 (Geraeteliste am Plotter). */
 				set_name_eeprom(name);
 				get_name_eeprom(sensor_name);
+				dev_info++;		/* aktualisiertes 126998 auf dem NMEA-Bus
+								 * verschicken (Symmetrie zum Setzen per
+								 * Group Function: PC-Tool/Plotter sehen den
+								 * neuen Namen sofort) */
 				/* erst bestätigen, dann Modul umbenennen (Modul startet danach
 				 * neu und trennt die Verbindung). Der Modulname folgt dem
 				 * gespeicherten (ggf. auf 24 Zeichen gekuerzten) Sensornamen. */
