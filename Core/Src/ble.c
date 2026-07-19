@@ -331,6 +331,11 @@ uint8_t BLE_SetSecFlags(uint8_t flags)
 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
 	HAL_Delay(50);
 	ble_send_cmd0(CMD_RESET_REQ);	/* Einstellungen aktivieren */
+	/* Ein Reset trennt die Funkverbindung, das Modul sendet dabei KEIN
+	 * CMD_DISCONNECT_IND -> Zustand hier selbst zuruecksetzen, sonst bleibt
+	 * ble_connected haengen und der Boot-Abgleich postponet endlos. */
+	ble_connected = 0;
+	ble_channel_open = 0;
 	return 1;
 }
 
@@ -343,6 +348,8 @@ uint8_t BLE_ClearBonds(void)
 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
 	HAL_Delay(50);
 	ble_send_cmd0(CMD_RESET_REQ);	/* sauberer Neuanlauf, frisches Advertising */
+	ble_connected = 0;				/* Reset trennt die Verbindung (kein IND) */
+	ble_channel_open = 0;
 	return 1;
 }
 
@@ -388,6 +395,8 @@ void BLE_ApplyPendingPin(void)
 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
 	HAL_Delay(50);
 	ble_send_cmd0(CMD_RESET_REQ);	/* neue PIN aktivieren */
+	ble_connected = 0;				/* Reset trennt die Verbindung (kein IND) */
+	ble_channel_open = 0;
 }
 
 void BLE_ApplyPendingName(void)

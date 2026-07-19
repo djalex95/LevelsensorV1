@@ -653,12 +653,21 @@ int main(void)
 				}
 				ble_get_ready = 0;
 				ble_sync_wait = 0;
-				if (postpone)
+				if (postpone && (++ble_sync_tries < 5))
 				{
 					ble_sync_next = time_el + 1500;	/* selber Schritt erneut */
 				}
 				else
 				{
+					/* Fertig ODER Postpone-Obergrenze erreicht: in letzterem
+					 * Fall die Provisionierung als erledigt markieren, damit
+					 * der Sensor nicht in einer Reset-Schleife haengt (der
+					 * Abgleich ist Best-Effort - der Sensor bleibt nutzbar). */
+					if (postpone && (ble_sync_step == 2))
+					{
+						cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
+						config_save();
+					}
 					ble_sync_step++;
 					ble_sync_tries = 0;
 					ble_sync_next = time_el + settle;
