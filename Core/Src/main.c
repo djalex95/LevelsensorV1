@@ -4,6 +4,28 @@
   * @file           : main.c
   * @brief          : Main program body
   ******************************************************************************
+  *
+  * Druckbasierter Fuellstandsensor mit NMEA2000 (CAN) und Bluetooth LE.
+  *
+  * NAVIGATION (die Datei ist gross; ein spaeterer Refactor teilt diese Bloecke
+  * in eigene Module auf):
+  *   - main() + Hauptschleife .............. Messtakt, NMEA-Sendetimer,
+  *                                            BLE-Bearbeitung, Boot-Abgleich, LED
+  *   - Config-/EEPROM-Helfer ............... check/get/save_EEPROM, *_dac_EEPROM,
+  *                                            get/set_param_eeprom, name/adr
+  *   - Sensor/Mess-Ebene ................... get_value, calc_percent,
+  *                                            linearize_percent, set_volt, DAC
+  *   - LED ................................. set_led, calc_color, blink_LED
+  *   - NMEA2000-Handler .................... handle_group_function,
+  *                                            handle_prop_config,
+  *                                            handle_commanded_address
+  *   - BLE-Kommando-Ebene .................. ble_send_status, ble_send_lin,
+  *                                            ble_handle_command, ble_desired_name
+  *   - CubeMX-generiert .................... SystemClock/MX_*_Init, HAL-Callbacks
+  *
+  * Der eigentliche Proteus-e-BLE-Treiber liegt in ble.c, der robuste
+  * Config-Speicher in config_store.c, der NMEA2000-Stack in nmea2000.c.
+  ******************************************************************************
   * @attention
   *
   * Copyright (c) 2023 STMicroelectronics.
@@ -386,6 +408,17 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  /* Hauptschleife (kooperatives, zeitscheibenbasiertes Scheduling ueber
+   * HAL_GetTick-Vergleiche - kein RTOS). Pro Durchlauf, jeweils per eigenem
+   * Timer gedrosselt:
+   *   - Messtakt (tx_time): Druck lesen, EMA-filtern, Fuellstand rechnen, DAC
+   *   - NMEA2000 senden: Fluid Level 127505 (2,5 s), Temperatur 130312 (2 s),
+   *     Heartbeat 126993 (60 s); auf Anfrage Adressen-Claim/PGN-Liste
+   *   - reassemblierte Fast-Packets abarbeiten (126208/126720/65240)
+   *   - BLE: empfangene Kommandos, Status-Streaming, aufgeschobener Namens-Set,
+   *     einmaliger Boot-Abgleich (Name + Security-Provisionierung)
+   *   - LED-Animation
+   * Der Watchdog wird zu Beginn jedes Durchlaufs gefuettert. */
   while (1)
   {
 	  IWDG->KR = 0x0000AAAAUL;	/* Watchdog fuettern */
@@ -2029,15 +2062,20 @@ static void ble_send_lin()
 }
 
 /*
- * Verarbeitet ein Textkommando von der App (CMD_DATA_IND).
- * Unterstützt (Groß-/Kleinschreibung egal):
+ * Verarbeitet ein Textkommando von der App (CMD_DATA_IND). Vollstaendige
+ * Spezifikation in PC_Tools/BLE_Protokoll.md. Unterstützt (case-insensitive):
  *   VER            Firmware-Version senden (VER;x.y.z)
- *   GET            aktuellen Status sofort senden
+ *   GET            aktuellen Status sofort senden (STAT;...)
+ *   LIN            aktuelle Tankform-Kennlinie senden (LIN;...)
+ *   LIN v0,...,v10 Kennlinie setzen (11 Werte 0..100, steigend)
  *   CAL100         aktuellen Druck als 100 % kalibrieren
  *   CALRESET       Kalibrierung auf Werkswert zurücksetzen
  *   FLUID <0..15>  Fluidtyp setzen
  *   CAP <1..255>   Tankkapazität (Liter) setzen
  *   INST <0..15>   Instanz setzen
+ *   NAME <text>    Sensor-/BLE-Namen setzen; NAME (ohne Arg) fragt ihn ab
+ *   FACTORYRESET   Config löschen und neu starten
+ *   DFU            in den Bootloader/Update-Modus wechseln
  */
 void ble_handle_command(const uint8_t *data, uint16_t len)
 {
