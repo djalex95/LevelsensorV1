@@ -16,14 +16,12 @@ relevant – es wird vom Modul transparent überbrückt.
 Ablauf beim Verbinden:
 
 1. Nach Gerätename oder Service-UUID scannen und verbinden.
-2. **Pairing mit PIN** (ab Firmware 1.2.7): Das Modul verlangt beim ersten
-   Verbinden einen 6-stelligen Passkey (Werks-PIN **123123**, per `PIN`-Kommando
-   änderbar). Die Eingabe übernimmt der System-Pairing-Dialog des
-   Betriebssystems; danach ist die Verbindung verschlüsselt und gebondet
-   (keine erneute Eingabe nötig).
-3. **Große MTU anfordern** (bis 247 Byte) – wichtig, damit längere Kommandos
+2. **Große MTU anfordern** (bis 247 Byte) – wichtig, damit längere Kommandos
    wie `LIN …` in einem Write passen.
-4. Notifications der TX-Charakteristik aktivieren.
+3. Notifications der TX-Charakteristik aktivieren.
+
+Die BLE-Schnittstelle ist **ohne Verschlüsselung/Pairing** – es ist kein
+Passkey nötig (siehe Hinweis unten).
 
 Danach: Kommandos als UTF-8/ASCII-Text in RX schreiben, Antworten und den
 periodischen Status als TX-Notification empfangen. Jede Nachricht endet mit `\n`.
@@ -83,9 +81,8 @@ ERR ?             unbekanntes Kommando
 | `INST n` | Instanz setzen (0..15) | `OK INST n` / `ERR INST` |
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
 | `CALRESET` | Kalibrierung auf Werkswert zurücksetzen | `OK CALRESET` |
-| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name, PIN und gespeicherte Adresse; Sensor startet neu (beim nächsten Boot: BLE-Name wieder `LevelSense-<UID>`, PIN wieder `123123`, alle Kopplungen gelöscht) | `OK FACTORYRESET`, dann Neustart |
+| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (beim nächsten Boot: BLE-Name wieder `LevelSense-<UID>`) | `OK FACTORYRESET`, dann Neustart |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
-| `PIN nnnnnn` | Bluetooth-PIN ändern (genau 6 Ziffern) | `OK PIN` / `ERR PIN`; bei Änderung **trennt sich die Verbindung**, alle Kopplungen werden gelöscht, danach mit neuer PIN neu koppeln |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 
 **Hinweis zu `NAME`:** Der Name wird zusätzlich persistent im Sensor
@@ -111,23 +108,13 @@ antwortet der Sensor nur mit `OK NAME` (kein Modul-Neustart, Verbindung
 bleibt bestehen). Hinweis: Der Sensor speichert max. 24 Zeichen, das
 BLE-Modul zeigt davon max. 20.
 
-**Sicherheit (PIN):** Ab Firmware 1.2.7 ist die BLE-Schnittstelle mit
-Static-Passkey-Pairing und Bonding gesichert (`RF_SecFlags = 0x0B`). Die
-Wunsch-PIN liegt im Sensor-Config (einzige Quelle der Wahrheit). Nach einem
-Werksreset bzw. beim Erstboot **provisioniert** die Firmware die Sicherheit
-**einmalig** (SecFlags + Passkey setzen, Bonds löschen) und fasst sie danach
-im Betrieb nicht mehr an – das ist wichtig, weil manche Module den Passkey
-nicht identisch zurückliefern; ein Abgleich bei jedem Boot würde die Kopplung
-sonst bei jedem Neustart verlieren. Werks-PIN ist `123123`. `PIN nnnnnn` setzt
-eine neue PIN: Der Sensor speichert sie, trennt die Verbindung, löscht alle
-Bonds im Modul und startet es neu – **jedes Handy muss sich danach neu
-koppeln** (ggf. vorher die alte Kopplung in den Bluetooth-Einstellungen des
-Handys entfernen). PIN vergessen? Werksreset über das PC-Tool per CAN stellt
-`123123` wieder her. Nach einem Werksreset (und einmalig nach dem Update auf
-1.2.7) bereinigt der Sensor beim nächsten Boot außerdem die Kopplungstabelle
-des Funkmoduls – hängengebliebene „Geister-Kopplungen" können das Pairing
-sonst blockieren. Hinweis nach einem Firmware-Update von ≤ 1.2.6: Beim
-ersten Verbinden ist einmalig die Neukopplung mit `123123` nötig.
+**Sicherheit:** Die BLE-Schnittstelle läuft **ohne Verschlüsselung/Pairing**
+(`RF_SecFlags = 0x00`). Eine PIN-Absicherung (Static-Passkey + Bonding) wurde
+erprobt, aber wieder entfernt: Mit diesem Funkmodul in Kombination mit Androids
+Bond-Handling überlebte die Kopplung einen Sensor-Neustart nicht zuverlässig.
+Die Firmware stellt den Sicherheitsmodus nach einem Werksreset bzw. einmalig
+nach dem Update selbst auf „aus" (und bereinigt dabei alte Kopplungen im Modul),
+sodass keine hängengebliebenen Bonds das Verbinden blockieren.
 
 Im **Bootloader-Modus** (während des OTA-Updates) beantwortet der Bootloader
 zusätzlich `VER` mit `BLV;x.y.z` (seiner eigenen Version). Die App fragt das beim

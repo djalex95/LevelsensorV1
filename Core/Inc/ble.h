@@ -39,16 +39,12 @@
 #define CMD_DELETEBONDS_REQ     0x0E	/* Bonding-Daten loeschen (Len 0=alle) */
 #define CFG_IDX_DEVICENAME      0x02	/* Settings-Index RF_DeviceName        */
 #define CFG_IDX_SECFLAGS        0x0C	/* Settings-Index RF_SecFlags (1 Byte) */
-#define CFG_IDX_STATICPASSKEY   0x12	/* Settings-Index RF_StaticPasskey     */
 
-/* Ziel-Sicherheitsmodus: Static Passkey (0x3) + Bonding (Bit 3) -> 0x0B.
- * Quelle: Proteus-e User Manual rev 1.9, Kap. 10.8 (Table 20). */
-#define BLE_SECFLAGS_TARGET     0x0B
-
-/* Werks-Passkey des Moduls (RF_StaticPasskey-Default laut Manual Kap. 10.7).
- * Gilt, solange im Config keine eigene PIN gespeichert ist. */
-#define BLE_PIN_DEFAULT         "123123"
-#define BLE_PIN_LEN             6
+/* Ziel-Sicherheitsmodus: 0x00 = keine Verschluesselung. Die frueher erprobte
+ * PIN-Absicherung (Static Passkey + Bonding) hat sich mit diesem Modul in
+ * Kombination mit Androids Bond-Handling als nicht zuverlaessig erwiesen
+ * (Bond ueberlebt Sensor-Neustart nicht) und wurde daher entfernt. */
+#define BLE_SECFLAGS_TARGET     0x00
 
 #define BLE_MAX_PAYLOAD         243
 #define BLE_FRAME_MAX           (BLE_MAX_PAYLOAD + 5)
@@ -99,22 +95,13 @@ extern uint8_t           ble_get_index;      /* Index der offenen Anfrage    */
 extern uint8_t           ble_get_value[21];  /* Wert (nullterminiert)        */
 extern volatile uint16_t ble_get_len;
 
-/* Einmalige Sicherheits-Provisionierung (nach Werksreset/Erstboot): setzt den
- * Sicherheitsmodus (RF_SecFlags) und den Passkey, löscht die Bond-Tabelle und
- * startet das Modul neu - alles in einem Rutsch (ein Modul-Reset). Danach wird
- * die Sicherheit im Betrieb NICHT mehr angefasst; die PIN ändert nur noch das
- * PIN-Kommando aktiv. Nur im getrennten Zustand aufrufen. */
-uint8_t BLE_ProvisionSecurity(uint8_t flags, const char *pin);
+/* Einmalige Sicherheits-Provisionierung (nach Werksreset/Erstboot bzw. einmalig
+ * nach diesem Firmware-Update): setzt RF_SecFlags, löscht die Bond-Tabelle und
+ * startet das Modul neu. Aktuell wird damit die Verschlüsselung deaktiviert
+ * (flags = 0). Nur im getrennten Zustand aufrufen. */
+uint8_t BLE_ProvisionSecurity(uint8_t flags);
 
 /* Aktive Verbindung modulseitig trennen (CMD_DISCONNECT_REQ). */
 void BLE_Disconnect(void);
-
-/* Ändert den BLE-Passkey (RF_StaticPasskey, 6 Ziffern) dauerhaft im Modul,
- * löscht die Bonds und startet das Modul neu. Bei bestehender Verbindung
- * wird erst getrennt; die Hauptschleife wendet die PIN danach an
- * (ble_setpin_pending, BLE_ApplyPendingPin). */
-uint8_t BLE_SetPin(const char *pin);
-void BLE_ApplyPendingPin(void);
-extern volatile uint8_t ble_setpin_pending;
 
 #endif /* INC_BLE_H_ */

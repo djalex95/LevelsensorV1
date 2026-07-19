@@ -19,9 +19,9 @@
  *   31     Geraete-/Tank-Instanz
  *   32     Layout-Version (2)
  *   33..56 Sensorname (24 Byte, 0x00-terminiert/-gepolstert; 0xFF = nie gesetzt)
- *   57..62 BLE-PIN (6 ASCII-Ziffern; 0xFF/ungueltig = Werks-PIN 123123)
- *   63     Security-Provisioning-Marker (0xA5 = Bond-Tabelle des BLE-Moduls
- *          wurde nach Werksreset/Erstboot bereinigt; sonst 0xFF)
+ *   57..62 frei (ehemalige BLE-PIN, nicht mehr genutzt)
+ *   63     Security-Provisioning-Marker (CFG_SECPROV_MAGIC = BLE-Sicherheit
+ *          wurde nach Werksreset/Erstboot einmalig provisioniert; sonst 0xFF)
  *
  * Bytes 0..31 sind identisch zum alten 32-Byte-Format (Layout-Version 1).
  * Beim ersten Boot nach einem Update migriert config_load() einen
@@ -41,10 +41,11 @@
 #define CFG_LAYOUT_V  2
 #define CFG_NAME_OFF  33          /* Sensorname (Installation Description)  */
 #define CFG_NAME_LEN  24
-#define CFG_PIN_OFF   57          /* BLE-PIN (RF_StaticPasskey, 6 Ziffern)  */
-#define CFG_PIN_LEN   6
-#define CFG_SECPROV_OFF   63      /* Marker: Modul-Bonds einmalig bereinigt */
-#define CFG_SECPROV_MAGIC 0xA5
+/* 57..62 frei (ehemalige BLE-PIN, nicht mehr genutzt)                     */
+#define CFG_SECPROV_OFF   63      /* Marker: BLE-Sicherheit einmalig provisioniert */
+/* Wert bewusst geaendert (war 0xA5): so provisionieren bereits gesetzte
+ * Sensoren beim Firmware-Update einmalig neu -> SecFlags=0, Bonds geloescht. */
+#define CFG_SECPROV_MAGIC 0x5A
 
 /* RAM-Cache der Konfiguration; Aenderungen hier eintragen, dann config_save() */
 extern uint8_t cfg_data[CFG_SIZE];

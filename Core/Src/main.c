@@ -125,8 +125,6 @@ uint8_t get_adr_eeprom();
 void get_name_eeprom(char *buf);
 void set_name_eeprom(const char *name);
 static void ble_desired_name(char *buf);
-void get_pin_eeprom(char *buf);
-void set_pin_eeprom(const char *pin);
 void set_adr_eeprom(uint8_t adr);
 void handle_group_function();
 void handle_prop_config();
@@ -217,6 +215,7 @@ static uint8_t  ble_sync_step = 0;
 static uint8_t  ble_sync_wait = 0;		/* 1 = Antwort auf GET ausstehend    */
 static uint32_t ble_sync_next = 1500;	/* Modul bootet ~1,5 s               */
 static uint8_t  ble_sync_tries = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -545,12 +544,6 @@ int main(void)
 			HAL_Delay(50);
 			BLE_ApplyPendingName();
 		}
-		if(ble_setpin_pending && (ble_connected == 0))
-		{
-			/* dito fuer eine aufgeschobene PIN-Aenderung */
-			HAL_Delay(50);
-			BLE_ApplyPendingPin();
-		}
 
 		/* --- Nach dem Boot: (0) Modulnamen abgleichen, (1) die Sicherheit
 		 * EINMALIG provisionieren. Sicherheitsmodus und PIN werden danach im
@@ -630,9 +623,7 @@ int main(void)
 				}
 				else
 				{
-					char pin[BLE_PIN_LEN + 1];
-					get_pin_eeprom(pin);
-					BLE_ProvisionSecurity(BLE_SECFLAGS_TARGET, pin);
+					BLE_ProvisionSecurity(BLE_SECFLAGS_TARGET);
 					cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
 					config_save();
 					ble_sync_step = 2;
@@ -785,40 +776,6 @@ void get_name_eeprom(char *buf)
 		buf[i] = (char)c;
 	}
 	buf[i] = '\0';
-}
-
-/* BLE-PIN aus dem Config lesen (Bytes 57..62): 6 ASCII-Ziffern.
- * Unplausibel/0xFF = nie gesetzt -> Werks-PIN (123123, Proteus-Default).
- * buf braucht CFG_PIN_LEN+1 Bytes. */
-void get_pin_eeprom(char *buf)
-{
-	uint8_t i, ok = 1;
-	for (i = 0; i < CFG_PIN_LEN; i++)
-	{
-		uint8_t c = cfg_data[CFG_PIN_OFF + i];
-		if ((c < '0') || (c > '9'))
-		{
-			ok = 0;
-			break;
-		}
-		buf[i] = (char)c;
-	}
-	if (!ok)
-	{
-		memcpy(buf, BLE_PIN_DEFAULT, CFG_PIN_LEN);
-	}
-	buf[CFG_PIN_LEN] = '\0';
-}
-
-/* BLE-PIN persistent speichern (genau 6 Ziffern, Aufrufer validiert). */
-void set_pin_eeprom(const char *pin)
-{
-	uint8_t i;
-	for (i = 0; i < CFG_PIN_LEN; i++)
-	{
-		cfg_data[CFG_PIN_OFF + i] = (uint8_t)pin[i];
-	}
-	config_save();
 }
 
 /* Gewuenschter BLE-Modulname (max. 20 Zeichen, Proteus-Limit):
@@ -2217,43 +2174,6 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		else
 		{
 			BLE_SendString("ERR NAME\n");
-		}
-	}
-	else if (strncasecmp(cmd, "PIN ", 4) == 0)
-	{
-		const char *pin = cmd + 4;
-		uint8_t i, valid = (strlen(pin) == BLE_PIN_LEN);
-		for (i = 0; valid && (i < BLE_PIN_LEN); i++)
-		{
-			if ((pin[i] < '0') || (pin[i] > '9'))
-			{
-				valid = 0;
-			}
-		}
-		if (valid)
-		{
-			char cur[BLE_PIN_LEN + 1];
-			get_pin_eeprom(cur);
-			if (strcmp(pin, cur) == 0)
-			{
-				/* unveraendert -> kein Flash-Schreibzugriff, kein
-				 * Modul-Neustart (Verbindung bleibt bestehen) */
-				BLE_SendString("OK PIN\n");
-			}
-			else
-			{
-				set_pin_eeprom(pin);
-				/* erst bestaetigen, dann Modul umstellen: trennt die
-				 * Verbindung, loescht alle Bonds und startet das Modul
-				 * neu - alle Handys muessen sich neu koppeln. */
-				BLE_SendString("OK PIN\n");
-				HAL_Delay(50);
-				BLE_SetPin(pin);
-			}
-		}
-		else
-		{
-			BLE_SendString("ERR PIN\n");
 		}
 	}
 	else if (strncasecmp(cmd, "FLUID ", 6) == 0)

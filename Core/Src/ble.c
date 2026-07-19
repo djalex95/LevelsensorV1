@@ -28,10 +28,6 @@ static uint8_t ble_mps = 19;
 volatile uint8_t ble_setname_pending = 0;
 static char ble_pending_name[21];
 
-/* Aufgeschobene PIN-Änderung (wird nach dem Trennen angewendet) */
-volatile uint8_t ble_setpin_pending = 0;
-static char ble_pending_pin[BLE_PIN_LEN + 1];
-
 /* Ergebnis einer Einstellungs-Abfrage (BLE_RequestSetting) */
 volatile uint8_t  ble_get_ready = 0;
 uint8_t           ble_get_index = 0xFF;
@@ -317,19 +313,19 @@ uint8_t BLE_RequestSetting(uint8_t idx)
 	return (HAL_UART_Transmit(ble_uart, frame, 6, 100) == HAL_OK) ? 1 : 0;
 }
 
-/* Einmalige Sicherheits-Provisionierung: RF_SecFlags + Passkey schreiben,
- * Bond-Tabelle leeren und Modul EINMAL neu starten. Nur im getrennten
- * Zustand aufrufen. Wird nach Werksreset/Erstboot genau einmal ausgefuehrt;
- * danach wird die Sicherheit im Betrieb nicht mehr angefasst. */
-uint8_t BLE_ProvisionSecurity(uint8_t flags, const char *pin)
+/* Einmalige Sicherheits-Provisionierung: RF_SecFlags setzen, Bond-Tabelle
+ * leeren und Modul EINMAL neu starten. Nur im getrennten Zustand aufrufen.
+ * Wird nach Werksreset/Erstboot (oder einmalig nach diesem Firmware-Update,
+ * via SECPROV-Marker) ausgefuehrt. Aktuell wird die BLE-Schnittstelle damit
+ * OHNE Verschluesselung betrieben (flags = 0) - eine PIN-Absicherung hat sich
+ * mit diesem Modul + Android als nicht zuverlaessig erwiesen. */
+uint8_t BLE_ProvisionSecurity(uint8_t flags)
 {
 	if (ble_uart == NULL)
 	{
 		return 0;
 	}
 	ble_send_set(CFG_IDX_SECFLAGS, &flags, 1);
-	HAL_Delay(50);
-	ble_send_set(CFG_IDX_STATICPASSKEY, (const uint8_t *)pin, BLE_PIN_LEN);
 	HAL_Delay(50);
 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
 	HAL_Delay(50);
@@ -347,44 +343,6 @@ void BLE_Disconnect(void)
 	{
 		ble_send_cmd0(CMD_DISCONNECT_REQ);
 	}
-}
-
-uint8_t BLE_SetPin(const char *pin)
-{
-	if (ble_uart == NULL)
-	{
-		return 0;
-	}
-	memcpy(ble_pending_pin, pin, BLE_PIN_LEN);
-	ble_pending_pin[BLE_PIN_LEN] = '\0';
-
-	if (ble_connected)
-	{
-		/* wie beim Namen: erst trennen, die Hauptschleife wendet die PIN
-		 * nach CMD_DISCONNECT_IND an */
-		ble_setpin_pending = 1;
-		ble_send_cmd0(CMD_DISCONNECT_REQ);
-	}
-	else
-	{
-		BLE_ApplyPendingPin();
-	}
-	return 1;
-}
-
-void BLE_ApplyPendingPin(void)
-{
-	ble_setpin_pending = 0;
-	ble_send_set(CFG_IDX_STATICPASSKEY,
-			(const uint8_t *)ble_pending_pin, BLE_PIN_LEN);
-	HAL_Delay(50);
-	/* Alte Kopplungen ungueltig machen - sonst kaemen bereits gebondete
-	 * Geraete weiterhin ohne die neue PIN hinein. */
-	ble_send_cmd0(CMD_DELETEBONDS_REQ);
-	HAL_Delay(50);
-	ble_send_cmd0(CMD_RESET_REQ);	/* neue PIN aktivieren */
-	ble_connected = 0;				/* Reset trennt die Verbindung (kein IND) */
-	ble_channel_open = 0;
 }
 
 void BLE_ApplyPendingName(void)
