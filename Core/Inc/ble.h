@@ -99,16 +99,12 @@ extern uint8_t           ble_get_index;      /* Index der offenen Anfrage    */
 extern uint8_t           ble_get_value[21];  /* Wert (nullterminiert)        */
 extern volatile uint16_t ble_get_len;
 
-/* Setzt den Sicherheitsmodus (RF_SecFlags), löscht die Bonds (laut Manual
- * bei SecFlags-Änderung nötig) und startet das Modul neu. Nur im getrennten
- * Zustand aufrufen (z. B. Boot-Abgleich). */
-uint8_t BLE_SetSecFlags(uint8_t flags);
-
-/* Löscht die komplette Bond-Tabelle im Modul (CMD_DELETEBONDS_REQ) und
- * startet es neu. Räumt Geister-Kopplungen ab, die das Pairing blockieren
- * (z. B. Handy hat seine Kopplung gelöscht, das Modul nicht). Nur im
- * getrennten Zustand aufrufen. */
-uint8_t BLE_ClearBonds(void);
+/* Einmalige Sicherheits-Provisionierung (nach Werksreset/Erstboot): setzt den
+ * Sicherheitsmodus (RF_SecFlags) und den Passkey, löscht die Bond-Tabelle und
+ * startet das Modul neu - alles in einem Rutsch (ein Modul-Reset). Danach wird
+ * die Sicherheit im Betrieb NICHT mehr angefasst; die PIN ändert nur noch das
+ * PIN-Kommando aktiv. Nur im getrennten Zustand aufrufen. */
+uint8_t BLE_ProvisionSecurity(uint8_t flags, const char *pin);
 
 /* Aktive Verbindung modulseitig trennen (CMD_DISCONNECT_REQ). */
 void BLE_Disconnect(void);

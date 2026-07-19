@@ -113,10 +113,12 @@ BLE-Modul zeigt davon max. 20.
 
 **Sicherheit (PIN):** Ab Firmware 1.2.7 ist die BLE-Schnittstelle mit
 Static-Passkey-Pairing und Bonding gesichert (`RF_SecFlags = 0x0B`). Die
-Wunsch-PIN liegt im Sensor-Config (einzige Quelle der Wahrheit); beim Boot
-gleicht die Firmware Sicherheitsmodus und Passkey des Moduls ab und schreibt
-nur bei Abweichung. Werks-PIN ist `123123` (der Proteus-Default – bei
-fabrikfrischen Modulen ist so kein Schreibzugriff nötig). `PIN nnnnnn` setzt
+Wunsch-PIN liegt im Sensor-Config (einzige Quelle der Wahrheit). Nach einem
+Werksreset bzw. beim Erstboot **provisioniert** die Firmware die Sicherheit
+**einmalig** (SecFlags + Passkey setzen, Bonds löschen) und fasst sie danach
+im Betrieb nicht mehr an – das ist wichtig, weil manche Module den Passkey
+nicht identisch zurückliefern; ein Abgleich bei jedem Boot würde die Kopplung
+sonst bei jedem Neustart verlieren. Werks-PIN ist `123123`. `PIN nnnnnn` setzt
 eine neue PIN: Der Sensor speichert sie, trennt die Verbindung, löscht alle
 Bonds im Modul und startet es neu – **jedes Handy muss sich danach neu
 koppeln** (ggf. vorher die alte Kopplung in den Bluetooth-Einstellungen des

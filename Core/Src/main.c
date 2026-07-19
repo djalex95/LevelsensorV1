@@ -552,139 +552,91 @@ int main(void)
 			BLE_ApplyPendingPin();
 		}
 
-		/* --- Einmaliger Abgleich nach dem Boot: Name, Sicherheitsmodus und
-		 * PIN des Moduls lesen und nur bei Abweichung vom Config-Stand
-		 * (bzw. den Defaults) neu setzen. Deckt ab: Erstinbetriebnahme
-		 * (Default-Name "LevelSense-<UID>", Security an, Werks-PIN),
-		 * Umbenennung per Plotter im ausgeschalteten Zustand, Werksreset. */
-		if ((ble_sync_step < 3) && (time_el >= ble_sync_next))
+		/* --- Nach dem Boot: (0) Modulnamen abgleichen, (1) die Sicherheit
+		 * EINMALIG provisionieren. Sicherheitsmodus und PIN werden danach im
+		 * Betrieb NICHT mehr angefasst - die PIN aendert nur noch das aktive
+		 * PIN-Kommando. Frueher wurde die Modul-PIN bei jedem Boot zurueck-
+		 * gelesen und verglichen; liefert das Modul die PIN nicht identisch
+		 * zurueck, fuehrte das zu staendigem Neu-Schreiben samt Bond-Loeschung
+		 * -> Kopplung nach jedem Neustart weg. Deshalb jetzt einmalig. */
+		if ((ble_sync_step < 2) && (time_el >= ble_sync_next))
 		{
-			static const uint8_t sync_idx[3] =
-				{ CFG_IDX_DEVICENAME, CFG_IDX_SECFLAGS, CFG_IDX_STATICPASSKEY };
-
-			if (ble_sync_wait == 0)
+			if (ble_sync_step == 0)			/* Modulname (per GET abgleichen) */
 			{
-				/* Anfrage fuer den aktuellen Schritt stellen */
-				if (BLE_RequestSetting(sync_idx[ble_sync_step]))
+				if (ble_sync_wait == 0)
 				{
-					ble_sync_wait = 1;
-					ble_sync_next = time_el + 500;
+					if (BLE_RequestSetting(CFG_IDX_DEVICENAME))
+					{
+						ble_sync_wait = 1;
+						ble_sync_next = time_el + 500;
+					}
+					else
+					{
+						ble_sync_step = 1;	/* UART-Fehler -> Name ueberspringen */
+						ble_sync_next = time_el + 100;
+					}
 				}
-				else
-				{
-					ble_sync_step = 3;		/* UART-Fehler -> aufgeben */
-				}
-			}
-			else if (ble_get_ready && (ble_get_index == sync_idx[ble_sync_step]))
-			{
-				uint32_t settle = 100;
-				uint8_t postpone = 0;	/* 1 = Schritt spaeter wiederholen */
-
-				if (ble_sync_step == 0)			/* Modulname */
+				else if (ble_get_ready && (ble_get_index == CFG_IDX_DEVICENAME))
 				{
 					char want[21];
+					uint32_t settle = 100;
 					ble_desired_name(want);
 					if ((ble_get_len != strlen(want))
 							|| (memcmp(ble_get_value, want, ble_get_len) != 0))
 					{
 						BLE_SetDeviceName(want);	/* behandelt 'verbunden' selbst */
-						settle = 2000;			/* Modul startet neu */
+						settle = 2000;				/* Modul startet neu */
 					}
-				}
-				else if (ble_sync_step == 1)	/* Sicherheitsmodus */
-				{
-					if ((ble_get_len != 1)
-							|| (ble_get_value[0] != BLE_SECFLAGS_TARGET))
-					{
-						if (ble_connected)
-						{
-							/* nicht mitten in eine aktive Verbindung (evtl.
-							 * laufendes Pairing) graetschen: erst trennen,
-							 * Schritt im Leerlauf wiederholen */
-							BLE_Disconnect();
-							postpone = 1;
-						}
-						else
-						{
-							BLE_SetSecFlags(BLE_SECFLAGS_TARGET);
-							settle = 2000;
-						}
-					}
-				}
-				else							/* Passkey (PIN) */
-				{
-					char pin[BLE_PIN_LEN + 1];
-					uint8_t wrote = 0;
-					get_pin_eeprom(pin);
-					if ((ble_get_len != BLE_PIN_LEN)
-							|| (memcmp(ble_get_value, pin, BLE_PIN_LEN) != 0))
-					{
-						BLE_SetPin(pin);	/* loescht auch die Bonds;
-											 * behandelt 'verbunden' selbst */
-						wrote = 1;
-						settle = 2000;
-					}
-					/* Einmalig nach Werksreset/Firmware-Update: Bond-Tabelle
-					 * im Modul bereinigen, auch wenn PIN und SecFlags schon
-					 * stimmen. Sonst blockieren Geister-Kopplungen (Handy hat
-					 * seine Kopplung geloescht, das Modul nicht) das Pairing
-					 * - teils ohne sichtbare PIN-Abfrage. */
-					if (cfg_data[CFG_SECPROV_OFF] != CFG_SECPROV_MAGIC)
-					{
-						if (!wrote)
-						{
-							if (ble_connected)
-							{
-								BLE_Disconnect();
-								postpone = 1;
-							}
-							else
-							{
-								BLE_ClearBonds();
-								settle = 2000;
-							}
-						}
-						if (!postpone)
-						{
-							cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
-							config_save();
-						}
-					}
-				}
-				ble_get_ready = 0;
-				ble_sync_wait = 0;
-				if (postpone && (++ble_sync_tries < 5))
-				{
-					ble_sync_next = time_el + 1500;	/* selber Schritt erneut */
-				}
-				else
-				{
-					/* Fertig ODER Postpone-Obergrenze erreicht: in letzterem
-					 * Fall die Provisionierung als erledigt markieren, damit
-					 * der Sensor nicht in einer Reset-Schleife haengt (der
-					 * Abgleich ist Best-Effort - der Sensor bleibt nutzbar). */
-					if (postpone && (ble_sync_step == 2))
-					{
-						cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
-						config_save();
-					}
-					ble_sync_step++;
+					ble_get_ready = 0;
+					ble_sync_wait = 0;
 					ble_sync_tries = 0;
+					ble_sync_step = 1;
 					ble_sync_next = time_el + settle;
 				}
-			}
-			else
-			{
-				/* keine Antwort -> bis zu 3 Versuche je Schritt, dann
-				 * aufgeben (Sensor bleibt voll funktionsfaehig) */
-				if (++ble_sync_tries >= 3)
+				else if (++ble_sync_tries >= 3)	/* keine Antwort -> weiter */
 				{
-					ble_sync_step = 3;
+					ble_sync_wait = 0;
+					ble_sync_tries = 0;
+					ble_sync_step = 1;
+					ble_sync_next = time_el + 100;
 				}
 				else
 				{
 					ble_sync_wait = 0;
 					ble_sync_next = time_el;
+				}
+			}
+			else							/* (1) Sicherheit einmalig provisionieren */
+			{
+				if (cfg_data[CFG_SECPROV_OFF] == CFG_SECPROV_MAGIC)
+				{
+					ble_sync_step = 2;	/* schon provisioniert -> nie wieder anfassen */
+				}
+				else if (ble_connected)
+				{
+					/* nicht mitten in eine Verbindung reset-en: erst trennen,
+					 * gleich erneut versuchen (begrenzt, sonst aufgeben) */
+					BLE_Disconnect();
+					if (++ble_sync_tries >= 5)
+					{
+						cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
+						config_save();
+						ble_sync_step = 2;
+					}
+					else
+					{
+						ble_sync_next = time_el + 1500;
+					}
+				}
+				else
+				{
+					char pin[BLE_PIN_LEN + 1];
+					get_pin_eeprom(pin);
+					BLE_ProvisionSecurity(BLE_SECFLAGS_TARGET, pin);
+					cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
+					config_save();
+					ble_sync_step = 2;
+					ble_sync_next = time_el + 2000;
 				}
 			}
 		}

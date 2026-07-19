@@ -317,10 +317,11 @@ uint8_t BLE_RequestSetting(uint8_t idx)
 	return (HAL_UART_Transmit(ble_uart, frame, 6, 100) == HAL_OK) ? 1 : 0;
 }
 
-/* Sicherheitsmodus setzen: RF_SecFlags schreiben, Bonds loeschen (laut
- * Manual bei SecFlags-Aenderung erforderlich) und Modul neu starten.
- * Nur im getrennten Zustand aufrufen. */
-uint8_t BLE_SetSecFlags(uint8_t flags)
+/* Einmalige Sicherheits-Provisionierung: RF_SecFlags + Passkey schreiben,
+ * Bond-Tabelle leeren und Modul EINMAL neu starten. Nur im getrennten
+ * Zustand aufrufen. Wird nach Werksreset/Erstboot genau einmal ausgefuehrt;
+ * danach wird die Sicherheit im Betrieb nicht mehr angefasst. */
+uint8_t BLE_ProvisionSecurity(uint8_t flags, const char *pin)
 {
 	if (ble_uart == NULL)
 	{
@@ -328,27 +329,14 @@ uint8_t BLE_SetSecFlags(uint8_t flags)
 	}
 	ble_send_set(CFG_IDX_SECFLAGS, &flags, 1);
 	HAL_Delay(50);
+	ble_send_set(CFG_IDX_STATICPASSKEY, (const uint8_t *)pin, BLE_PIN_LEN);
+	HAL_Delay(50);
 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
 	HAL_Delay(50);
-	ble_send_cmd0(CMD_RESET_REQ);	/* Einstellungen aktivieren */
+	ble_send_cmd0(CMD_RESET_REQ);	/* Einstellungen aktivieren, frisch starten */
 	/* Ein Reset trennt die Funkverbindung, das Modul sendet dabei KEIN
-	 * CMD_DISCONNECT_IND -> Zustand hier selbst zuruecksetzen, sonst bleibt
-	 * ble_connected haengen und der Boot-Abgleich postponet endlos. */
+	 * CMD_DISCONNECT_IND -> Zustand hier selbst zuruecksetzen. */
 	ble_connected = 0;
-	ble_channel_open = 0;
-	return 1;
-}
-
-uint8_t BLE_ClearBonds(void)
-{
-	if (ble_uart == NULL)
-	{
-		return 0;
-	}
-	ble_send_cmd0(CMD_DELETEBONDS_REQ);
-	HAL_Delay(50);
-	ble_send_cmd0(CMD_RESET_REQ);	/* sauberer Neuanlauf, frisches Advertising */
-	ble_connected = 0;				/* Reset trennt die Verbindung (kein IND) */
 	ble_channel_open = 0;
 	return 1;
 }
