@@ -16,10 +16,14 @@ relevant – es wird vom Modul transparent überbrückt.
 Ablauf beim Verbinden:
 
 1. Nach Gerätename oder Service-UUID scannen und verbinden.
-2. **Große MTU anfordern** (bis 247 Byte) – wichtig, damit längere Kommandos
+2. **Pairing mit PIN** (ab Firmware 1.2.7): Das Modul verlangt beim ersten
+   Verbinden einen 6-stelligen Passkey (Werks-PIN **123123**, per `PIN`-Kommando
+   änderbar). Die Eingabe übernimmt der System-Pairing-Dialog des
+   Betriebssystems; danach ist die Verbindung verschlüsselt und gebondet
+   (keine erneute Eingabe nötig).
+3. **Große MTU anfordern** (bis 247 Byte) – wichtig, damit längere Kommandos
    wie `LIN …` in einem Write passen.
-3. Notifications der TX-Charakteristik aktivieren.
-4. Ggf. Pairing/Bonding, falls das Modul mit Sicherheit konfiguriert ist.
+4. Notifications der TX-Charakteristik aktivieren.
 
 Danach: Kommandos als UTF-8/ASCII-Text in RX schreiben, Antworten und den
 periodischen Status als TX-Notification empfangen. Jede Nachricht endet mit `\n`.
@@ -79,8 +83,9 @@ ERR ?             unbekanntes Kommando
 | `INST n` | Instanz setzen (0..15) | `OK INST n` / `ERR INST` |
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
 | `CALRESET` | Kalibrierung auf Werkswert zurücksetzen | `OK CALRESET` |
-| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (BLE-Modulname fällt beim nächsten Boot auf `LevelSense-<UID>` zurück) | `OK FACTORYRESET`, dann Neustart |
+| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name, PIN und gespeicherte Adresse; Sensor startet neu (beim nächsten Boot: BLE-Name wieder `LevelSense-<UID>`, PIN wieder `123123`, alle Kopplungen gelöscht) | `OK FACTORYRESET`, dann Neustart |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
+| `PIN nnnnnn` | Bluetooth-PIN ändern (genau 6 Ziffern) | `OK PIN` / `ERR PIN`; bei Änderung **trennt sich die Verbindung**, alle Kopplungen werden gelöscht, danach mit neuer PIN neu koppeln |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 
 **Hinweis zu `NAME`:** Der Name wird zusätzlich persistent im Sensor
@@ -105,6 +110,19 @@ unterscheidbar. Wird `NAME` mit dem bereits gesetzten Namen erneut gesendet,
 antwortet der Sensor nur mit `OK NAME` (kein Modul-Neustart, Verbindung
 bleibt bestehen). Hinweis: Der Sensor speichert max. 24 Zeichen, das
 BLE-Modul zeigt davon max. 20.
+
+**Sicherheit (PIN):** Ab Firmware 1.2.7 ist die BLE-Schnittstelle mit
+Static-Passkey-Pairing und Bonding gesichert (`RF_SecFlags = 0x0B`). Die
+Wunsch-PIN liegt im Sensor-Config (einzige Quelle der Wahrheit); beim Boot
+gleicht die Firmware Sicherheitsmodus und Passkey des Moduls ab und schreibt
+nur bei Abweichung. Werks-PIN ist `123123` (der Proteus-Default – bei
+fabrikfrischen Modulen ist so kein Schreibzugriff nötig). `PIN nnnnnn` setzt
+eine neue PIN: Der Sensor speichert sie, trennt die Verbindung, löscht alle
+Bonds im Modul und startet es neu – **jedes Handy muss sich danach neu
+koppeln** (ggf. vorher die alte Kopplung in den Bluetooth-Einstellungen des
+Handys entfernen). PIN vergessen? Werksreset über das PC-Tool per CAN stellt
+`123123` wieder her. Hinweis nach einem Firmware-Update von ≤ 1.2.6: Beim
+ersten Verbinden ist einmalig die Neukopplung mit `123123` nötig.
 
 Im **Bootloader-Modus** (während des OTA-Updates) beantwortet der Bootloader
 zusätzlich `VER` mit `BLV;x.y.z` (seiner eigenen Version). Die App fragt das beim

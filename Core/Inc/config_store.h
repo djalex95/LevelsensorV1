@@ -19,7 +19,8 @@
  *   31     Geraete-/Tank-Instanz
  *   32     Layout-Version (2)
  *   33..56 Sensorname (24 Byte, 0x00-terminiert/-gepolstert; 0xFF = nie gesetzt)
- *   57..63 frei (0xFF)
+ *   57..62 BLE-PIN (6 ASCII-Ziffern; 0xFF/ungueltig = Werks-PIN 123123)
+ *   63     frei (0xFF)
  *
  * Bytes 0..31 sind identisch zum alten 32-Byte-Format (Layout-Version 1).
  * Beim ersten Boot nach einem Update migriert config_load() einen
@@ -39,6 +40,8 @@
 #define CFG_LAYOUT_V  2
 #define CFG_NAME_OFF  33          /* Sensorname (Installation Description)  */
 #define CFG_NAME_LEN  24
+#define CFG_PIN_OFF   57          /* BLE-PIN (RF_StaticPasskey, 6 Ziffern)  */
+#define CFG_PIN_LEN   6
 
 /* RAM-Cache der Konfiguration; Aenderungen hier eintragen, dann config_save() */
 extern uint8_t cfg_data[CFG_SIZE];
@@ -59,7 +62,8 @@ uint8_t config_save(void);
 void config_nmi_recover(uint32_t fail_addr);
 
 /* Werksreset: loescht beide Config-Pages. Nach dem naechsten Boot gelten
- * Werkswerte (Adresse 0x21, unkalibriert, keine Tankform, kein Name).
+ * Werkswerte (Adresse 0x21, unkalibriert, keine Tankform, kein Name,
+ * Werks-PIN 123123 - der Boot-Abgleich stellt sie im BLE-Modul wieder her).
  * Rueckgabe 0 = Loeschfehler. */
 uint8_t config_factory_reset(void);
 

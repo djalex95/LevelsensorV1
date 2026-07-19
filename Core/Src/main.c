@@ -125,6 +125,8 @@ uint8_t get_adr_eeprom();
 void get_name_eeprom(char *buf);
 void set_name_eeprom(const char *name);
 static void ble_desired_name(char *buf);
+void get_pin_eeprom(char *buf);
+void set_pin_eeprom(const char *pin);
 void set_adr_eeprom(uint8_t adr);
 void handle_group_function();
 void handle_prop_config();
@@ -207,12 +209,13 @@ NMEA_parameter_Device dev_info_par;
 /* BLE (Proteus-e): Status-Streaming-Zeitpunkt */
 uint32_t last_run_ble = 0, ble_time = 1000;
 
-/* Einmaliger Namensabgleich Modul <-> Config nach dem Boot:
- * 0 = wartet (Modul bootet noch), 1 = Abfrage laeuft, 2 = fertig/aufgegeben.
- * Es wird nur bei ABWEICHUNG geschrieben (CMD_SET_REQ kostet einen
- * Flash-Zyklus im Modul und einen Modul-Neustart). */
-static uint8_t  ble_sync_state = 0;
-static uint32_t ble_sync_t0 = 0;
+/* Einmaliger Abgleich Modul <-> Config nach dem Boot in drei Schritten:
+ * 0 = Name, 1 = Sicherheitsmodus (SecFlags), 2 = Passkey (PIN), 3 = fertig.
+ * Es wird jeweils erst gelesen und nur bei ABWEICHUNG geschrieben
+ * (Modul-Flash ~10k Zyklen, jedes Schreiben loest einen Modul-Neustart aus). */
+static uint8_t  ble_sync_step = 0;
+static uint8_t  ble_sync_wait = 0;		/* 1 = Antwort auf GET ausstehend    */
+static uint32_t ble_sync_next = 1500;	/* Modul bootet ~1,5 s               */
 static uint8_t  ble_sync_tries = 0;
 /* USER CODE END 0 */
 
@@ -542,42 +545,89 @@ int main(void)
 			HAL_Delay(50);
 			BLE_ApplyPendingName();
 		}
-
-		/* --- Einmaliger Namensabgleich nach dem Boot: Modulname lesen und
-		 * nur bei Abweichung vom Config-Namen (bzw. Default) neu setzen.
-		 * Deckt ab: Erstinbetriebnahme (Default "LevelSense-<UID>"),
-		 * Umbenennung per Plotter im ausgeschalteten Zustand, Werksreset. */
-		if ((ble_sync_state == 0) && (time_el >= 1500))
+		if(ble_setpin_pending && (ble_connected == 0))
 		{
-			/* Modul ist nach ~1,5 s sicher gebootet */
-			ble_sync_state = BLE_RequestDeviceName() ? 1 : 2;
-			ble_sync_t0 = time_el;
+			/* dito fuer eine aufgeschobene PIN-Aenderung */
+			HAL_Delay(50);
+			BLE_ApplyPendingPin();
 		}
-		else if (ble_sync_state == 1)
+
+		/* --- Einmaliger Abgleich nach dem Boot: Name, Sicherheitsmodus und
+		 * PIN des Moduls lesen und nur bei Abweichung vom Config-Stand
+		 * (bzw. den Defaults) neu setzen. Deckt ab: Erstinbetriebnahme
+		 * (Default-Name "LevelSense-<UID>", Security an, Werks-PIN),
+		 * Umbenennung per Plotter im ausgeschalteten Zustand, Werksreset. */
+		if ((ble_sync_step < 3) && (time_el >= ble_sync_next))
 		{
-			if (ble_name_ready)
+			static const uint8_t sync_idx[3] =
+				{ CFG_IDX_DEVICENAME, CFG_IDX_SECFLAGS, CFG_IDX_STATICPASSKEY };
+
+			if (ble_sync_wait == 0)
 			{
-				char want[21];
-				ble_desired_name(want);
-				if (strcmp(ble_module_name, want) != 0)
+				/* Anfrage fuer den aktuellen Schritt stellen */
+				if (BLE_RequestSetting(sync_idx[ble_sync_step]))
 				{
-					BLE_SetDeviceName(want);	/* Modul startet danach neu */
-				}
-				ble_name_ready = 0;
-				ble_sync_state = 2;
-			}
-			else if ((time_el - ble_sync_t0) >= 500)
-			{
-				/* keine Antwort -> bis zu 3 Versuche, dann aufgeben
-				 * (Sensor bleibt ohne Abgleich voll funktionsfaehig) */
-				if (++ble_sync_tries >= 3)
-				{
-					ble_sync_state = 2;
+					ble_sync_wait = 1;
+					ble_sync_next = time_el + 500;
 				}
 				else
 				{
-					BLE_RequestDeviceName();
-					ble_sync_t0 = time_el;
+					ble_sync_step = 3;		/* UART-Fehler -> aufgeben */
+				}
+			}
+			else if (ble_get_ready && (ble_get_index == sync_idx[ble_sync_step]))
+			{
+				uint32_t settle = 100;
+
+				if (ble_sync_step == 0)			/* Modulname */
+				{
+					char want[21];
+					ble_desired_name(want);
+					if ((ble_get_len != strlen(want))
+							|| (memcmp(ble_get_value, want, ble_get_len) != 0))
+					{
+						BLE_SetDeviceName(want);
+						settle = 2000;			/* Modul startet neu */
+					}
+				}
+				else if (ble_sync_step == 1)	/* Sicherheitsmodus */
+				{
+					if ((ble_get_len != 1)
+							|| (ble_get_value[0] != BLE_SECFLAGS_TARGET))
+					{
+						BLE_SetSecFlags(BLE_SECFLAGS_TARGET);
+						settle = 2000;
+					}
+				}
+				else							/* Passkey (PIN) */
+				{
+					char pin[BLE_PIN_LEN + 1];
+					get_pin_eeprom(pin);
+					if ((ble_get_len != BLE_PIN_LEN)
+							|| (memcmp(ble_get_value, pin, BLE_PIN_LEN) != 0))
+					{
+						BLE_SetPin(pin);
+						settle = 2000;
+					}
+				}
+				ble_get_ready = 0;
+				ble_sync_step++;
+				ble_sync_wait = 0;
+				ble_sync_tries = 0;
+				ble_sync_next = time_el + settle;
+			}
+			else
+			{
+				/* keine Antwort -> bis zu 3 Versuche je Schritt, dann
+				 * aufgeben (Sensor bleibt voll funktionsfaehig) */
+				if (++ble_sync_tries >= 3)
+				{
+					ble_sync_step = 3;
+				}
+				else
+				{
+					ble_sync_wait = 0;
+					ble_sync_next = time_el;
 				}
 			}
 		}
@@ -726,6 +776,40 @@ void get_name_eeprom(char *buf)
 		buf[i] = (char)c;
 	}
 	buf[i] = '\0';
+}
+
+/* BLE-PIN aus dem Config lesen (Bytes 57..62): 6 ASCII-Ziffern.
+ * Unplausibel/0xFF = nie gesetzt -> Werks-PIN (123123, Proteus-Default).
+ * buf braucht CFG_PIN_LEN+1 Bytes. */
+void get_pin_eeprom(char *buf)
+{
+	uint8_t i, ok = 1;
+	for (i = 0; i < CFG_PIN_LEN; i++)
+	{
+		uint8_t c = cfg_data[CFG_PIN_OFF + i];
+		if ((c < '0') || (c > '9'))
+		{
+			ok = 0;
+			break;
+		}
+		buf[i] = (char)c;
+	}
+	if (!ok)
+	{
+		memcpy(buf, BLE_PIN_DEFAULT, CFG_PIN_LEN);
+	}
+	buf[CFG_PIN_LEN] = '\0';
+}
+
+/* BLE-PIN persistent speichern (genau 6 Ziffern, Aufrufer validiert). */
+void set_pin_eeprom(const char *pin)
+{
+	uint8_t i;
+	for (i = 0; i < CFG_PIN_LEN; i++)
+	{
+		cfg_data[CFG_PIN_OFF + i] = (uint8_t)pin[i];
+	}
+	config_save();
 }
 
 /* Gewuenschter BLE-Modulname (max. 20 Zeichen, Proteus-Limit):
@@ -2124,6 +2208,43 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		else
 		{
 			BLE_SendString("ERR NAME\n");
+		}
+	}
+	else if (strncasecmp(cmd, "PIN ", 4) == 0)
+	{
+		const char *pin = cmd + 4;
+		uint8_t i, valid = (strlen(pin) == BLE_PIN_LEN);
+		for (i = 0; valid && (i < BLE_PIN_LEN); i++)
+		{
+			if ((pin[i] < '0') || (pin[i] > '9'))
+			{
+				valid = 0;
+			}
+		}
+		if (valid)
+		{
+			char cur[BLE_PIN_LEN + 1];
+			get_pin_eeprom(cur);
+			if (strcmp(pin, cur) == 0)
+			{
+				/* unveraendert -> kein Flash-Schreibzugriff, kein
+				 * Modul-Neustart (Verbindung bleibt bestehen) */
+				BLE_SendString("OK PIN\n");
+			}
+			else
+			{
+				set_pin_eeprom(pin);
+				/* erst bestaetigen, dann Modul umstellen: trennt die
+				 * Verbindung, loescht alle Bonds und startet das Modul
+				 * neu - alle Handys muessen sich neu koppeln. */
+				BLE_SendString("OK PIN\n");
+				HAL_Delay(50);
+				BLE_SetPin(pin);
+			}
+		}
+		else
+		{
+			BLE_SendString("ERR PIN\n");
 		}
 	}
 	else if (strncasecmp(cmd, "FLUID ", 6) == 0)

@@ -36,7 +36,19 @@
 #define CMD_GET_REQ             0x10	/* Setting lesen                       */
 #define CMD_GET_CNF             0x50	/* Antwort: Status(1) + Wert           */
 #define CMD_DISCONNECT_REQ      0x07
-#define CFG_IDX_DEVICENAME      0x02	/* Settings-Index RF_DeviceName */
+#define CMD_DELETEBONDS_REQ     0x0E	/* Bonding-Daten loeschen (Len 0=alle) */
+#define CFG_IDX_DEVICENAME      0x02	/* Settings-Index RF_DeviceName        */
+#define CFG_IDX_SECFLAGS        0x0C	/* Settings-Index RF_SecFlags (1 Byte) */
+#define CFG_IDX_STATICPASSKEY   0x12	/* Settings-Index RF_StaticPasskey     */
+
+/* Ziel-Sicherheitsmodus: Static Passkey (0x3) + Bonding (Bit 3) -> 0x0B.
+ * Quelle: Proteus-e User Manual rev 1.9, Kap. 10.8 (Table 20). */
+#define BLE_SECFLAGS_TARGET     0x0B
+
+/* Werks-Passkey des Moduls (RF_StaticPasskey-Default laut Manual Kap. 10.7).
+ * Gilt, solange im Config keine eigene PIN gespeichert ist. */
+#define BLE_PIN_DEFAULT         "123123"
+#define BLE_PIN_LEN             6
 
 #define BLE_MAX_PAYLOAD         243
 #define BLE_FRAME_MAX           (BLE_MAX_PAYLOAD + 5)
@@ -76,13 +88,28 @@ void BLE_ApplyPendingName(void);
 /* 1 = es liegt eine aufgeschobene Namensänderung vor (nach Trennung anwenden). */
 extern volatile uint8_t ble_setname_pending;
 
-/* Fragt den aktuell im Modul gespeicherten Gerätenamen ab (CMD_GET_REQ,
- * RF_DeviceName). Die Antwort landet asynchron in ble_module_name;
- * ble_name_ready wird dann 1. Rückgabe 0 = Sendefehler. */
-uint8_t BLE_RequestDeviceName(void);
+/* Fragt eine Moduleinstellung ab (CMD_GET_REQ). Da die Antwort (CMD_GET_CNF)
+ * den Settings-Index nicht enthält, wird er hier gemerkt - es darf immer nur
+ * EINE Anfrage offen sein. Ergebnis landet asynchron in ble_get_value/-_len;
+ * ble_get_ready wird dann 1. Rückgabe 0 = Sendefehler. */
+uint8_t BLE_RequestSetting(uint8_t idx);
 
-/* Ergebnis der Namensabfrage (gültig sobald ble_name_ready == 1). */
-extern volatile uint8_t ble_name_ready;
-extern char             ble_module_name[21];
+extern volatile uint8_t  ble_get_ready;
+extern uint8_t           ble_get_index;      /* Index der offenen Anfrage    */
+extern uint8_t           ble_get_value[21];  /* Wert (nullterminiert)        */
+extern volatile uint16_t ble_get_len;
+
+/* Setzt den Sicherheitsmodus (RF_SecFlags), löscht die Bonds (laut Manual
+ * bei SecFlags-Änderung nötig) und startet das Modul neu. Nur im getrennten
+ * Zustand aufrufen (z. B. Boot-Abgleich). */
+uint8_t BLE_SetSecFlags(uint8_t flags);
+
+/* Ändert den BLE-Passkey (RF_StaticPasskey, 6 Ziffern) dauerhaft im Modul,
+ * löscht die Bonds und startet das Modul neu. Bei bestehender Verbindung
+ * wird erst getrennt; die Hauptschleife wendet die PIN danach an
+ * (ble_setpin_pending, BLE_ApplyPendingPin). */
+uint8_t BLE_SetPin(const char *pin);
+void BLE_ApplyPendingPin(void);
+extern volatile uint8_t ble_setpin_pending;
 
 #endif /* INC_BLE_H_ */

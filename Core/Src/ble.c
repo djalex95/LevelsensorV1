@@ -28,9 +28,15 @@ static uint8_t ble_mps = 19;
 volatile uint8_t ble_setname_pending = 0;
 static char ble_pending_name[21];
 
-/* Ergebnis einer Namensabfrage (BLE_RequestDeviceName) */
-volatile uint8_t ble_name_ready = 0;
-char             ble_module_name[21];
+/* Aufgeschobene PIN-Änderung (wird nach dem Trennen angewendet) */
+volatile uint8_t ble_setpin_pending = 0;
+static char ble_pending_pin[BLE_PIN_LEN + 1];
+
+/* Ergebnis einer Einstellungs-Abfrage (BLE_RequestSetting) */
+volatile uint8_t  ble_get_ready = 0;
+uint8_t           ble_get_index = 0xFF;
+uint8_t           ble_get_value[21];
+volatile uint16_t ble_get_len = 0;
 
 /* --- Frame-Parser-Zustand --- */
 typedef enum { ST_STX = 0, ST_CMD, ST_LEN_L, ST_LEN_H, ST_PAYLOAD, ST_CS } parse_state;
@@ -79,19 +85,20 @@ static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
 
 	case CMD_GET_CNF:
 		/* Antwort auf CMD_GET_REQ: Status(1, 0x00 = ok) + Einstellungswert.
-		 * Die CNF enthaelt den Settings-Index NICHT - da hier ausschliesslich
-		 * RF_DeviceName abgefragt wird, ist der Wert immer der Modulname.
-		 * (Bei weiteren GET-Abfragen: angefragten Index merken!) */
-		if (!ble_name_ready && len >= 1 && payload[0] == 0x00)
+		 * Die CNF enthaelt den Settings-Index NICHT - er wird beim Request
+		 * in ble_get_index gemerkt (immer nur eine Anfrage offen). */
+		if (!ble_get_ready && (ble_get_index != 0xFF) && len >= 1
+				&& payload[0] == 0x00)
 		{
 			uint16_t nl = len - 1;
 			if (nl > 20)
 			{
 				nl = 20;
 			}
-			memcpy(ble_module_name, payload + 1, nl);
-			ble_module_name[nl] = '\0';
-			ble_name_ready = 1;
+			memcpy(ble_get_value, payload + 1, nl);
+			ble_get_value[nl] = '\0';
+			ble_get_len = nl;
+			ble_get_ready = 1;
 		}
 		break;
 
@@ -225,25 +232,43 @@ uint8_t BLE_SendString(const char *s)
 	return BLE_SendData((const uint8_t *)s, (uint16_t)strlen(s));
 }
 
-/* Sendet CMD_SET_REQ zum Umbenennen (nur im ACTION_IDLE erlaubt).
- * STX | 0x11 | Len(2) | SettingsIndex(1) | Name | CS, Len = 1 + Namenslänge.
- * Das Modul startet danach selbst neu. */
-static void ble_send_setname(const char *name)
+/* Sendet CMD_SET_REQ fuer eine Einstellung (nur im ACTION_IDLE erlaubt).
+ * STX | 0x11 | Len(2) | SettingsIndex(1) | Wert | CS, Len = 1 + Wertlaenge. */
+static void ble_send_set(uint8_t idx, const uint8_t *data, uint16_t n)
 {
 	uint8_t frame[BLE_FRAME_MAX];
-	uint16_t nl = (uint16_t)strlen(name);
-	if (nl > 20) nl = 20;
-	uint16_t len = 1 + nl;
+	uint16_t len = 1 + n;
 
 	frame[0] = BLE_STX;
 	frame[1] = CMD_SET_REQ;
 	frame[2] = (uint8_t)(len & 0xFF);
 	frame[3] = (uint8_t)((len >> 8) & 0xFF);
-	frame[4] = CFG_IDX_DEVICENAME;
-	memcpy(&frame[5], name, nl);
-	frame[5 + nl] = xor_cs(frame, 5 + nl);
+	frame[4] = idx;
+	memcpy(&frame[5], data, n);
+	frame[5 + n] = xor_cs(frame, 5 + n);
 
-	HAL_UART_Transmit(ble_uart, frame, 6 + nl, 200);
+	HAL_UART_Transmit(ble_uart, frame, 6 + n, 200);
+}
+
+/* Sendet ein Kommando ohne Payload (z. B. RESET, DISCONNECT, DELETEBONDS). */
+static void ble_send_cmd0(uint8_t cmd)
+{
+	uint8_t frame[5];
+
+	frame[0] = BLE_STX;
+	frame[1] = cmd;
+	frame[2] = 0;
+	frame[3] = 0;
+	frame[4] = xor_cs(frame, 4);
+	HAL_UART_Transmit(ble_uart, frame, 5, 100);
+}
+
+/* CMD_SET_REQ zum Umbenennen; das Modul startet danach selbst neu. */
+static void ble_send_setname(const char *name)
+{
+	uint16_t nl = (uint16_t)strlen(name);
+	if (nl > 20) nl = 20;
+	ble_send_set(CFG_IDX_DEVICENAME, (const uint8_t *)name, nl);
 }
 
 uint8_t BLE_SetDeviceName(const char *name)
@@ -259,14 +284,8 @@ uint8_t BLE_SetDeviceName(const char *name)
 	{
 		/* CMD_SET_REQ ist im verbundenen Zustand nicht erlaubt -> erst trennen.
 		 * Die Hauptschleife wendet den Namen nach CMD_DISCONNECT_IND an. */
-		uint8_t frame[5];
 		ble_setname_pending = 1;
-		frame[0] = BLE_STX;
-		frame[1] = CMD_DISCONNECT_REQ;
-		frame[2] = 0;
-		frame[3] = 0;
-		frame[4] = xor_cs(frame, 4);
-		HAL_UART_Transmit(ble_uart, frame, 5, 100);
+		ble_send_cmd0(CMD_DISCONNECT_REQ);
 	}
 	else
 	{
@@ -275,10 +294,10 @@ uint8_t BLE_SetDeviceName(const char *name)
 	return 1;
 }
 
-/* Fragt den im Modul-Flash gespeicherten Geraetenamen ab (CMD_GET_REQ,
- * RF_DeviceName). Lesen ist - anders als CMD_SET_REQ - jederzeit erlaubt.
- * Die Antwort (CMD_GET_CNF) verarbeitet ble_dispatch() asynchron. */
-uint8_t BLE_RequestDeviceName(void)
+/* Fragt eine im Modul-Flash gespeicherte Einstellung ab (CMD_GET_REQ).
+ * Lesen ist - anders als CMD_SET_REQ - jederzeit erlaubt. Die Antwort
+ * (CMD_GET_CNF) verarbeitet ble_dispatch() asynchron. */
+uint8_t BLE_RequestSetting(uint8_t idx)
 {
 	uint8_t frame[6];
 
@@ -286,15 +305,69 @@ uint8_t BLE_RequestDeviceName(void)
 	{
 		return 0;
 	}
-	ble_name_ready = 0;
+	ble_get_ready = 0;
+	ble_get_index = idx;
 	frame[0] = BLE_STX;
 	frame[1] = CMD_GET_REQ;
 	frame[2] = 1;					/* Len = 1: nur der Settings-Index */
 	frame[3] = 0;
-	frame[4] = CFG_IDX_DEVICENAME;
+	frame[4] = idx;
 	frame[5] = xor_cs(frame, 5);
 
 	return (HAL_UART_Transmit(ble_uart, frame, 6, 100) == HAL_OK) ? 1 : 0;
+}
+
+/* Sicherheitsmodus setzen: RF_SecFlags schreiben, Bonds loeschen (laut
+ * Manual bei SecFlags-Aenderung erforderlich) und Modul neu starten.
+ * Nur im getrennten Zustand aufrufen. */
+uint8_t BLE_SetSecFlags(uint8_t flags)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_send_set(CFG_IDX_SECFLAGS, &flags, 1);
+	HAL_Delay(50);
+	ble_send_cmd0(CMD_DELETEBONDS_REQ);
+	HAL_Delay(50);
+	ble_send_cmd0(CMD_RESET_REQ);	/* Einstellungen aktivieren */
+	return 1;
+}
+
+uint8_t BLE_SetPin(const char *pin)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	memcpy(ble_pending_pin, pin, BLE_PIN_LEN);
+	ble_pending_pin[BLE_PIN_LEN] = '\0';
+
+	if (ble_connected)
+	{
+		/* wie beim Namen: erst trennen, die Hauptschleife wendet die PIN
+		 * nach CMD_DISCONNECT_IND an */
+		ble_setpin_pending = 1;
+		ble_send_cmd0(CMD_DISCONNECT_REQ);
+	}
+	else
+	{
+		BLE_ApplyPendingPin();
+	}
+	return 1;
+}
+
+void BLE_ApplyPendingPin(void)
+{
+	ble_setpin_pending = 0;
+	ble_send_set(CFG_IDX_STATICPASSKEY,
+			(const uint8_t *)ble_pending_pin, BLE_PIN_LEN);
+	HAL_Delay(50);
+	/* Alte Kopplungen ungueltig machen - sonst kaemen bereits gebondete
+	 * Geraete weiterhin ohne die neue PIN hinein. */
+	ble_send_cmd0(CMD_DELETEBONDS_REQ);
+	HAL_Delay(50);
+	ble_send_cmd0(CMD_RESET_REQ);	/* neue PIN aktivieren */
 }
 
 void BLE_ApplyPendingName(void)
