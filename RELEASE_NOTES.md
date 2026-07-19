@@ -1,3 +1,20 @@
+## Firmware 1.2.7
+
+### Bluetooth
+- Deutlich stabilerer BLE-Verbindungsaufbau und -Neustart: ein interner
+  Zustandsfehler beim Modul-Reset (Verbindung galt fälschlich als offen)
+  konnte zu wiederkehrenden Verbindungsabbrüchen führen – behoben.
+- Der Modulname wird beim Boot nur noch bei Abweichung neu geschrieben; der
+  BLE-Sicherheitsmodus wird einmalig sauber gesetzt. Die BLE-Schnittstelle
+  läuft bewusst unverschlüsselt (eine PIN-Absicherung erwies sich mit diesem
+  Funkmodul in Kombination mit Android als nicht zuverlässig).
+- Sensoren aus Zwischenständen mit aktivierter Verschlüsselung stellen sich
+  beim Update automatisch einmalig auf „ohne Verschlüsselung" um und löschen
+  dabei alte Kopplungen.
+
+### Update
+OTA über die App (DFU) oder SWD. `Fuellstandsensor_v1.2.7.bin` ist OTA-tauglich.
+
 ## Firmware 1.2.6
 
 ### Bluetooth-Name
