@@ -153,6 +153,8 @@ uint32_t time_el = 0, last_run = 0, last_run_nmea=0;
  volatile uint8_t adr_lost = 0;		/* Adress-Arbitrierung verloren (ISR -> Hauptschleife) */
  volatile uint8_t prod_info = 0;
  volatile uint8_t dev_info = 0;
+ uint8_t boot_cfginfo_pending = 1;	/* nach dem Boot einmal 126998 senden (Namensstand
+									   auf den Bus, z.B. nach einem Werksreset) */
 
  uint32_t claim_time = 0;			/* Zeitpunkt des letzten Address Claims (250-ms-Sendepause) */
 
@@ -494,6 +496,15 @@ int main(void)
 	  	{
 	  		prod_info = 0;
 	  		NMEA2000_setPInfo(&hfdcan1, &p_info, dev_info_par.srcAdr);
+	  	}
+	  	if(boot_cfginfo_pending && ((time_el - claim_time) >= 300))
+	  	{
+	  		/* Einmalig nach dem Boot (nach der Claim-Sendepause) den aktuellen
+	  		 * Namensstand als 126998 verschicken. So sehen PC-Tool/Plotter
+	  		 * z.B. nach einem Werksreset sofort, dass der Name weg ist -
+	  		 * ohne selbst anfragen zu muessen. */
+	  		boot_cfginfo_pending = 0;
+	  		dev_info++;
 	  	}
 	  	if(dev_info != 0)
 	  	{

@@ -657,6 +657,11 @@ class App:
                             self.sensor_addr = c_src
                             self.lbl_addr.config(text=f"Adresse: 0x{c_src:02X}")
                     self._refresh_combo()
+                    # Ein Claim heisst: der Sensor ist (neu) gebootet oder
+                    # umgezogen - Namen frisch anfragen, damit die Registry
+                    # nicht auf einem alten Stand sitzen bleibt (z.B. nach
+                    # einem Werksreset, der den Namen loescht).
+                    self._request_cfginfo(c_src)
                     mine = " (Sensor)" if c_src == self.sensor_addr else ""
                     self.lbl_claim.config(
                         text=f"Letzter Address Claim: 0x{c_src:02X}{mine}  "
