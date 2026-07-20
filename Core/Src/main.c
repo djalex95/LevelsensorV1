@@ -299,6 +299,10 @@ int main(void)
 	  get_EEPROM(&EEPROM_values);
   }
   else{
+	  /* Werkszustand: explizit als "unkalibriert" markieren. Ohne das blieb
+	   * calib_available auf 0x00 (Null-Initialisierung der globalen Variable)
+	   * - ausgerechnet der Marker fuer "kalibriert" -> App zeigte CAL=1. */
+	  EEPROM_values.calib_available = 0xFF;
 	  EEPROM_values.max_val = std_press;
 	  EEPROM_values.offset = std_offset;
   }
