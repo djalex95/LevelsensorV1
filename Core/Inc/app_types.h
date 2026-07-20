@@ -42,4 +42,8 @@ typedef struct sensor_data{
 #define std_press 1000	//100,0mBar -> 100000uBar
 #define std_offset 0
 
+/* Fehler-Flags in error_mode (Bitmaske; steuern die Fehler-LED). */
+#define ERROR_TX_CAN 1
+#define ERROR_I2C 10
+
 #endif /* INC_APP_TYPES_H_ */
