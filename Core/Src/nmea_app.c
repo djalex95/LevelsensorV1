@@ -6,6 +6,7 @@
  */
 #include "main.h"
 #include "nmea_app.h"
+#include "ble_app.h"
 #include "app_types.h"
 #include "app_config.h"
 #include "config_store.h"
@@ -32,9 +33,6 @@ extern uint16_t percent_val;
 extern volatile int32_t raw_press;
 extern uint32_t claim_time;
 extern volatile uint8_t dev_info;
-
-/* Gewuenschter BLE-Modulname - noch in main.c (zieht spaeter nach ble_app). */
-void ble_desired_name(char *buf);
 
 /*
  * Verarbeitet eine komplett empfangene Group Function (PGN 126208).
