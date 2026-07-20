@@ -172,7 +172,9 @@ uint8_t init_p_struct(NMEA_parameter_Product *p_info_struct)
 {
 	uint8_t filled_string[32] = {[0 ... 31] = 0xFF};
 	memcpy(p_info_struct->ModelID, filled_string,32);
-	strcpy(p_info_struct->ModelID, "Simple Level Monitor");
+	/* Felder sind uint8_t[] (werden als Roh-Bytes ins Payload kopiert);
+	 * fuer die String-Funktionen explizit nach char* casten. */
+	strcpy((char *)p_info_struct->ModelID, "Simple Level Monitor");
 	memcpy(p_info_struct->ModelSerialCode, filled_string,32);
 	/* Seriennummer aus der 96-bit-Chip-UID als 8-stelliger Hex-String. */
 	{
@@ -188,9 +190,9 @@ uint8_t init_p_struct(NMEA_parameter_Product *p_info_struct)
 		s[8] = '\0';
 	}
 	memcpy(p_info_struct->ModelVersion, filled_string,32);
-	strcpy(p_info_struct->ModelVersion, "Rev " HW_REV_STR);
+	strcpy((char *)p_info_struct->ModelVersion, "Rev " HW_REV_STR);
 	memcpy(p_info_struct->SwCode, filled_string,32);
-	strcpy(p_info_struct->SwCode, FW_VERSION_STR);
+	strcpy((char *)p_info_struct->SwCode, FW_VERSION_STR);
 
 	p_info_struct->ProductCode=102;
 
