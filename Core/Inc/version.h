@@ -18,4 +18,16 @@
 #define HW_REV           1000
 #define HW_REV_STR       "1000"
 
+/* Hardware-Variante (Messprinzip/Frontend), unabhaengig von der Revision:
+ *   1000 = Drucksensor V1   (aktuell)
+ *   1001 = Drucksensor V2   (geplant)
+ *   1002 = Ultraschall      (geplant)
+ * Wird im BLE-STAT als HWV gemeldet, damit App/Bootloader die passende
+ * Firmware zuordnen koennen (Schutz vor Cross-Flashing, siehe
+ * ARCHITECTURE.md). Aktuell Compile-Konstante je Build; spaeter aus dem
+ * OTP verankert und beim Boot dagegen geprueft. */
+#ifndef HW_VARIANT
+#define HW_VARIANT       1000
+#endif
+
 #endif /* INC_VERSION_H_ */

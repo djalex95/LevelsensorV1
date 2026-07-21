@@ -31,8 +31,11 @@ periodischen Status als TX-Notification empfangen. Jede Nachricht endet mit `\n`
 ### Status (automatisch ca. jede Sekunde, solange verbunden)
 
 ```
-STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0;HW=1000
+STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0;HW=1000;HWV=1000
 ```
+
+Die App zerlegt die Zeile in `Schlüssel=Wert`-Paare; unbekannte oder
+fehlende Felder werden toleriert (vorwärts-/rückwärtskompatibel).
 
 | Feld | Bedeutung | Einheit / Wertebereich |
 |---|---|---|
@@ -44,6 +47,7 @@ STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0;HW=1000
 | `CAL` | 100%-Kalibrierung vorhanden | 0 oder 1 |
 | `V` | Firmware-Version | z. B. `1.2.0` |
 | `HW` | Hardware-Revision | 4-stellig, z. B. `1000` |
+| `HWV` | Hardware-Variante (Messprinzip) | `1000`=Druck V1, `1001`=Druck V2, `1002`=Ultraschall |
 
 Damit hat die App aus dem Stream bereits alle Anzeige- und Konfigurationswerte.
 
