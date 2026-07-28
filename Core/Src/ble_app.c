@@ -174,6 +174,38 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 			BLE_SendString("ERR CAL100 nodruck\n");
 		}
 	}
+	else if ((strncasecmp(cmd, "CAL", 3) == 0) && (cmd[3] == '\0'))
+	{
+		/* Abfrage des Kalibrierwerts fuer die Sicherung:
+		 *   CAL;<0|1>;<max_val>
+		 * max_val ist der Rohdruck bei 100 % - genau der Wert, den CAL100
+		 * aus raw_press bildet. Damit laesst sich eine Kalibrierung spaeter
+		 * ohne vollen Tank wiederherstellen. Die Pruefung auf das Stringende
+		 * grenzt sauber gegen CAL100 und CALRESET ab. */
+		snprintf(resp, sizeof(resp), "CAL;%d;%lu\n",
+				 (EEPROM_values.calib_available == 0x00) ? 1 : 0,
+				 (unsigned long)EEPROM_values.max_val);
+		BLE_SendString(resp);
+	}
+	else if (strncasecmp(cmd, "CAL ", 4) == 0)
+	{
+		/* Kalibrierwert direkt setzen (Wiederherstellung aus einer Sicherung).
+		 * Bewusst ohne Druckmessung - der Wert stammt aus dem Backup. */
+		long v = atol(cmd + 4);
+		if (v >= 1 && v <= 1000000L)
+		{
+			EEPROM_values.max_val = (uint32_t)v;
+			EEPROM_values.calib_available = 0x00;
+			save_EEPROM(&EEPROM_values);
+			snprintf(resp, sizeof(resp), "OK CAL %lu\n",
+					 (unsigned long)EEPROM_values.max_val);
+			BLE_SendString(resp);
+		}
+		else
+		{
+			BLE_SendString("ERR CAL\n");
+		}
+	}
 	else if (strncasecmp(cmd, "CALRESET", 8) == 0)
 	{
 		EEPROM_values.calib_available = 0xFF;

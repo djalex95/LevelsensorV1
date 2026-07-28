@@ -87,7 +87,38 @@ damit nachvollziehbar bleibt, was womit getestet wurde.
 - [ ] **Wichtig:** OTA-Update läuft, App kurz in den Hintergrund →
       Update wird **nicht** abgebrochen
 
-### B.2 Regression
+### B.2 Neu: Sicherung der Konfiguration
+
+> Für den vollständigen Test werden **zwei** Sensoren gebraucht (oder ein
+> Sensor, der zwischendurch per `FACTORYRESET` geleert wird). Die Sicherung
+> liegt als lesbare JSON-Datei vor – sie darf ruhig einmal im Texteditor
+> geöffnet und gegengelesen werden.
+
+- [ ] „Sichern" schreibt eine Datei `backup_<Name>_<Zeitstempel>.json`
+- [ ] Datei im Editor öffnen: Kalibrierwert, Kennlinie, Fluidtyp, Kapazität,
+      Instanz und Name stehen drin und passen zum Sensor
+- [ ] Quellblock enthält Firmware-Version, HW-Revision und HW-Variante
+- [ ] Sensor per `FACTORYRESET` leeren → App zeigt Werkszustand
+- [ ] „Einspielen" mit dieser Datei: Dialog listet alle Werte auf,
+      „Abbrechen" schreibt nichts
+- [ ] „Einspielen" bestätigen → alle Werte stehen wieder, Füllstand rechnet
+      wie vorher (Kalibrierung ist zurück, **ohne** vollen Tank)
+- [ ] Der Name kommt zuletzt: Modul startet danach neu, Verbindung trennt sich
+      – das ist erwartet, danach normal neu verbinden
+- [ ] Auf einen **zweiten** Sensor einspielen → verhält sich wie der erste
+- [ ] Sicherung eines **unkalibrierten** Sensors einspielen → Zielsensor ist
+      danach unkalibriert (`CALRESET`), kein Fehler
+- [ ] **Fremde Datei** wählen (z. B. irgendein anderes JSON) → verständliche
+      Meldung, es wird nichts geschrieben
+- [ ] **Variantenwarnung:** in einer Sicherung `hw_variante` von Hand auf
+      `1002` ändern → Dialog zeigt die rote Warnung, Einspielen bleibt möglich
+- [ ] **Alte Firmware 1.2.8:** „Sichern" meldet sauber, dass Firmware 1.2.9
+      nötig ist (der Sensor kennt `CAL` noch nicht) – kein Absturz, keine
+      halbe Datei
+- [ ] Getrennter Sensor: beide Schaltflächen sind ausgegraut, Hinweistext
+      erscheint
+
+### B.3 Regression
 
 - [ ] Scan findet den Sensor, Hinzufügen funktioniert
 - [ ] Tankform-Assistent schreibt und liest die Kennlinie korrekt

@@ -83,11 +83,31 @@ ERR ?             unbekanntes Kommando
 | `FLUID n` | Fluidtyp setzen (0..15) | `OK FLUID n` / `ERR FLUID` |
 | `CAP n` | Kapazität setzen (1..255 L) | `OK CAP n` / `ERR CAP` |
 | `INST n` | Instanz setzen (0..15) | `OK INST n` / `ERR INST` |
+| `CAL` | Kalibrierwert abfragen (für die Sicherung) | `CAL;<0/1>;<max_val>` |
+| `CAL n` | Kalibrierwert direkt setzen (Wiederherstellung, 1..1000000) | `OK CAL n` / `ERR CAL` |
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
 | `CALRESET` | Kalibrierung auf Werkswert zurücksetzen | `OK CALRESET` |
 | `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (beim nächsten Boot: BLE-Name wieder `LevelSense-<UID>`) | `OK FACTORYRESET`, dann Neustart |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
+
+**Hinweis zu `CAL`:** `max_val` ist der Rohdruck bei 100 % Füllstand – genau
+der Wert, den `CAL100` aus dem anliegenden Druck bildet. Mit der Abfrage lässt
+sich die Kalibrierung sichern und mit `CAL n` später ohne vollen Tank
+wiederherstellen, etwa nach einem Gerätetausch. Ist der Sensor unkalibriert,
+meldet die Abfrage `CAL;0;…`. Da `max_val` Tankhöhe, Flüssigkeitsdichte und
+Sensorverstärkung zusammenfasst, gilt ein übertragener Wert am selben Tank als
+sehr guter Startwert, ersetzt aber bei hohem Genauigkeitsanspruch keine echte
+Nachkalibrierung.
+
+**Sicherung der Konfiguration:** Eine vollständige Sicherung besteht aus
+`CAL` (Kalibrierung), `LIN` (Tankform), `NAME` (Name) sowie `F`, `C` und `I`
+aus der `STAT`-Zeile. Beim Wiederherstellen werden `LIN …`, `FLUID …`,
+`CAP …`, `INST …`, `NAME …` und `CAL …` gesendet. Bewusst **nicht** Teil der
+Sicherung sind die geclaimte NMEA2000-Quelladresse (Byte 30 – würde auf dem
+Bus zu Adresskonflikten führen; sie wird beim Start ohnehin neu ausgehandelt)
+und der interne Provisioning-Marker. Die DAC-Kalibrierung liegt fest in der
+Firmware und wird nicht im Config gespeichert.
 
 **Hinweis zu `NAME`:** Der Name wird zusätzlich persistent im Sensor
 gespeichert und als *Installation Description 1* in PGN 126998
