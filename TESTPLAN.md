@@ -39,10 +39,18 @@ damit nachvollziehbar bleibt, was womit getestet wurde.
 
 ### A.2 Neu: Variantenkennung HWV
 
-- [ ] STAT-Zeile enthält `;HWV=1000` (in App-Log oder PC-Tool sichtbar)
-- [ ] Feldreihenfolge sonst unverändert, Zeile wird nicht abgeschnitten
+> Die `STAT`-Zeile läuft nur über BLE (nicht über CAN), das PC-Tool zeigt sie
+> nicht. Sichtbar wird sie in der App unter **„Modul"** – dort stehen
+> Firmware-Version, HW-Revision und ab 1.4.8 auch die HW-Variante. Wer die
+> Rohzeile sehen will, nimmt ein BLE-Terminal (nRF Connect / Proteus Connect).
+
+- [ ] App zeigt unter „Modul" die Zeile **„HW-Variante: Drucksensor V1 (1000)"**
+- [ ] Firmware-Version und HW-Revision daneben weiterhin korrekt
+      (Zeile wird nicht abgeschnitten, Felder nicht verschoben)
 - [ ] **Rückwärtskompatibilität:** alte App 1.4.7 gegen neue Firmware –
       Anzeige vollständig, kein Parse-Fehler durch das Zusatzfeld
+- [ ] **Vorwärtskompatibilität:** neue App 1.4.8 gegen alte Firmware 1.2.8 –
+      Zeile „HW-Variante" fehlt einfach, alles andere unverändert
 
 ### A.3 Neu: Kalibrierstatus im Werkszustand (Bugfix)
 
