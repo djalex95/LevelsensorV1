@@ -16,16 +16,16 @@ damit nachvollziehbar bleibt, was womit getestet wurde.
 | Feld | Wert |
 |---|---|
 | Datum | |
-| Firmware-Version | 1.2.9-dev |
-| App-Version | 1.4.8-dev (+20) |
-| Bootloader-Version | 1.1.1-dev |
+| Firmware-Version | 1.2.9 |
+| App-Version | 1.4.8 (+20) |
+| Bootloader-Version | 1.1.1 |
 | Testsensor (UID) | |
 | Handy / Android-Version | |
 | Tester | Alex |
 
 ---
 
-## A – Firmware 1.2.9-dev
+## A – Firmware 1.2.9
 
 ### A.1 Grundfunktion (Regression nach dem main.c-Split)
 
@@ -71,7 +71,7 @@ damit nachvollziehbar bleibt, was womit getestet wurde.
 
 ---
 
-## B – App 1.4.8-dev
+## B – App 1.4.8
 
 ### B.1 Neu: Verbindung im Hintergrund freigeben (15 s)
 
