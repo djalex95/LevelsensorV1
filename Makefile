@@ -1,5 +1,5 @@
 # Eigenständiges Makefile für die Firmware (unabhängig von STM32CubeIDE).
-# Baut die App-Partition (Linkerscript STM32G0B1KBUXN_FLASH.ld, ab 0x08008000).
+# Baut die App-Partition (Linkerscript STM32G0B1KBUX_FLASH.ld, ab 0x08008000).
 # Ergebnis: build/<HW_VARIANT>/CAN_FuellstandsensorBLE.elf / .bin / .hex
 #
 # Verwendung:
@@ -55,9 +55,9 @@ C_SOURCES = \
   $(SENSOR_SRC) \
   $(wildcard Drivers/STM32G0xx_HAL_Driver/Src/*.c)
 
-ASM_SOURCES = Core/Startup/startup_stm32g0b1kbuxn.s
+ASM_SOURCES = Core/Startup/startup_stm32g0b1kbux.s
 
-LDSCRIPT = STM32G0B1KBUXN_FLASH.ld
+LDSCRIPT = STM32G0B1KBUX_FLASH.ld
 
 ######################################
 # Toolchain
