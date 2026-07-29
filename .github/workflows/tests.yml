@@ -25,3 +25,43 @@ jobs:
       # nichts: keine ARM-Toolchain, keine Fremdbibliotheken.
       - name: Host-Tests
         run: sh tests/run_tests.sh
+
+      # Die Variantenabfrage im Makefile pruefen. Das geht ohne
+      # ARM-Toolchain, weil beide Faelle schon beim Einlesen des Makefiles
+      # abbrechen - es wird nichts uebersetzt. Ohne diesen Schritt fiele ein
+      # Fehler in der Bedingung erst beim naechsten Release-Tag auf.
+      #
+      # Auf die Meldung wird bewusst genau geprueft: ohne ARM-Toolchain
+      # scheitert "make" sonst einfach am fehlenden Compiler, und der Test
+      # waere gruen, obwohl die Abfrage gar nicht mehr greift.
+      - name: Makefile verlangt HW_VARIANT
+        run: |
+          set -e
+
+          erwarte_abbruch() {
+            beschreibung=$1
+            muster=$2
+            shift 2
+            if ausgabe=$("$@" 2>&1); then
+              echo "FEHLER: $beschreibung lief durch, statt abzubrechen." >&2
+              echo "$ausgabe" >&2
+              exit 1
+            fi
+            case "$ausgabe" in
+              *"$muster"*)
+                echo "ok: $beschreibung bricht mit der erwarteten Meldung ab" ;;
+              *)
+                echo "FEHLER: $beschreibung brach ab, aber nicht an der Variantenabfrage." >&2
+                echo "$ausgabe" >&2
+                exit 1 ;;
+            esac
+          }
+
+          erwarte_abbruch "make ohne HW_VARIANT" \
+            "HW_VARIANT nicht gesetzt" make
+          erwarte_abbruch "make mit unbekannter HW_VARIANT" \
+            "Unbekannte HW_VARIANT" make HW_VARIANT=1002
+
+          # Gegenprobe: die variantenfreien Ziele muessen ohne Angabe laufen.
+          make clean
+          echo "ok: make clean laeuft ohne HW_VARIANT"

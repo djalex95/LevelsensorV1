@@ -3,9 +3,9 @@
 # Ergebnis: build/<HW_VARIANT>/CAN_FuellstandsensorBLE.elf / .bin / .hex
 #
 # Verwendung:
-#   make                      # Standardvariante 1001 bauen
-#   make HW_VARIANT=1000      # andere Hardwarevariante bauen
-#   make clean                # aufräumen (alle Varianten)
+#   make HW_VARIANT=1003      # Variante bauen (Angabe ist Pflicht)
+#   make clean                # aufräumen (alle Varianten, ohne Variante)
+#   make test                 # Host-Tests (ohne Variante)
 # Voraussetzung: arm-none-eabi-gcc im PATH.
 
 TARGET    = CAN_FuellstandsensorBLE
@@ -20,10 +20,25 @@ TARGET    = CAN_FuellstandsensorBLE
 # Die Variante bestimmt die Sensorkonstanten (Core/Inc/variants/<id>/) und
 # welcher Sensortreiber übersetzt wird. Sie geht außerdem als HW_VARIANT in
 # die Firmware ein und wird über BLE als HWV gemeldet.
-HW_VARIANT ?= 1001
+# Es gibt bewusst KEINEN Standardwert. Ein nacktes "make" soll abbrechen,
+# statt still die Firmware einer Variante zu bauen, die gar nicht auf dem
+# Tisch liegt. Der #error in sensor_cfg.h fängt so einen Fehlgriff nicht
+# ab, weil dieses Makefile Include-Pfad und Define gemeinsam setzt: beide
+# wären dann konsistent, nur konsistent falsch für die Platine. Auffallen
+# würde es erst nach dem Flashen an der HWV in der STAT-Zeile.
+#
+# "clean" und "test" brauchen keine Variante - clean räumt alle weg, und
+# die Host-Tests setzen ihre Defines selbst (siehe tests/run_tests.sh).
+VARIANT_OPTIONAL := $(if $(MAKECMDGOALS),$(if $(filter-out clean test,$(MAKECMDGOALS)),,ja),)
 
-ifeq ($(wildcard Core/Inc/variants/$(HW_VARIANT)/sensor_cfg.h),)
-  $(error Unbekannte HW_VARIANT '$(HW_VARIANT)' - vorhanden: $(notdir $(wildcard Core/Inc/variants/*)))
+ifeq ($(VARIANT_OPTIONAL)$(strip $(HW_VARIANT)),)
+  $(error HW_VARIANT nicht gesetzt - z.B. "make HW_VARIANT=1003". Vorhanden: $(notdir $(wildcard Core/Inc/variants/*)))
+endif
+
+ifneq ($(strip $(HW_VARIANT)),)
+  ifeq ($(wildcard Core/Inc/variants/$(HW_VARIANT)/sensor_cfg.h),)
+    $(error Unbekannte HW_VARIANT '$(HW_VARIANT)' - vorhanden: $(notdir $(wildcard Core/Inc/variants/*)))
+  endif
 endif
 
 # Getrennte Ausgabeverzeichnisse, damit ein Variantenwechsel nicht gegen
