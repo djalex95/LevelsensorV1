@@ -16,6 +16,19 @@
 #define INC_VARIANT_SENSOR_CFG_H_
 
 #include "sensor_kind.h"
+#include "version.h"
+
+/* Abgleich Include-Pfad <-> HW_VARIANT: Welche dieser Dateien gilt,
+ * entscheidet der Include-Pfad; was die Firmware als HWV meldet, das
+ * Symbol HW_VARIANT. Das Makefile setzt beides gemeinsam, die CubeIDE
+ * dagegen in zwei getrennten Feldern (Include paths / Define symbols).
+ * Bei 1001 gegen 1003 ist das besonders heikel: beide bauen denselben
+ * Treiber, der Unterschied steckt nur im Messbereich. Ohne diese
+ * Abfrage entstuende eine Firmware, die richtig misst, sich aber falsch
+ * ausgibt - genau die Verwechslung, gegen die die HWV schuetzen soll. */
+#if HW_VARIANT != 1003
+#error "Variante 1003 eingebunden, aber HW_VARIANT steht anders (CubeIDE: Include paths und Define symbols abgleichen)."
+#endif
 
 #define SENSOR_KIND         SENSOR_KIND_PDMS
 #define SENSOR_NAME         "WSEN-PDMS +/-1 kPa (flach)"
