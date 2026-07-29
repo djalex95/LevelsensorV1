@@ -47,15 +47,21 @@ extern calib_data EEPROM_values;
 /*
  * Byte-Reihenfolge: das Handbuch widerspricht sich - an einer Stelle
  * heisst es, das niederwertige Byte komme zuerst, an anderer, innerhalb
- * eines 16-Bit-Worts werde MSB zuerst uebertragen. Das laesst sich nur
- * am Aufbau klaeren.
+ * eines 16-Bit-Worts werde MSB zuerst uebertragen.
  *
- * Probe am Prueffeld: die Temperatur muss bei Raumtemperatur rund
- * 2000..2500 (20..25 Grad C) liefern. Bei vertauschten Bytes liegt der
- * Wert voellig daneben (mehrere hundert Grad oder tief negativ). Trifft
- * das zu, diesen Schalter auf 0 setzen und neu bauen.
+ * Am Aufbau geklaert (V2-Board, Juli 2026): der Sensor sendet das
+ * NIEDERWERTIGE Byte zuerst. Mit MSB-first gelesen zeigte die Firmware
+ * 210,19 Grad C (t16 = 0xE032) bei tatsaechlich 20,64 Grad C
+ * (t16 = 0x32E0), und der Druck stand stabil auf plus Vollausschlag
+ * (L = 99,9 % bei beiden offenen Ports), weil das echte High-Byte
+ * konstant 0x40 ist und der vertauschte Wert damit ueber
+ * SENSOR_OUT_MAX klemmt.
+ *
+ * Erkennungsmerkmal, falls das je wieder auftritt: die Temperatur
+ * schwankt um rund 25 Grad C, sobald sich die echte Temperatur um
+ * 0,1 Grad C aendert - das vertauschte Byte wirkt mit Faktor 256.
  */
-#define SENSOR_PDMS_MSB_FIRST   1
+#define SENSOR_PDMS_MSB_FIRST   0
 
 /* Ein 16-Bit-Register lesen. Rueckgabe 1 = ok, 0 = I2C-Fehler. */
 static uint8_t read_reg16(uint8_t reg, uint16_t *out)
