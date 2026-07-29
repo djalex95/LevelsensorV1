@@ -7,7 +7,8 @@
  *
  * Die Funktionen nutzen die in main.c definierten CubeMX-Handles
  * (hi2c1, hdac1) sowie den App-Zustand (EEPROM_values, device_param,
- * error_mode) per extern - siehe sensor.c.
+ * error_mode) per extern - siehe sensor_common.c und den jeweiligen
+ * Treiber sensor_legacy.c / sensor_pdms.c.
  */
 #ifndef INC_SENSOR_H_
 #define INC_SENSOR_H_

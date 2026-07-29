@@ -32,18 +32,33 @@ jobs:
           test "${GITHUB_REF_NAME#v}" = "${{ steps.ver.outputs.fw }}" \
             || { echo "::error::Tag ${GITHUB_REF_NAME} passt nicht zu FW_VERSION ${{ steps.ver.outputs.fw }}"; exit 1; }
 
+      - name: Host-Tests
+        run: sh tests/run_tests.sh
+
       - name: ARM-Toolchain installieren
         uses: carlosperate/arm-none-eabi-gcc-action@v1
         with:
           release: '13.2.Rel1'
 
-      - name: Firmware bauen
-        run: make -j4
-
-      - name: .bin benennen
+      # Jede Hardwarevariante bekommt ein eigenes Binary. Der Name enthält
+      # die Variante, damit App und Bootloader sie zuordnen können:
+      #   Fuellstandsensor_v1.2.10_hwv1001.bin
+      #
+      # ACHTUNG: Die App zeigt bislang jedes .bin aus dem Release zur Auswahl
+      # an (github_releases.dart: fetchBinAssets filtert nur auf ".bin").
+      # Solange sie nicht nach der vom Sensor gemeldeten HWV filtert, kann
+      # der Anwender die falsche Variante aufspielen - bei 1001 gegen 1003
+      # fällt das nicht als Fehler auf, sondern nur als zehnfach falscher
+      # Füllstand. Vor dem nächsten Release-Tag also erst die App anpassen.
+      - name: Firmware bauen (alle Varianten)
         run: |
           mkdir -p dist
-          cp build/CAN_FuellstandsensorBLE.bin "dist/Fuellstandsensor_v${{ steps.ver.outputs.fw }}.bin"
+          for hwv in 1000 1001 1003; do
+            make -j4 HW_VARIANT=$hwv
+            cp "build/$hwv/CAN_FuellstandsensorBLE.bin" \
+               "dist/Fuellstandsensor_v${{ steps.ver.outputs.fw }}_hwv${hwv}.bin"
+          done
+          ls -l dist
 
       - name: Release veröffentlichen
         uses: softprops/action-gh-release@v2

@@ -12,7 +12,7 @@
   *   - main() + Hauptschleife .............. Messtakt, NMEA-Sendetimer,
   *                                            BLE-Bearbeitung, Boot-Abgleich, LED
   *   - Config-/EEPROM-Helfer ............... ausgelagert nach app_config.c
-  *   - Sensor/Mess-Ebene ................... ausgelagert nach sensor.c
+  *   - Sensor/Mess-Ebene ................... ausgelagert nach sensor_common.c
   *   - LED ................................. set_led, calc_color, blink_LED
   *   - NMEA2000-Handler .................... ausgelagert nach nmea_app.c
   *   - BLE-Kommando-Ebene .................. ausgelagert nach ble_app.c
@@ -1286,7 +1286,7 @@ void set_led(int32_t red, int32_t green, int32_t blue, int32_t brightness)
 	PWM_BLUE = blue*brightness;
 }
 
-/* set_volt(), set_volt_raw(), calc_percent(): siehe sensor.c */
+/* set_volt(), set_volt_raw(), calc_percent(): siehe sensor_common.c */
 
 void calc_color(int32_t *c_red, int32_t *c_green, int32_t *c_blue, uint16_t percent)
 {
@@ -1393,7 +1393,7 @@ void blink_LED()
 	// Weiß blinken für 0 anzeigen
 }
 
-/* get_value(), init_Sensor(): siehe sensor.c */
+/* get_value(), init_Sensor(): siehe sensor_legacy.c / sensor_pdms.c */
 
 /* ble_send_status(), ble_send_lin(), ble_handle_command(): siehe ble_app.c */
 
