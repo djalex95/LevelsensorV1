@@ -1,0 +1,27 @@
+name: Host-Tests
+
+# Laeuft bei jedem Push auf einen Zweig, also auch auf Arbeitszweigen -
+# damit ein Fehler auffaellt, lange bevor daraus ein Release wird.
+#
+# Tag-Pushes sind bewusst ausgenommen: '**' trifft nur Zweige, keine Tags.
+# Bei einem Versions-Tag laeuft stattdessen release.yml, das die Tests
+# seinerseits als erste Stufe vor dem Bauen ausfuehrt. So bleibt die
+# Freigabe an bestandene Tests gebunden, ohne dass beide Workflows
+# gleichzeitig dasselbe tun.
+
+on:
+  push:
+    branches: [ '**' ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # gcc bringt ubuntu-latest schon mit. Die Host-Tests brauchen sonst
+      # nichts: keine ARM-Toolchain, keine Fremdbibliotheken.
+      - name: Host-Tests
+        run: sh tests/run_tests.sh
