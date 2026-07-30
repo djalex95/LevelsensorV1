@@ -44,16 +44,21 @@ jobs:
       # die Variante, damit App und Bootloader sie zuordnen können:
       #   Fuellstandsensor_v1.2.10_hwv1001.bin
       #
-      # ACHTUNG: Die App zeigt bislang jedes .bin aus dem Release zur Auswahl
-      # an (github_releases.dart: fetchBinAssets filtert nur auf ".bin").
-      # Solange sie nicht nach der vom Sensor gemeldeten HWV filtert, kann
-      # der Anwender die falsche Variante aufspielen - bei 1001 gegen 1003
-      # fällt das nicht als Fehler auf, sondern nur als zehnfach falscher
-      # Füllstand. Vor dem nächsten Release-Tag also erst die App anpassen.
+      # Variante 1000 (Platine V1) wird NICHT mehr gebaut: der Quellstand
+      # traegt seit der V2-Migration die V2-Pinbelegung (CAN auf PA11/12
+      # statt PD0/1) - ein 1000er-Build waere auf der V1-Platine
+      # funktionsunfaehig. V1-Geraete bleiben auf der v1.2.9-Linie
+      # (Branch v1-legacy).
+      #
+      # Die App filtert die Auswahl nach der hwv-Kennung im Dateinamen
+      # (github_releases.dart: assetsForVariant): Assets mit Kennung nur
+      # fuer die exakt passende Variante, Assets ohne Kennung nur fuer die
+      # V1-Linie. Das Namensschema "_hwv<nnnn>.bin" ist damit Schnittstelle
+      # und darf nicht geaendert werden, ohne die App anzupassen.
       - name: Firmware bauen (alle Varianten)
         run: |
           mkdir -p dist
-          for hwv in 1000 1001 1003; do
+          for hwv in 1001 1003; do
             make -j4 HW_VARIANT=$hwv
             cp "build/$hwv/CAN_FuellstandsensorBLE.bin" \
                "dist/Fuellstandsensor_v${{ steps.ver.outputs.fw }}_hwv${hwv}.bin"

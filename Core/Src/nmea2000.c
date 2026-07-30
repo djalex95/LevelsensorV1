@@ -8,6 +8,7 @@
 #include "nmea2000.h"
 #include "main.h"		/* fuer Error_Handler() */
 #include "version.h"	/* zentrale Firmware-Version */
+#include "sensor_cfg.h"	/* HW_REV_SUFFIX der Variante (fuer HWV_FULL_STR) */
 
 typedef union nmea_int16_convert{
 	uint8_t small_arr[2];
@@ -190,7 +191,7 @@ uint8_t init_p_struct(NMEA_parameter_Product *p_info_struct)
 		s[8] = '\0';
 	}
 	memcpy(p_info_struct->ModelVersion, filled_string,32);
-	strcpy((char *)p_info_struct->ModelVersion, "Rev " HW_REV_STR);
+	strcpy((char *)p_info_struct->ModelVersion, HWV_FULL_STR);
 	memcpy(p_info_struct->SwCode, filled_string,32);
 	strcpy((char *)p_info_struct->SwCode, FW_VERSION_STR);
 

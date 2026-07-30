@@ -36,4 +36,10 @@
  * 1000 = 100,0 mBar = Vollausschlag = rund 1,02 m Wassersaeule. */
 #define SENSOR_STD_PRESS    1000
 
+/* Platinen-Stand der V2-Platine, Teil der HWV-Meldung ("1001A").
+ * ACHTUNG: 1001 und 1003 sitzen auf DERSELBEN Platine. Bei einer
+ * Hardware-Aenderung ohne Firmware-Relevanz (z. B. Widerstandstausch)
+ * den Buchstaben in BEIDEN sensor_cfg.h gleichzeitig hochzaehlen. */
+#define HW_REV_SUFFIX       "A"
+
 #endif /* INC_VARIANT_SENSOR_CFG_H_ */
