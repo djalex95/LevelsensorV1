@@ -10,6 +10,8 @@
 #include "version.h"	/* zentrale Firmware-Version */
 #include "sensor_cfg.h"	/* HW_REV_SUFFIX der Variante (fuer HWV_FULL_STR) */
 
+extern char hw_id_str[];	/* Laufzeit-Kennung "1003A", OTP oder Build (main.c) */
+
 typedef union nmea_int16_convert{
 	uint8_t small_arr[2];
 	uint16_t max_val;
@@ -191,7 +193,7 @@ uint8_t init_p_struct(NMEA_parameter_Product *p_info_struct)
 		s[8] = '\0';
 	}
 	memcpy(p_info_struct->ModelVersion, filled_string,32);
-	strcpy((char *)p_info_struct->ModelVersion, HWV_FULL_STR);
+	strcpy((char *)p_info_struct->ModelVersion, hw_id_str);
 	memcpy(p_info_struct->SwCode, filled_string,32);
 	strcpy((char *)p_info_struct->SwCode, FW_VERSION_STR);
 

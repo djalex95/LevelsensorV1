@@ -50,8 +50,11 @@ typedef struct sensor_data{
 #define std_press SENSOR_STD_PRESS
 #define std_offset 0
 
-/* Fehler-Flags in error_mode (Bitmaske; steuern die Fehler-LED). */
+/* Fehler-Flags in error_mode (Bitmaske; steuern die Fehler-LED und das
+ * E=-Feld im BLE-STAT). ERROR_I2C war historisch 10 (Bits 1 und 3) -
+ * jetzt echte Einzelbits. */
 #define ERROR_TX_CAN 1
-#define ERROR_I2C 10
+#define ERROR_I2C    2
+#define ERROR_HWV    4	/* OTP-Variante widerspricht der Firmware (Issue #2) */
 
 #endif /* INC_APP_TYPES_H_ */
