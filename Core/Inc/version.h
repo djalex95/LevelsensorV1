@@ -9,7 +9,7 @@
 
 /* Firmware-Version der Applikation. Bei jeder Freigabe erhöhen. */
 #define FW_VERSION       "1.2.10-dev"
-#define FW_VERSION_DATE  "2026-07-28"
+#define FW_VERSION_DATE  "2026-07-30"
 
 /* Kombinierte Anzeige, z. B. "1.2.0 (2026-07-07)". */
 #define FW_VERSION_STR   FW_VERSION " (" FW_VERSION_DATE ")"
