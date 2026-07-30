@@ -1,3 +1,46 @@
+## Firmware 1.2.10
+
+Erste Firmware fuer die Platine V2 (STM32G0B1KBU6 ohne N-Suffix) mit dem
+Wuerth-Drucksensor WSEN-PDMS. Die V1-Linie ist mit 1.2.9 eingefroren
+(Branch `v1-legacy`); dieses Release enthaelt daher keine Binaries fuer
+die Variante 1000 mehr.
+
+### Hardware-Varianten
+- Neuer Treiber fuer den WSEN-PDMS: Variante 1001 (+/-10 kPa) und 1003
+  (+/-1 kPa, flache Tanks). Beide nutzen dieselbe Platine V2 und
+  unterscheiden sich nur im bestueckten Sensor.
+- Der Build verlangt jetzt eine ausdrueckliche Variante
+  (`make HW_VARIANT=1003`); ein Build ohne Angabe bricht ab. Die CI
+  weist das nach.
+- Jede Variante prueft beim Kompilieren, dass Include-Pfad und
+  HW_VARIANT-Symbol zusammenpassen - eine vertauschte Firmware faellt
+  sonst nicht als Fehler auf, sondern nur als zehnfach falscher
+  Fuellstand.
+
+### Variantenkennung mit Platinen-Stand
+- Variante und Platinen-Revision sind nach aussen EINE Kennung, z. B.
+  `1003A`: die Zahl entscheidet ueber die passende Firmware, der
+  Buchstabe ist der Hardware-Stand der Platine (rein informativ).
+- Die `STAT`-Zeile meldet `HWV=1003A`; das fruehere Feld `HW=` entfaellt.
+  Die NMEA2000-Produktinfo (PGN 126996) meldet die Kennung im
+  ModelVersion-Feld statt des bisherigen "Rev 1000".
+- Die App filtert das Update-Angebot ab Version 1.4.9 nach dieser
+  Kennung; aeltere Apps zeigen bei der Variante einen Strich.
+
+### Behoben
+- Kompletter Ausfall des NMEA2000-Empfangs nach einer
+  CubeMX-Neugenerierung: `ExtFiltersNbr` stand auf 0, damit wurden alle
+  29-Bit-Frames verworfen (Fuellstand wurde weiter gesendet, aber
+  Address Claim und Produktabfragen blieben unbeantwortet). Details in
+  Issue #1.
+
+### Intern
+- Projekt auf STM32G0B1KBUx umbenannt (Linkerscripte, Startup, .cproject);
+  Flusskontrolle der BLE-UART bewusst deaktiviert (Modul nutzt bei
+  115200 Baud kein RTS/CTS, Pins sind auf der Platine vorhanden).
+- Host-Tests fuer die Umrechnung aller Varianten (`tests/run_tests.sh`),
+  laufen in der CI bei jedem Push.
+
 ## Firmware 1.2.9
 
 ### Sicherung der Konfiguration
