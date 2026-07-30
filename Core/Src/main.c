@@ -46,6 +46,7 @@
 #include "config_store.h"
 #include "dfu_common.h"
 #include "version.h"
+#include "hw_otp.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -118,6 +119,12 @@ void blink_LED();
 /* USER CODE BEGIN 0 */
 /* volatile: wird in Interrupt-Callbacks UND Hauptschleife verwendet */
 volatile uint8_t error_mode = 0;
+
+/* Hardware-Kennung, z. B. "1003A": aus dem OTP (gueltiger Slot) oder als
+ * Fallback aus dem Build (HWV_FULL_STR). Siehe hw_otp.h und Issue #2. */
+char hw_id_str[8] = HWV_FULL_STR;
+volatile uint8_t hw_otp_mismatch = 0;
+
 uint8_t led_jump = 0;
 
 volatile uint8_t run_mode = 1;
@@ -231,6 +238,26 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   __HAL_TIM_CLEAR_FLAG(&htim6,TIM_SR_UIF);
+
+  /* Hardware-Kennung aus dem OTP lesen (Issue #2). Ein gueltiger Slot
+   * ueberstimmt die Build-Werte. Widerspruch bei der Variante: Geraet
+   * bootet und bleibt per BLE erreichbar (OTA-Rettung), sendet aber
+   * keine Sensordaten auf den NMEA-Bus und zeigt ERROR_HWV (rote
+   * Fehler-LED, E=-Feld im STAT). OTP leer (Entwicklungsboard):
+   * Verhalten wie bisher. */
+  {
+    const hw_otp_slot_t *hw_slot = hw_otp_find();
+    if (hw_slot != NULL)
+    {
+      snprintf(hw_id_str, sizeof(hw_id_str), "%u%c",
+               (unsigned)hw_slot->variant, (char)hw_slot->rev);
+      if (hw_slot->variant != HW_VARIANT)
+      {
+        hw_otp_mismatch = 1;
+        error_mode |= ERROR_HWV;
+      }
+    }
+  }
 
 
 
@@ -433,12 +460,12 @@ int main(void)
 	  	/* Sendezyklen nach NMEA2000-Norm: 127505 alle 2,5 s, 130312 alle 2 s,
 	  	 * Heartbeat 126993 alle 60 s. Vorher wurde alles im 200-ms-Takt gesendet
 	  	 * (~12-fache Buslast ohne Nutzen). */
-	  	if(((time_el-last_run_nmea)>=nmea_time) && ((time_el-claim_time)>=250))
+	  	if((hw_otp_mismatch == 0) && ((time_el-last_run_nmea)>=nmea_time) && ((time_el-claim_time)>=250))
 	  	{
 	  		last_run_nmea = time_el;
 	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, percent_val, dev_info_par.cap);
 	  	}
-	  	if(((time_el-last_run_temp)>=temp_time) && ((time_el-claim_time)>=250))
+	  	if((hw_otp_mismatch == 0) && ((time_el-last_run_temp)>=temp_time) && ((time_el-claim_time)>=250))
 	  	{
 	  		last_run_temp = time_el;
 	  		NMEA2000_SendTemperature(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, TEMP_SOURCE_NMEA, sensor_data_rx.temp);
@@ -451,8 +478,11 @@ int main(void)
 	  	if(fluid_req != 0)	/* ISO Request auf 127505 -> sofort antworten */
 	  	{
 	  		fluid_req = 0;
-	  		NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, percent_val, dev_info_par.cap);
-	  		last_run_nmea = time_el;
+	  		if (hw_otp_mismatch == 0)
+	  		{
+	  			NMEA2000_SendFluidLevel(&hfdcan1, dev_info_par.srcAdr, dev_info_par.devInstance, dev_info_par.fluidType, percent_val, dev_info_par.cap);
+	  			last_run_nmea = time_el;
+	  		}
 	  	}
 	  	if(pgnlist_req != 0)	/* ISO Request auf 126464 -> TX/RX-PGN-Listen senden */
 	  	{
@@ -658,6 +688,10 @@ int main(void)
 	  				if(error_mode & ERROR_I2C)
 	  				{
 	  					LED_g=255;
+	  				}
+	  				if(error_mode & ERROR_HWV)
+	  				{
+	  					LED_r=255;
 	  				}
 	  				if(error_cnt > 100)
 	  				{

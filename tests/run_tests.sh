@@ -29,6 +29,10 @@ $CC $CFLAGS -DHW_VARIANT=1001 -ICore/Inc -ICore/Inc/variants/1001 \
 	-o "$OUT/test_config_store" tests/test_config_store.c
 run "config_store" "$OUT/test_config_store"
 
+# OTP-Slot-Logik (hw_otp.h) - variantenneutral, arbeitet auf RAM-Puffern.
+$CC $CFLAGS -ICore/Inc -o "$OUT/test_hw_otp" tests/test_hw_otp.c
+run "hw_otp" "$OUT/test_hw_otp"
+
 for hwv in 1000 1001 1003; do
 	$CC $CFLAGS -DHW_VARIANT=$hwv -ICore/Inc -ICore/Inc/variants/$hwv \
 		-o "$OUT/test_sensor_conv_$hwv" tests/test_sensor_conv.c

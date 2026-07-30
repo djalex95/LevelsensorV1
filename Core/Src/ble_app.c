@@ -23,6 +23,8 @@ extern calib_data EEPROM_values;
 extern sensor_mess sensor_data_rx;
 extern char sensor_name[CFG_NAME_LEN + 1];
 extern uint16_t percent_val;
+extern char hw_id_str[];			/* Laufzeit-Kennung "1003A" (main.c) */
+extern volatile uint8_t error_mode;	/* ERROR_*-Bits (app_types.h) */
 extern volatile int32_t raw_press;
 extern volatile uint8_t dev_info;
 
@@ -47,12 +49,14 @@ void ble_desired_name(char *buf)
 
 /*
  * Sendet den aktuellen Sensorzustand als maschinenlesbare Zeile an die App.
- * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>;HWV=<variante><rev>\n
+ * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>;HWV=<variante><rev>;E=<fehler>\n
  * L: Füllstand in %, T: Temperatur in Grad C, F: Fluidtyp (0..15),
  * C: Kapazität (Liter), I: Instanz, CAL: 1 = kalibriert,
  * HWV: Hardware-Variante plus Platinen-Buchstabe, z. B. 1003A (die Zahl
  * ordnet die passende Firmware zu, der Buchstabe ist rein informativ).
- * Das fruehere Feld HW= (Revision) ist entfallen.
+ * Das fruehere Feld HW= (Revision) ist entfallen. Die Kennung kommt aus
+ * dem OTP, wenn das Geraet provisioniert ist (hw_otp.h, Issue #2).
+ * E: Fehlerbits (ERROR_* aus app_types.h), 0 = kein Fehler.
  */
 void ble_send_status(void)
 {
@@ -69,10 +73,10 @@ void ble_send_status(void)
 
 	int cal = (EEPROM_values.calib_available == 0x00) ? 1 : 0;
 
-	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HWV=%s\n",
+	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HWV=%s;E=%u\n",
 			 p_int, p_frac, tsign, ta / 100, ta % 100,
 			 dev_info_par.fluidType, dev_info_par.cap, dev_info_par.devInstance, cal,
-			 FW_VERSION, HWV_FULL_STR);
+			 FW_VERSION, hw_id_str, (unsigned)error_mode);
 
 	BLE_SendString(line);
 }
