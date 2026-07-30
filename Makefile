@@ -1,14 +1,49 @@
 # Eigenständiges Makefile für die Firmware (unabhängig von STM32CubeIDE).
-# Baut die App-Partition (Linkerscript STM32G0B1KBUXN_FLASH.ld, ab 0x08008000).
-# Ergebnis: build/CAN_FuellstandsensorBLE.elf / .bin / .hex
+# Baut die App-Partition (Linkerscript STM32G0B1KBUX_FLASH.ld, ab 0x08008000).
+# Ergebnis: build/<HW_VARIANT>/CAN_FuellstandsensorBLE.elf / .bin / .hex
 #
 # Verwendung:
-#   make            # bauen
-#   make clean      # aufräumen
+#   make HW_VARIANT=1003      # Variante bauen (Angabe ist Pflicht)
+#   make clean                # aufräumen (alle Varianten, ohne Variante)
+#   make test                 # Host-Tests (ohne Variante)
 # Voraussetzung: arm-none-eabi-gcc im PATH.
 
 TARGET    = CAN_FuellstandsensorBLE
-BUILD_DIR = build
+
+######################################
+# Hardwarevariante
+######################################
+# 1000 = Drucksensor V1 (alter 24-Bit-Sensor, STM32G0B1KBU6N)
+# 1001 = Drucksensor V2 (Würth WSEN-PDMS ±10 kPa)
+# 1003 = Drucksensor V2 flach (Würth WSEN-PDMS ±1 kPa, gleiche Platine)
+#
+# Die Variante bestimmt die Sensorkonstanten (Core/Inc/variants/<id>/) und
+# welcher Sensortreiber übersetzt wird. Sie geht außerdem als HW_VARIANT in
+# die Firmware ein und wird über BLE als HWV gemeldet.
+# Es gibt bewusst KEINEN Standardwert. Ein nacktes "make" soll abbrechen,
+# statt still die Firmware einer Variante zu bauen, die gar nicht auf dem
+# Tisch liegt. Der #error in sensor_cfg.h fängt so einen Fehlgriff nicht
+# ab, weil dieses Makefile Include-Pfad und Define gemeinsam setzt: beide
+# wären dann konsistent, nur konsistent falsch für die Platine. Auffallen
+# würde es erst nach dem Flashen an der HWV in der STAT-Zeile.
+#
+# "clean" und "test" brauchen keine Variante - clean räumt alle weg, und
+# die Host-Tests setzen ihre Defines selbst (siehe tests/run_tests.sh).
+VARIANT_OPTIONAL := $(if $(MAKECMDGOALS),$(if $(filter-out clean test,$(MAKECMDGOALS)),,ja),)
+
+ifeq ($(VARIANT_OPTIONAL)$(strip $(HW_VARIANT)),)
+  $(error HW_VARIANT nicht gesetzt - z.B. "make HW_VARIANT=1003". Vorhanden: $(notdir $(wildcard Core/Inc/variants/*)))
+endif
+
+ifneq ($(strip $(HW_VARIANT)),)
+  ifeq ($(wildcard Core/Inc/variants/$(HW_VARIANT)/sensor_cfg.h),)
+    $(error Unbekannte HW_VARIANT '$(HW_VARIANT)' - vorhanden: $(notdir $(wildcard Core/Inc/variants/*)))
+  endif
+endif
+
+# Getrennte Ausgabeverzeichnisse, damit ein Variantenwechsel nicht gegen
+# alte Objektdateien linkt.
+BUILD_DIR = build/$(HW_VARIANT)
 
 # Optimierung: -O0 entspricht dem bisher auf Hardware getesteten Stand
 # (wie der CubeIDE-Debug-Build). -Og/-Os erst nach einem Hardware-Test
@@ -19,13 +54,25 @@ DEBUG ?= 1
 ######################################
 # Quellen
 ######################################
+# Genau ein Sensortreiber wird eingebunden; die übrigen werden aus dem
+# Wildcard herausgefiltert, damit sie nicht doppelt definierte Symbole
+# liefern.
+SENSOR_ALL = Core/Src/sensor_legacy.c Core/Src/sensor_pdms.c
+
+ifeq ($(HW_VARIANT),1000)
+  SENSOR_SRC = Core/Src/sensor_legacy.c
+else
+  SENSOR_SRC = Core/Src/sensor_pdms.c
+endif
+
 C_SOURCES = \
-  $(wildcard Core/Src/*.c) \
+  $(filter-out $(SENSOR_ALL),$(wildcard Core/Src/*.c)) \
+  $(SENSOR_SRC) \
   $(wildcard Drivers/STM32G0xx_HAL_Driver/Src/*.c)
 
-ASM_SOURCES = Core/Startup/startup_stm32g0b1kbuxn.s
+ASM_SOURCES = Core/Startup/startup_stm32g0b1kbux.s
 
-LDSCRIPT = STM32G0B1KBUXN_FLASH.ld
+LDSCRIPT = STM32G0B1KBUX_FLASH.ld
 
 ######################################
 # Toolchain
@@ -43,13 +90,14 @@ CPU       = -mcpu=cortex-m0plus
 FLOAT-ABI = -mfloat-abi=soft
 MCU       = $(CPU) -mthumb $(FLOAT-ABI)
 
-C_DEFS = -DUSE_HAL_DRIVER -DSTM32G0B1xx
+C_DEFS = -DUSE_HAL_DRIVER -DSTM32G0B1xx -DHW_VARIANT=$(HW_VARIANT)
 ifeq ($(DEBUG),1)
 C_DEFS += -DDEBUG
 endif
 
 C_INCLUDES = \
   -ICore/Inc \
+  -ICore/Inc/variants/$(HW_VARIANT) \
   -IDrivers/STM32G0xx_HAL_Driver/Inc \
   -IDrivers/STM32G0xx_HAL_Driver/Inc/Legacy \
   -IDrivers/CMSIS/Device/ST/STM32G0xx/Include \
@@ -98,9 +146,14 @@ $(BUILD_DIR)/%.hex: $(BUILD_DIR)/%.elf
 $(BUILD_DIR):
 	mkdir -p $@
 
+# Alle Varianten entfernen, nicht nur die gerade gewählte.
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf build
+
+# Host-Tests (laufen auf dem PC, kein Target nötig).
+test:
+	sh tests/run_tests.sh
 
 -include $(wildcard $(BUILD_DIR)/*.d)
 
-.PHONY: all clean
+.PHONY: all clean test

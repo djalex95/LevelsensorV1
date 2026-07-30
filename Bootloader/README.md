@@ -9,7 +9,7 @@ siehe `DESIGN.md`.
 - `Core/Src/main.c` – Entscheidung (App/DFU), Flash-Zugriffe, App-Sprung, DFU-Schleife
 - `Core/Src/boot_proteus.c`, `Core/Inc/boot_proteus.h` – Proteus-e-UART-Treiber (Polling)
 - `Core/Src/boot_dfu.c`, `Core/Inc/boot_dfu.h` – DFU-Ablauf (hardwareunabhängig, getestet)
-- `STM32G0B1KBUXN_BOOT.ld` – Linker-Skript (Bootloader bei `0x08000000`, 32 KB)
+- `STM32G0B1KBUX_BOOT.ld` – Linker-Skript (Bootloader bei `0x08000000`, 32 KB)
 - `tools/make_meta.py` – erzeugt die Metadaten für die Erst-Inbetriebnahme
 - gemeinsam mit der App: `../Core/Inc/dfu_common.h`, `../Core/Src/dfu_common.c`
 
@@ -23,7 +23,7 @@ damit diese Infrastruktur schon passt:
 1. In CubeIDE im Project Explorer das App-Projekt **kopieren und einfügen**
    (Rechtsklick → Copy, dann Paste) und einen neuen Namen vergeben, z. B.
    `CAN_Fuellstandsensor_Boot`.
-2. Im Duplikat das Linker-Skript auf **`STM32G0B1KBUXN_BOOT.ld`** setzen
+2. Im Duplikat das Linker-Skript auf **`STM32G0B1KBUX_BOOT.ld`** setzen
    (Properties → C/C++ Build → Settings → MCU GCC Linker → General → Linker
    Script) – oder in der vorhandenen `.ld` die FLASH-Region auf
    `ORIGIN = 0x08000000, LENGTH = 32K` ändern.

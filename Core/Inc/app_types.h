@@ -11,6 +11,12 @@
 
 #include <stdint.h>
 
+/* Sensorkonstanten der gebauten Hardwarevariante. Der Include-Pfad
+ * Core/Inc/variants/<HW_VARIANT> kommt aus dem Makefile; in der CubeIDE
+ * muss er einmalig unter Project > Properties > C/C++ Build > Settings >
+ * MCU GCC Compiler > Include paths eingetragen werden. */
+#include "sensor_cfg.h"
+
 /* Kalibrierdaten des Drucksensors (Config-Bytes 0..4). */
 typedef struct calib_data{
 	uint8_t calib_available;
@@ -38,8 +44,10 @@ typedef struct sensor_data{
 	int16_t temp;
 }sensor_mess;
 
-/* Werkswerte fuer die Druckmessung. */
-#define std_press 1000	//100,0mBar -> 100000uBar
+/* Werkswerte fuer die Druckmessung. max_val in Einheiten von 0,1 mBar,
+ * also 1000 = 100,0 mBar = 100000 uBar. Der Wert haengt vom Messbereich
+ * des bestueckten Sensors ab und kommt deshalb aus der Variante. */
+#define std_press SENSOR_STD_PRESS
 #define std_offset 0
 
 /* Fehler-Flags in error_mode (Bitmaske; steuern die Fehler-LED). */

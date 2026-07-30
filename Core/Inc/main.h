@@ -66,8 +66,17 @@ void Error_Handler(void);
 #define BLE_RESET_GPIO_Port GPIOA
 #define BLE_BUSY_Pin GPIO_PIN_1
 #define BLE_BUSY_GPIO_Port GPIOB
-#define BLE_LED_Pin GPIO_PIN_15
+#define BLE_LED_Pin GPIO_PIN_2
 #define BLE_LED_GPIO_Port GPIOB
+#define WC_N_Pin GPIO_PIN_15
+#define WC_N_GPIO_Port GPIOA
+#define D_OUT_Pin GPIO_PIN_3
+#define D_OUT_GPIO_Port GPIOB
+#define CAN_STBY_Pin GPIO_PIN_4
+#define CAN_STBY_GPIO_Port GPIOB
+#define TASTER_Pin GPIO_PIN_8
+#define TASTER_GPIO_Port GPIOB
+#define TASTER_EXTI_IRQn EXTI4_15_IRQn
 
 /* USER CODE BEGIN Private defines */
 
