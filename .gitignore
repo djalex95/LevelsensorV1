@@ -1,6 +1,8 @@
 # ===== STM32 / STM32CubeIDE (Firmware) =====
 /Debug/
 /Release/
+/Debug_*/
+/Release_*/
 *.o
 *.d
 *.su

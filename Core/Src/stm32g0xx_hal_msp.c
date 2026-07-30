@@ -20,7 +20,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 /* USER CODE BEGIN Includes */
-
+#include "board_pins.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -201,6 +201,10 @@ void HAL_FDCAN_MspInit(FDCAN_HandleTypeDef* hfdcan)
     HAL_NVIC_SetPriority(TIM16_FDCAN_IT0_IRQn, 1, 0);
     HAL_NVIC_EnableIRQ(TIM16_FDCAN_IT0_IRQn);
     /* USER CODE BEGIN FDCAN1_MspInit 1 */
+
+    /* CAN liegt auf der V1-Platine auf PD0/PD1 statt auf PA11/PA12
+     * (siehe board_pins.h). Fuer die V2-Platine leer. */
+    board_fdcan_pins_init();
 
     /* USER CODE END FDCAN1_MspInit 1 */
 

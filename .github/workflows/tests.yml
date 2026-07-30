@@ -65,3 +65,51 @@ jobs:
           # Gegenprobe: die variantenfreien Ziele muessen ohne Angabe laufen.
           make clean
           echo "ok: make clean laeuft ohne HW_VARIANT"
+
+  # Cross-Build aller Varianten. Der ARM-Uebersetzungslauf findet sonst nur
+  # beim Release-Tag statt (release.yml) - ein Fehler in einer einzelnen
+  # Variante faellt damit erst bei der Freigabe auf. Hier laeuft er bei
+  # jedem Push auf einen Zweig.
+  #
+  # Erst nach den Host-Tests, damit die Toolchain nicht geladen wird,
+  # wenn schon die schnelle Stufe rot ist.
+  crossbuild:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Dieselbe Version wie in release.yml, damit ein gruener Lauf hier
+      # auch wirklich fuer das Release gilt.
+      - name: ARM-Toolchain installieren
+        uses: carlosperate/arm-none-eabi-gcc-action@v1
+        with:
+          release: '13.2.Rel1'
+
+      # Der Dateiname traegt zusaetzlich den Commit. So laesst sich ein
+      # Testbuild nicht mit einem Release-Binary verwechseln, das nur
+      # "Fuellstandsensor_v<version>_hwv<nnnn>.bin" heisst.
+      - name: Firmware bauen (alle Varianten)
+        run: |
+          set -e
+          fw=$(grep -oP '^#define\s+FW_VERSION\s+"\K[^"]+' Core/Inc/version.h | head -n1)
+          sha=$(echo "$GITHUB_SHA" | cut -c1-7)
+          mkdir -p dist
+          for hwv in 1000 1001 1003; do
+            make -j4 HW_VARIANT=$hwv
+            cp "build/$hwv/CAN_FuellstandsensorBLE.bin" \
+               "dist/Fuellstandsensor_v${fw}+${sha}_hwv${hwv}.bin"
+          done
+          ls -l dist
+
+      # Kein Release, sondern ein Anhang am Lauf selbst: Actions-Tab, den
+      # Lauf oeffnen, Abschnitt "Artifacts" unten auf der Uebersichtsseite.
+      # Die App sieht diese Dateien nicht, sie liest ausschliesslich
+      # Release-Assets.
+      - name: Binaries anhaengen
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ github.sha }}
+          path: dist/*.bin
+          retention-days: 14

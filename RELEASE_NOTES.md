@@ -1,3 +1,49 @@
+## Firmware 1.2.11
+
+Die Hardware-Kennung steht jetzt im OTP des Controllers, und die Platine V1
+wird wieder aus dem Hauptzweig bedient.
+
+### Hardware-Kennung im OTP
+- Variante und Platinen-Buchstabe werden bei der Produktion in den
+  OTP-Bereich des STM32G0B1 geschrieben (ab 0x1FFF7000). Die Kennung ist
+  damit eine Eigenschaft des Geraets und nicht mehr nur eine Behauptung
+  der aufgespielten Firmware.
+- Beim Start vergleicht die Firmware den OTP-Eintrag mit der Variante,
+  fuer die sie gebaut wurde. Weichen beide voneinander ab, stellt sie das
+  Senden auf NMEA2000 ein. Eine versehentlich aufgespielte Fremdvariante
+  meldet damit gar nichts mehr, statt still einen um Faktor zehn falschen
+  Fuellstand zu liefern.
+- Die `STAT`-Zeile meldet `HWV` aus dem OTP, sobald das Geraet
+  provisioniert ist; sonst weiterhin aus dem Build.
+- Der OTP laesst sich je Doppelwort nur ein einziges Mal beschreiben,
+  auch derselbe Wert darf nicht nachgeschrieben werden. Deshalb eine
+  Liste aus 16 Slots: eine Korrektur ist ein neuer Eintrag dahinter, es
+  gilt immer der letzte gueltige. Details in Issue #2.
+
+### Variante 1000 wieder im Hauptzweig
+- Die Platine V1 (STM32G0B1KBU6N) bekommt wieder Firmware aus dem
+  Hauptzweig, das Release enthaelt also erneut ein `_hwv1000.bin`. Die
+  V1-Linie war mit 1.2.9 eingefroren; ihr fehlte damit unter anderem die
+  Behebung des NMEA2000-Empfangsausfalls aus 1.2.10 (Issue #1).
+- Dafuer war keine Aenderung an der Hardware noetig. Die Pinbelegungen
+  von KBU6 und KBU6N ueberschneiden sich fast nicht, deshalb darf die von
+  CubeMX erzeugte Init unveraendert durchlaufen - sie schreibt auf der
+  jeweils anderen Platine in Pads, die es physisch nicht gibt.
+  Nachgezogen wird nur, was wirklich gebraucht wird.
+- Auf der Platine V1 liegt CAN auf PD0/PD1 statt auf PA11/PA12 und
+  CAN_STBY auf PD2 statt auf PB4. Das erledigt `board_pins.c`, aufgerufen
+  aus den von CubeMX geschuetzten USER-CODE-Bloecken - eine
+  Neugenerierung des Projekts bleibt damit erlaubt.
+
+### Intern
+- Die CI baut alle drei Varianten jetzt bei jedem Push mit derselben
+  Toolchain wie das Release, nicht mehr nur beim Freigabe-Tag. Ein Fehler
+  in einer einzelnen Variante faellt damit nicht mehr erst bei der
+  Freigabe auf. Die Binaries haengen als Artefakt am Lauf.
+- Das CubeIDE-Projekt hat Build-Konfigurationen fuer alle drei Varianten
+  (`Debug_1000`, `Debug_1001`, `Debug_1003`). Vorher waren Variante und
+  Include-Pfad fest verdrahtet, ein Build aus der IDE lieferte immer 1003.
+
 ## Firmware 1.2.10
 
 Erste Firmware fuer die Platine V2 (STM32G0B1KBU6 ohne N-Suffix) mit dem

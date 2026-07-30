@@ -47,6 +47,7 @@
 #include "dfu_common.h"
 #include "version.h"
 #include "hw_otp.h"
+#include "board_pins.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1162,6 +1163,11 @@ static void MX_GPIO_Init(void)
   HAL_NVIC_EnableIRQ(EXTI4_15_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
+
+  /* Pins nachziehen, die auf der V1-Platine anders liegen als in der
+   * generierten Init (siehe board_pins.h). Fuer die V2-Platine leer. */
+  board_gpio_fixup();
+
   /* USER CODE END MX_GPIO_Init_2 */
 }
 
