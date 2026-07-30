@@ -38,10 +38,11 @@
 #define SENSOR_STD_PRESS    1000
 
 /* Platinen-Stand der V1-Platine, Teil der HWV-Meldung ("1000A").
- * Die Variante ist eingefroren: letzter ausgelieferter Stand ist
- * v1.2.9 (Branch v1-legacy). Der aktuelle Quellstand traegt die
- * V2-Pinbelegung und laeuft NICHT auf der V1-Platine - der Suffix
- * steht hier nur der Vollstaendigkeit halber. */
+ * Die Variante wird wieder aus dem Hauptzweig gebaut. Die Pins, die
+ * beim STM32G0B1KBU6N der V1-Platine anders liegen als in der von
+ * CubeMX generierten V2-Init, zieht board_pins.c nach - Begruendung
+ * und Pinliste stehen in board_pins.h. Der Branch v1-legacy bleibt
+ * als eingefrorener Stand von v1.2.9 erhalten. */
 #define HW_REV_SUFFIX       "A"
 
 #endif /* INC_VARIANT_SENSOR_CFG_H_ */
