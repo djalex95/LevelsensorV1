@@ -37,4 +37,11 @@
  * bzw. etwa 1,02 m Wassersaeule. */
 #define SENSOR_STD_PRESS    1000
 
+/* Platinen-Stand der V1-Platine, Teil der HWV-Meldung ("1000A").
+ * Die Variante ist eingefroren: letzter ausgelieferter Stand ist
+ * v1.2.9 (Branch v1-legacy). Der aktuelle Quellstand traegt die
+ * V2-Pinbelegung und laeuft NICHT auf der V1-Platine - der Suffix
+ * steht hier nur der Vollstaendigkeit halber. */
+#define HW_REV_SUFFIX       "A"
+
 #endif /* INC_VARIANT_SENSOR_CFG_H_ */

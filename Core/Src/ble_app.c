@@ -47,10 +47,12 @@ void ble_desired_name(char *buf)
 
 /*
  * Sendet den aktuellen Sensorzustand als maschinenlesbare Zeile an die App.
- * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>;HW=<rev>;HWV=<variante>\n
+ * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>;HWV=<variante><rev>\n
  * L: Füllstand in %, T: Temperatur in Grad C, F: Fluidtyp (0..15),
- * C: Kapazität (Liter), I: Instanz, CAL: 1 = kalibriert, HW: Revision,
- * HWV: Hardware-Variante (Messprinzip; App ordnet die passende Firmware zu).
+ * C: Kapazität (Liter), I: Instanz, CAL: 1 = kalibriert,
+ * HWV: Hardware-Variante plus Platinen-Buchstabe, z. B. 1003A (die Zahl
+ * ordnet die passende Firmware zu, der Buchstabe ist rein informativ).
+ * Das fruehere Feld HW= (Revision) ist entfallen.
  */
 void ble_send_status(void)
 {
@@ -67,10 +69,10 @@ void ble_send_status(void)
 
 	int cal = (EEPROM_values.calib_available == 0x00) ? 1 : 0;
 
-	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HW=%d;HWV=%d\n",
+	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HWV=%s\n",
 			 p_int, p_frac, tsign, ta / 100, ta % 100,
 			 dev_info_par.fluidType, dev_info_par.cap, dev_info_par.devInstance, cal,
-			 FW_VERSION, HW_REV, HW_VARIANT);
+			 FW_VERSION, HWV_FULL_STR);
 
 	BLE_SendString(line);
 }
