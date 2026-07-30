@@ -19,7 +19,8 @@ steps* → *Command*:
 arm-none-eabi-objcopy -O binary "${BuildArtifactFileName}" "${BuildArtifactFileBaseName}.bin" && python "${ProjDirPath}/tools/make_app_meta_hex.py" "${BuildArtifactFileBaseName}.bin" "${BuildArtifactFileBaseName}_app_meta.hex"
 ```
 
-Nach jedem Build liegen dann im Build-Ordner (`Debug/` bzw. `Release/`):
+Nach jedem Build liegen dann im Build-Ordner der aktiven Konfiguration
+(`Debug_1000/`, `Debug_1001/`, `Debug_1003/` bzw. `Release/`):
 `<projekt>.bin`, `<projekt>_app_meta.hex` und `meta.hex`.
 
 Hinweise:
