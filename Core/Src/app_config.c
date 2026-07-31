@@ -200,3 +200,43 @@ void set_filt_eeprom(uint16_t w)
 	cfg_data[59] = CFG_FIELD_MAGIC;
 	config_save();
 }
+
+/* BLE-PIN: 6 Ziffern als Zahl gepackt (uint24 LE, Bytes 60..62). 0xFFFFFF
+ * (leer) und alles > 999999 gilt als "keine eigene PIN" -> Werkswert. */
+void get_pin_eeprom(char *buf)
+{
+	uint32_t v = (uint32_t)cfg_data[60]
+	           | ((uint32_t)cfg_data[61] << 8)
+	           | ((uint32_t)cfg_data[62] << 16);
+
+	if (v > 999999UL)
+	{
+		strcpy(buf, SENSOR_PIN_DEFAULT);
+		return;
+	}
+	for (int i = 5; i >= 0; i--)
+	{
+		buf[i] = (char)('0' + (v % 10));
+		v /= 10;
+	}
+	buf[6] = '\0';
+}
+
+void set_pin_eeprom(const char *pin6)
+{
+	uint32_t v = 0;
+
+	for (int i = 0; i < 6; i++)
+	{
+		v = v * 10 + (uint32_t)(pin6[i] - '0');
+	}
+	cfg_data[60] = (uint8_t)(v & 0xFF);
+	cfg_data[61] = (uint8_t)((v >> 8) & 0xFF);
+	cfg_data[62] = (uint8_t)((v >> 16) & 0xFF);
+	/* Marker loeschen: der Boot-Abgleich (bzw. der PIN-Trigger in der
+	 * Hauptschleife) provisioniert das Modul mit der neuen PIN neu -
+	 * inklusive Bond-Loeschung, damit alte Kopplungen nicht weiterhin
+	 * ohne die neue PIN hineinkommen. Ein config_save fuer beides. */
+	cfg_data[CFG_SECPROV_OFF] = 0xFF;
+	config_save();
+}

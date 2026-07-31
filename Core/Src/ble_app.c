@@ -29,6 +29,7 @@ extern volatile int32_t raw_press;
 extern volatile int32_t press_unfilt;	/* ungefilterter Messdruck (uBar, main.c) */
 extern uint16_t wertung;				/* EMA-Filter: Altanteil in Promille (main.c) */
 extern volatile uint8_t dev_info;
+extern volatile uint8_t bonds_req;		/* BONDS-Diagnose anfragen (main.c) */
 
 /* Gewuenschter BLE-Modulname (max. 20 Zeichen, Proteus-Limit):
  * der Sensorname aus dem Config ist die einzige Quelle der Wahrheit.
@@ -112,6 +113,9 @@ static void ble_send_lin(void)
  *   CALRESET       100%-Kalibrierung auf Werkswert (Nullpunkt bleibt)
  *   FILT           Filterstaerke abfragen (FILT;<0..990>)
  *   FILT <0..990>  Filterstaerke setzen (Anteil alter Wert in Promille)
+ *   PIN <6 Ziffern> Kopplungs-PIN aendern; loescht alle Bonds, Modul startet
+ *                  neu, alle Geraete muessen sich neu koppeln
+ *   BONDS          Diagnose: Anzahl Bonds im Modul + letzter Security-Status
  *   FLUID <0..15>  Fluidtyp setzen
  *   CAP <1..255>   Tankkapazität (Liter) setzen
  *   INST <0..15>   Instanz setzen
@@ -298,6 +302,43 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		{
 			BLE_SendString("ERR FILT\n");
 		}
+	}
+	else if (strncasecmp(cmd, "PIN ", 4) == 0)
+	{
+		/* Kopplungs-PIN (Static Passkey) aendern: genau 6 Ziffern. Die
+		 * Provisionierungs-Kette schreibt die PIN ins Modul, loescht alle
+		 * Bonds (alte Kopplungen kaemen sonst ohne neue PIN weiter hinein)
+		 * und startet das Modul neu - die Verbindung trennt sich dabei. */
+		const char *pp = cmd + 4;
+		uint8_t ok = (strlen(pp) == BLE_PIN_LEN);
+		for (int i = 0; ok && (i < BLE_PIN_LEN); i++)
+		{
+			if ((pp[i] < '0') || (pp[i] > '9'))
+			{
+				ok = 0;
+			}
+		}
+		if (ok)
+		{
+			/* PIN speichern (loescht den SECPROV-Marker) und den SENSOR neu
+			 * starten: beim Boot laeuft die Provisionierungs-Kette, BEVOR ein
+			 * Handy die Verbindung halten kann - im laufenden Betrieb verlor
+			 * sie das Rennen gegen den Auto-Reconnect und brach mittendrin
+			 * ab (Modul-Bonds blieben stehen -> Kopplungs-Sackgasse). */
+			set_pin_eeprom(pp);
+			BLE_SendString("OK PIN\n");
+			HAL_Delay(300);		/* Antwort noch ueber die Luft lassen */
+			__disable_irq();
+			NVIC_SystemReset();
+		}
+		else
+		{
+			BLE_SendString("ERR PIN\n");
+		}
+	}
+	else if ((strncasecmp(cmd, "BONDS", 5) == 0) && (cmd[5] == '\0'))
+	{
+		bonds_req = 1;	/* Antwort (BONDS;<n>;SEC=<s>) kommt asynchron */
 	}
 	else if (strncasecmp(cmd, "FACTORYRESET", 12) == 0)
 	{

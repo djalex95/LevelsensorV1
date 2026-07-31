@@ -199,6 +199,37 @@ static uint8_t  ble_sync_wait = 0;		/* 1 = Antwort auf GET ausstehend    */
 static uint32_t ble_sync_next = 1500;	/* Modul bootet ~1,5 s               */
 static uint8_t  ble_sync_tries = 0;
 
+/* Provisionierungs-Kette (Schritt 1 des Boot-Abgleichs): der Proteus-e
+ * startet nach jedem CMD_SET_REQ selbst neu, deshalb wird jedes Kommando
+ * einzeln bestaetigt und der Modul-Neustart abgewartet (ble_boot_seen). */
+static uint8_t  secprov_sub = 0;	/* 0 SecFlags, 1 Passkey, 2 DeleteBonds, 3 Reset */
+static uint8_t  secprov_wait = 0;	/* 1 = auf CNF/Neustart des Schritts warten */
+static uint8_t  secprov_att = 0;	/* Sendeversuche des aktuellen Schritts */
+static uint8_t  secprov_ints = 0;	/* Verbindungs-Unterbrechungen dieser Kette */
+static uint8_t  secprov_rounds = 0;	/* abgebrochene Ketten-Anlaeufe dieses Boots */
+
+/* Von ble_app.c gesetzt: BONDS-Diagnose angefragt (Antwort asynchron). */
+volatile uint8_t bonds_req = 0;		/* 1 = anfragen, 2 = Antwort offen, 3 = Modul-FW abfragen, 4 = FW-Antwort offen */
+static uint32_t  bonds_t0 = 0;
+
+/* Bond-Selbstheilung (Sensor-Seite): Haelt das Modul einen alten Bond fuer
+ * ein Handy, das seinen eigenen verloren hat, bricht das Pairing dort ab,
+ * BEVOR die PIN abgefragt wird - die Verbindung stirbt per Timeout. Muster:
+ * Verbindungen kommen, aber weder das Pairing laeuft noch geht der
+ * Datenkanal auf. Nach 3 solchen Fehlversuchen in Folge werden die
+ * Modul-Bonds geloescht und das Modul neu gestartet; danach klappt das
+ * frische Koppeln wieder. Kam dagegen eine Sicherheitsmeldung oder ging
+ * der Kanal auf, ist die Kopplung in Ordnung - dann wird NICHTS geloescht. */
+static uint8_t ble_prev_conn = 0;	/* Verbindungszustand des letzten Durchlaufs */
+static uint8_t ble_chan_seen = 0;	/* Kanal war in dieser Verbindung offen */
+static uint8_t ble_sec_seen = 0;	/* Pairing/Verschluesselung lief in dieser
+									   Verbindung (CMD_SECURITY_IND kam) */
+static uint8_t ble_fail_cnt = 0;	/* Verbindungen ohne offenen Kanal in Folge */
+static uint8_t bond_heal_step = 0;	/* 0 = aus, 1 = DeleteBonds gesendet */
+static uint8_t bond_heal_cnt = 0;	/* Heilungen dieses Boots */
+#define BOND_HEAL_MAX 3				/* mehr als das ist keine Bond-Frage mehr */
+static uint32_t bond_heal_t0 = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -567,6 +598,158 @@ int main(void)
 			ble_handle_command(ble_data_buf, ble_data_len);
 			ble_data_ready = 0;		/* Puffer wieder freigeben */
 		}
+
+		/* --- Bond-Selbstheilung: gescheiterte Verbindungen erkennen --- */
+		if (!ble_prev_conn && ble_connected)	/* neue Verbindung beginnt */
+		{
+			ble_sec_state = 0xFF;	/* Sicherheitsmeldung dieser Verbindung */
+			ble_sec_seen = 0;
+		}
+		if (ble_connected && ble_channel_open)
+		{
+			ble_chan_seen = 1;
+		}
+		if (ble_connected && (ble_sec_state != 0xFF))
+		{
+			ble_sec_seen = 1;
+		}
+		if (ble_prev_conn && !ble_connected)	/* Verbindung ist zu Ende */
+		{
+			if (ble_chan_seen || ble_sec_seen)
+			{
+				/* Kanal ging auf ODER das Pairing lief sauber durch. In
+				 * beiden Faellen sind die Bonds in Ordnung - bricht die
+				 * Verbindung danach ab, liegt es an der App und die Bonds
+				 * duerfen auf keinen Fall geloescht werden (sonst kippt
+				 * die Kopplung staendig hin und her). */
+				ble_fail_cnt = 0;
+				if (ble_chan_seen)
+				{
+					bond_heal_cnt = 0;	/* alles gut -> Heilung wieder frei */
+				}
+			}
+			else if (ble_fail_cnt < 255)
+			{
+				ble_fail_cnt++;
+			}
+			ble_chan_seen = 0;
+			ble_sec_seen = 0;
+
+			if ((ble_fail_cnt >= 3) && (bond_heal_cnt < BOND_HEAL_MAX)
+					&& (bond_heal_step == 0) && (ble_sync_step == 2))
+			{
+				/* Pairing-Sackgasse -> Modul-Bonds loeschen, dann Reset.
+				 * BEWUSST ohne Marker-Bedingung: gerade nach einer
+				 * abgebrochenen Provisionierung (Marker leer) haelt das
+				 * Modul noch alte Bonds - genau dann muss die Heilung
+				 * greifen. Nur nicht mitten in eine laufende Kette funken
+				 * (ble_sync_step == 2 = Kette gerade nicht aktiv). */
+				bond_heal_cnt++;
+				ble_fail_cnt = 0;	/* naechste Heilung braucht 3 neue Fehler */
+				bond_heal_step = 1;
+				bond_heal_t0 = time_el;
+				BLE_DeleteBonds();
+			}
+		}
+		ble_prev_conn = ble_connected;
+
+		if ((bond_heal_step == 1)
+				&& ((ble_delbonds_cnf != 0) || ((time_el - bond_heal_t0) > 800)))
+		{
+			bond_heal_step = 0;
+			BLE_ResetModule();	/* frisch starten, Handy koppelt danach neu */
+			if (cfg_data[CFG_SECPROV_OFF] != CFG_SECPROV_MAGIC)
+			{
+				/* Provisionierung ist noch offen (z. B. Kette abgebrochen):
+				 * direkt einen frischen Anlauf starten - das Modul bootet
+				 * gerade, die Kette hat freie Bahn. */
+				ble_sync_step = 1;
+				secprov_sub = 0;
+				secprov_wait = 0;
+				secprov_att = 0;
+				secprov_ints = 0;
+				secprov_rounds = 0;
+				ble_sync_next = time_el + 1500;
+			}
+		}
+
+		if (bonds_req == 1)			/* BONDS-Diagnose: Tabelle anfragen */
+		{
+			if (BLE_RequestBonds())
+			{
+				bonds_req = 2;
+				bonds_t0 = time_el;
+			}
+			else
+			{
+				bonds_req = 0;
+				BLE_SendString("ERR BONDS\n");
+			}
+		}
+		else if (bonds_req == 2)	/* auf CMD_GETBONDS_CNF warten */
+		{
+			if (ble_bonds_ready == 1)
+			{
+				char bl[32];
+				snprintf(bl, sizeof(bl), "BONDS;%u;SEC=%u\n",
+						 (unsigned)ble_bonds_count, (unsigned)ble_sec_state);
+				BLE_SendString(bl);
+				bonds_req = 3;	/* zusaetzlich Modul-FW melden */
+			}
+			else if (ble_bonds_ready == 2)
+			{
+				/* Modul hat geantwortet, aber mit Fehlerstatus (z. B. 255 =
+				 * Kommando dieser Modul-Firmware unbekannt) */
+				char bl[24];
+				snprintf(bl, sizeof(bl), "ERR BONDS st=%u\n",
+						 (unsigned)ble_bonds_status);
+				BLE_SendString(bl);
+				bonds_req = 3;
+			}
+			else if ((time_el - bonds_t0) > 1500)
+			{
+				BLE_SendString("ERR BONDS timeout\n");
+				bonds_req = 3;
+			}
+		}
+		else if (bonds_req == 3)	/* Modul-Firmware-Version abfragen */
+		{
+			if ((ble_sync_step >= 2) && BLE_RequestSetting(0x01))	/* FS_FWVersion */
+			{
+				bonds_req = 4;
+				bonds_t0 = time_el;
+			}
+			else
+			{
+				bonds_req = 0;
+			}
+		}
+		else if (bonds_req == 4)	/* auf die GET-Antwort warten */
+		{
+			if (ble_get_ready && (ble_get_index == 0x01))
+			{
+				char bl[40];
+				/* 3 Bytes: Patch, Minor, Major */
+				if (ble_get_len >= 3)
+				{
+					snprintf(bl, sizeof(bl), "MODFW;%u.%u.%u\n",
+							 (unsigned)ble_get_value[2],
+							 (unsigned)ble_get_value[1],
+							 (unsigned)ble_get_value[0]);
+				}
+				else
+				{
+					snprintf(bl, sizeof(bl), "MODFW;?\n");
+				}
+				BLE_SendString(bl);
+				ble_get_ready = 0;
+				bonds_req = 0;
+			}
+			else if ((time_el - bonds_t0) > 1500)
+			{
+				bonds_req = 0;
+			}
+		}
 		if(ble_channel_open && ((time_el - last_run_ble) >= ble_time))
 		{
 			last_run_ble = time_el;
@@ -640,29 +823,123 @@ int main(void)
 				{
 					ble_sync_step = 2;	/* schon provisioniert -> nie wieder anfassen */
 				}
-				else if (ble_connected)
+				else if (secprov_wait == 0)	/* naechstes Kommando der Kette senden */
 				{
-					/* nicht mitten in eine Verbindung reset-en: erst trennen,
-					 * gleich erneut versuchen (begrenzt, sonst aufgeben) */
-					BLE_Disconnect();
-					if (++ble_sync_tries >= 5)
+					if (ble_connected)
 					{
-						cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
-						config_save();
-						ble_sync_step = 2;
+						/* CMD_SET_REQ braucht den getrennten Zustand. Nur das
+						 * SENDEN stoert eine Verbindung - Fortschritt behalten
+						 * (secprov_sub bleibt!) und nach dem Trennen SCHNELL
+						 * weitermachen, sonst gewinnt der Auto-Reconnect des
+						 * Handys jedes Rennen und die Kette wirft das Modul
+						 * endlos per Reset aus der Luft. Eigener Zaehler:
+						 * ble_sync_tries wird an anderen Stellen genullt. */
+						BLE_Disconnect();
+						if (++secprov_ints > 10)
+						{
+							/* Diese Runde verloren. Nicht endgueltig aufgeben:
+							 * bis zu 2 weitere Anlaeufe mit Abstand (mehr
+							 * nicht - jede Runde schreibt Modul-Flash). */
+							secprov_ints = 0;
+							secprov_sub = 0;
+							secprov_wait = 0;
+							if (++secprov_rounds >= 3)
+							{
+								ble_sync_step = 2;	/* bis zum naechsten Boot */
+							}
+							else
+							{
+								ble_sync_next = time_el + 15000;
+							}
+						}
+						else
+						{
+							ble_sync_next = time_el + 150;
+						}
 					}
 					else
 					{
-						ble_sync_next = time_el + 1500;
+						uint8_t sent;
+						char pin[BLE_PIN_LEN + 1];
+
+						switch (secprov_sub)
+						{
+						case 0:
+							sent = BLE_SetSecFlags(BLE_SECFLAGS_TARGET);
+							break;
+						case 1:
+							get_pin_eeprom(pin);
+							sent = BLE_SetPasskey(pin);
+							break;
+						case 2:
+							sent = BLE_DeleteBonds();
+							break;
+						default:
+							sent = BLE_ResetModule();
+							break;
+						}
+						if (sent)
+						{
+							secprov_wait = 1;
+							ble_sync_tries = 0;
+						}
+						ble_sync_next = time_el + 100;
 					}
 				}
-				else
+				else						/* auf Bestaetigung/Modul-Neustart warten */
 				{
-					BLE_ProvisionSecurity(BLE_SECFLAGS_TARGET);
-					cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
-					config_save();
-					ble_sync_step = 2;
-					ble_sync_next = time_el + 2000;
+					uint8_t done = 0, fail = 0;
+
+					if (secprov_sub == 2)		/* DeleteBonds: nur CNF, kein Neustart */
+					{
+						done = (ble_delbonds_cnf == 1);
+						fail = (ble_delbonds_cnf == 2);
+					}
+					else if (secprov_sub == 3)	/* Reset: auf die Boot-Meldung warten */
+					{
+						done = ble_boot_seen;
+					}
+					else						/* SET: erst CNF, dann Modul-Neustart */
+					{
+						done = ((ble_set_cnf == 1) && ble_boot_seen);
+						fail = (ble_set_cnf == 2);
+					}
+
+					if (done)
+					{
+						secprov_wait = 0;
+						secprov_att = 0;
+						ble_sync_tries = 0;
+						if (secprov_sub >= 3)	/* Kette komplett -> Marker setzen */
+						{
+							cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
+							config_save();
+							ble_sync_step = 2;
+						}
+						else
+						{
+							secprov_sub++;
+							ble_sync_next = time_el + 150;
+						}
+					}
+					else if (fail || (++ble_sync_tries >= 15))
+					{
+						/* Schritt fehlgeschlagen bzw. 1,5 s ohne Antwort:
+						 * denselben Schritt neu senden, nach 3 Versuchen
+						 * diesen Boot aufgeben (Marker bleibt leer). */
+						secprov_wait = 0;
+						ble_sync_tries = 0;
+						if (++secprov_att >= 3)
+						{
+							secprov_att = 0;
+							ble_sync_step = 2;
+						}
+						ble_sync_next = time_el + 300;
+					}
+					else
+					{
+						ble_sync_next = time_el + 100;	/* weiter pollen */
+					}
 				}
 			}
 		}

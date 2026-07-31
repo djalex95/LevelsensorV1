@@ -34,6 +34,15 @@ uint8_t           ble_get_index = 0xFF;
 uint8_t           ble_get_value[21];
 volatile uint16_t ble_get_len = 0;
 
+/* Bestaetigungen fuer die Provisionierungs-Kette (siehe ble.h) */
+volatile uint8_t ble_set_cnf = 0;
+volatile uint8_t ble_delbonds_cnf = 0;
+volatile uint8_t ble_boot_seen = 0;
+volatile uint8_t ble_bonds_ready = 0;
+volatile uint8_t ble_bonds_count = 0;
+volatile uint8_t ble_bonds_status = 0xFF;
+volatile uint8_t ble_sec_state = 0xFF;
+
 /* --- Frame-Parser-Zustand --- */
 typedef enum { ST_STX = 0, ST_CMD, ST_LEN_L, ST_LEN_H, ST_PAYLOAD, ST_CS } parse_state;
 static parse_state pstate = ST_STX;
@@ -109,8 +118,45 @@ static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
 		}
 		break;
 
+	case CMD_GETSTATE_CNF:
+		/* Kommt nach jedem Modul-(Neu)start spontan - dient der
+		 * Provisionierungs-Kette als "Modul ist wieder da"-Signal. */
+		ble_boot_seen = 1;
+		break;
+
+	case CMD_SET_CNF:
+		ble_set_cnf = (len >= 1 && payload[0] == 0x00) ? 1 : 2;
+		break;
+
+	case CMD_DELETEBONDS_CNF:
+		ble_delbonds_cnf = (len >= 1 && payload[0] == 0x00) ? 1 : 2;
+		break;
+
+	case CMD_GETBONDS_CNF:
+		/* Status(1) + Anzahl(1) + je Bond: ID(2) + BTMAC(6) */
+		ble_bonds_status = (len >= 1) ? payload[0] : 0xFE;
+		if (len >= 2 && payload[0] == 0x00)
+		{
+			ble_bonds_count = payload[1];
+			ble_bonds_ready = 1;
+		}
+		else
+		{
+			ble_bonds_ready = 2;
+		}
+		break;
+
+	case CMD_SECURITY_IND:
+		/* Status(1) + BTMAC(6): 0x00 = re-bonded (bekannter Partner),
+		 * 0x01 = frisch gebondet. Fuer die BONDS-Diagnose gemerkt. */
+		if (len >= 1)
+		{
+			ble_sec_state = payload[0];
+		}
+		break;
+
 	default:
-		/* CMD_DATA_CNF, CMD_TXCOMPLETE_RSP, CMD_SECURITY_IND, GETSTATE_CNF … ignorieren */
+		/* CMD_DATA_CNF, CMD_TXCOMPLETE_RSP … ignorieren */
 		break;
 	}
 }
@@ -313,27 +359,71 @@ uint8_t BLE_RequestSetting(uint8_t idx)
 	return (HAL_UART_Transmit(ble_uart, frame, 6, 100) == HAL_OK) ? 1 : 0;
 }
 
-/* Einmalige Sicherheits-Provisionierung: RF_SecFlags setzen, Bond-Tabelle
- * leeren und Modul EINMAL neu starten. Nur im getrennten Zustand aufrufen.
- * Wird nach Werksreset/Erstboot (oder einmalig nach diesem Firmware-Update,
- * via SECPROV-Marker) ausgefuehrt. Aktuell wird die BLE-Schnittstelle damit
- * OHNE Verschluesselung betrieben (flags = 0) - eine PIN-Absicherung hat sich
- * mit diesem Modul + Android als nicht zuverlaessig erwiesen. */
-uint8_t BLE_ProvisionSecurity(uint8_t flags)
+/* --- Bausteine der Sicherheits-Provisionierung ---
+ * Nicht blockierend: jede Funktion schickt genau ein Kommando und loescht
+ * vorher die zugehoerigen Bestaetigungs-Flags. Der Proteus-e startet nach
+ * jedem CMD_SET_REQ SELBST neu - der Aufrufer (Schritt-Kette in main.c)
+ * wartet deshalb nach ble_set_cnf zusaetzlich auf ble_boot_seen, bevor er
+ * das naechste Kommando schickt. */
+
+uint8_t BLE_SetSecFlags(uint8_t flags)
 {
 	if (ble_uart == NULL)
 	{
 		return 0;
 	}
+	ble_set_cnf = 0;
+	ble_boot_seen = 0;
 	ble_send_set(CFG_IDX_SECFLAGS, &flags, 1);
-	HAL_Delay(50);
+	return 1;
+}
+
+uint8_t BLE_SetPasskey(const char *pin6)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_set_cnf = 0;
+	ble_boot_seen = 0;
+	ble_send_set(CFG_IDX_STATICPASSKEY, (const uint8_t *)pin6, BLE_PIN_LEN);
+	return 1;
+}
+
+uint8_t BLE_DeleteBonds(void)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_delbonds_cnf = 0;
 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
-	HAL_Delay(50);
-	ble_send_cmd0(CMD_RESET_REQ);	/* Einstellungen aktivieren, frisch starten */
+	return 1;
+}
+
+uint8_t BLE_ResetModule(void)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_boot_seen = 0;
+	ble_send_cmd0(CMD_RESET_REQ);
 	/* Ein Reset trennt die Funkverbindung, das Modul sendet dabei KEIN
 	 * CMD_DISCONNECT_IND -> Zustand hier selbst zuruecksetzen. */
 	ble_connected = 0;
 	ble_channel_open = 0;
+	return 1;
+}
+
+uint8_t BLE_RequestBonds(void)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_bonds_ready = 0;
+	ble_send_cmd0(CMD_GETBONDS_REQ);
 	return 1;
 }
 

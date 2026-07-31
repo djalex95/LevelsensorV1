@@ -33,18 +33,37 @@
 #define CMD_CHANNELOPEN_RSP     0xC6
 #define CMD_TXCOMPLETE_RSP      0xC4
 #define CMD_SET_REQ             0x11
+#define CMD_SET_CNF             0x51	/* Antwort: Status(1), 0x00 = ok       */
 #define CMD_GET_REQ             0x10	/* Setting lesen                       */
 #define CMD_GET_CNF             0x50	/* Antwort: Status(1) + Wert           */
 #define CMD_DISCONNECT_REQ      0x07
 #define CMD_DELETEBONDS_REQ     0x0E	/* Bonding-Daten loeschen (Len 0=alle) */
+#define CMD_DELETEBONDS_CNF     0x4E
+#define CMD_GETBONDS_REQ        0x0F	/* Bond-Tabelle abfragen               */
+#define CMD_GETBONDS_CNF        0x4F	/* Status(1)+Anzahl(1)+je Bond ID(2)+MAC(6) */
 #define CFG_IDX_DEVICENAME      0x02	/* Settings-Index RF_DeviceName        */
 #define CFG_IDX_SECFLAGS        0x0C	/* Settings-Index RF_SecFlags (1 Byte) */
+#define CFG_IDX_STATICPASSKEY   0x12	/* Settings-Index RF_StaticPasskey (6) */
 
-/* Ziel-Sicherheitsmodus: 0x00 = keine Verschluesselung. Die frueher erprobte
- * PIN-Absicherung (Static Passkey + Bonding) hat sich mit diesem Modul in
- * Kombination mit Androids Bond-Handling als nicht zuverlaessig erwiesen
- * (Bond ueberlebt Sensor-Neustart nicht) und wurde daher entfernt. */
-#define BLE_SECFLAGS_TARGET     0x00
+/* Ziel-Sicherheitsmodus: Static Passkey (0x03) + Bonding (Bit 3) = 0x0B.
+ *
+ * Zweiter Anlauf. Der erste scheiterte NICHT am Modul (Bonds liegen laut
+ * Handbuch und Wuerth-Treiber persistent im Modul-Flash, bis zu 12 Stueck),
+ * sondern an zwei eigenen Fehlern:
+ *  1. Die PIN wurde anfangs bei jedem Boot zurueckgelesen/verglichen und bei
+ *     (systematischer) Abweichung neu geschrieben - inkl. Bond-Loeschung.
+ *  2. Die Provisionierung feuerte SET/DELETEBONDS/RESET blind mit 50-ms-
+ *     Pausen: der Proteus-e startet aber nach JEDEM CMD_SET_REQ selbst neu,
+ *     Folgekommandos fielen in den Modul-Boot und gingen verloren (der
+ *     Wuerth-Referenztreiber wartet deshalb nach jedem Set auf die
+ *     Boot-Meldung CMD_GETSTATE_CNF).
+ * Jetzt: Schritt-Kette in der Hauptschleife, jedes Kommando mit bestaetigtem
+ * CNF und abgewartetem Modul-Neustart (ble_boot_seen). */
+#define BLE_SECFLAGS_TARGET     0x0B
+
+/* Laenge der statischen Passkey (6 Ziffern, ASCII). Der Werkswert steht in
+ * app_config.h (SENSOR_PIN_DEFAULT) und entspricht dem Modul-Default. */
+#define BLE_PIN_LEN             6
 
 #define BLE_MAX_PAYLOAD         243
 #define BLE_FRAME_MAX           (BLE_MAX_PAYLOAD + 5)
@@ -95,11 +114,34 @@ extern uint8_t           ble_get_index;      /* Index der offenen Anfrage    */
 extern uint8_t           ble_get_value[21];  /* Wert (nullterminiert)        */
 extern volatile uint16_t ble_get_len;
 
-/* Einmalige Sicherheits-Provisionierung (nach Werksreset/Erstboot bzw. einmalig
- * nach diesem Firmware-Update): setzt RF_SecFlags, löscht die Bond-Tabelle und
- * startet das Modul neu. Aktuell wird damit die Verschlüsselung deaktiviert
- * (flags = 0). Nur im getrennten Zustand aufrufen. */
-uint8_t BLE_ProvisionSecurity(uint8_t flags);
+/* --- Bausteine der Sicherheits-Provisionierung (nicht blockierend) ---
+ * Jede Funktion schickt genau EIN Kommando; die Bestaetigungen setzt der
+ * Parser als Flags. Die Schritt-Kette (Reihenfolge, Timeouts, Wieder-
+ * holungen) liegt in der Hauptschleife (main.c, ble_sync). */
+
+/* Vor dem Senden loeschen, danach pollen: 0 = offen, 1 = ok, 2 = Fehler */
+extern volatile uint8_t ble_set_cnf;        /* Antwort auf CMD_SET_REQ      */
+extern volatile uint8_t ble_delbonds_cnf;   /* Antwort auf CMD_DELETEBONDS  */
+
+/* 1 sobald das Modul (neu) gebootet hat - es meldet sich nach jedem Start
+ * spontan mit CMD_GETSTATE_CNF. Vor einem erwarteten Neustart loeschen. */
+extern volatile uint8_t ble_boot_seen;
+
+/* Bond-Tabelle: BLE_RequestBonds() senden, dann ble_bonds_ready pollen
+ * (1 = ok, 2 = Fehler); Anzahl steht in ble_bonds_count. */
+extern volatile uint8_t ble_bonds_ready;
+extern volatile uint8_t ble_bonds_count;
+extern volatile uint8_t ble_bonds_status;  /* Status-Byte der CNF (Diagnose) */
+
+/* Letzter per CMD_SECURITY_IND gemeldeter Sicherheitszustand der aktuellen
+ * Verbindung (0x00 = re-bonded, 0x01 = neu gebondet; 0xFF = noch keiner). */
+extern volatile uint8_t ble_sec_state;
+
+uint8_t BLE_SetSecFlags(uint8_t flags);          /* CMD_SET RF_SecFlags      */
+uint8_t BLE_SetPasskey(const char *pin6);        /* CMD_SET RF_StaticPasskey */
+uint8_t BLE_DeleteBonds(void);                   /* CMD_DELETEBONDS_REQ      */
+uint8_t BLE_ResetModule(void);                   /* CMD_RESET_REQ            */
+uint8_t BLE_RequestBonds(void);                  /* CMD_GETBONDS_REQ         */
 
 /* Aktive Verbindung modulseitig trennen (CMD_DISCONNECT_REQ). */
 void BLE_Disconnect(void);

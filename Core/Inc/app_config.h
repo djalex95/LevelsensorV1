@@ -41,6 +41,14 @@ void set_name_eeprom(const char *name);
 uint16_t get_filt_eeprom(void);
 void set_filt_eeprom(uint16_t w);
 
+/* BLE-PIN (Static Passkey, Config-Bytes 60..62 als uint24).
+ * Werks-PIN = Modul-Default; gilt solange keine eigene PIN gesetzt ist. */
+#define SENSOR_PIN_DEFAULT "123123"
+void get_pin_eeprom(char *buf);         /* buf: mind. 7 Bytes (6 Ziffern + 0) */
+void set_pin_eeprom(const char *pin6);  /* speichert PIN und loescht den
+                                           SECPROV-Marker -> die Provisio-
+                                           nierungs-Kette laeuft erneut */
+
 /* Stuetzstellen-Tabelle pruefen (0..100, monoton nicht fallend). */
 uint8_t lin_table_valid(uint8_t *t);
 

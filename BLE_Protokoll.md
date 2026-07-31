@@ -20,8 +20,11 @@ Ablauf beim Verbinden:
    wie `LIN …` in einem Write passen.
 3. Notifications der TX-Charakteristik aktivieren.
 
-Die BLE-Schnittstelle ist **ohne Verschlüsselung/Pairing** – es ist kein
-Passkey nötig (siehe Hinweis unten).
+Ab Firmware 2.0.0 ist die BLE-Schnittstelle mit **Static-Passkey-Pairing +
+Bonding** gesichert: beim ersten Verbinden fragt das Betriebssystem die
+6-stellige Kopplungs-PIN ab (Werks-PIN **123123**, per `PIN`-Kommando
+änderbar). Danach ist das Gerät gekoppelt und verbindet ohne erneute
+Eingabe. Firmware bis 1.3.0 läuft unverschlüsselt (siehe Hinweis unten).
 
 Danach: Kommandos als UTF-8/ASCII-Text in RX schreiben, Antworten und den
 periodischen Status als TX-Notification empfangen. Jede Nachricht endet mit `\n`.
@@ -70,11 +73,14 @@ OK CAL0 1234      Nullpunkt kalibriert (mit neuem Offset in µBar)
 OK CAL0RESET      Nullpunkt auf Werkswert zurückgesetzt
 OK CALRESET       100%-Kalibrierung zurückgesetzt (Nullpunkt bleibt)
 OK FILT 900       Filterstärke gesetzt
+OK PIN            Kopplungs-PIN geändert (Sensor startet neu, neu koppeln)
 ERR CAP           Wert ungültig
 ERR LIN           Kennlinie ungültig (nicht 0..100 oder nicht steigend)
 ERR CAL100 nodruck  Kalibrierung nicht möglich (kein Druck anliegend)
 ERR CAL0 range    Nullpunkt außerhalb ±30 mBar (Sensor prüfen)
 ERR FILT          Filterwert ungültig (erlaubt: 0..990)
+ERR PIN           PIN ungültig (genau 6 Ziffern nötig)
+ERR BONDS         Bond-Tabelle nicht lesbar
 ERR ?             unbekanntes Kommando
 ```
 
@@ -97,7 +103,9 @@ ERR ?             unbekanntes Kommando
 | `CALRESET` | 100%-Kalibrierung auf Werkswert zurücksetzen (Nullpunkt bleibt) | `OK CALRESET` |
 | `FILT` | Filterstärke abfragen | `FILT;<0..990>` |
 | `FILT n` | Filterstärke setzen: Anteil des alten Werts in Promille (0 = aus, 900 ≈ 1 s Zeitkonstante bei 100 ms Messtakt) | `OK FILT n` / `ERR FILT` |
-| `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (beim nächsten Boot: BLE-Name wieder `LevelSense-<UID>`) | `OK FACTORYRESET`, dann Neustart |
+| `PIN dddddd` | Kopplungs-PIN ändern (genau 6 Ziffern). Der **Sensor startet neu** und provisioniert das Funkmodul beim Boot mit der neuen PIN (löscht dabei alle Kopplungen) – jedes Gerät koppelt sich beim nächsten Verbinden mit der neuen PIN neu | `OK PIN`, dann Neustart |
+| `BONDS` | Diagnose: Anzahl der im Modul gespeicherten Kopplungen, letzter Security-Status (0 = wiedererkannt, 1 = neu gekoppelt, 255 = noch keiner) sowie die Modul-Firmware-Version als zweite Zeile `MODFW;x.y.z`. `ERR BONDS st=255` = Kommando von dieser Modul-Firmware nicht unterstützt | `BONDS;<n>;SEC=<s>` + `MODFW;…` / `ERR BONDS …` |
+| `FACTORYRESET` | Werksreset: löscht Kalibrierung (100 % + Nullpunkt), Glättung, Tankform, Instanz, Name, gespeicherte Adresse sowie Kopplungs-PIN und alle Kopplungen; Sensor startet neu (BLE-Name wieder `LevelSense-<UID>`, PIN wieder 123123) | `OK FACTORYRESET`, dann Neustart |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 
@@ -155,13 +163,36 @@ antwortet der Sensor nur mit `OK NAME` (kein Modul-Neustart, Verbindung
 bleibt bestehen). Hinweis: Der Sensor speichert max. 24 Zeichen, das
 BLE-Modul zeigt davon max. 20.
 
-**Sicherheit:** Die BLE-Schnittstelle läuft **ohne Verschlüsselung/Pairing**
-(`RF_SecFlags = 0x00`). Eine PIN-Absicherung (Static-Passkey + Bonding) wurde
-erprobt, aber wieder entfernt: Mit diesem Funkmodul in Kombination mit Androids
-Bond-Handling überlebte die Kopplung einen Sensor-Neustart nicht zuverlässig.
-Die Firmware stellt den Sicherheitsmodus nach einem Werksreset bzw. einmalig
-nach dem Update selbst auf „aus" (und bereinigt dabei alte Kopplungen im Modul),
-sodass keine hängengebliebenen Bonds das Verbinden blockieren.
+**Sicherheit:** Ab Firmware 2.0.0 läuft die Schnittstelle mit
+`RF_SecFlags = 0x0B` (Static Passkey + Bonding). Die Provisionierung passiert
+einmalig nach Update/Werksreset als bestätigte Schritt-Kette: SecFlags
+schreiben → Modul-Neustart abwarten → Passkey schreiben → Neustart abwarten →
+Bonds löschen → Neustart. (Der frühere PIN-Anlauf scheiterte nicht am Modul –
+Bonds liegen persistent im Modul-Flash –, sondern an zwei Firmware-Fehlern:
+die PIN wurde anfangs bei jedem Boot neu geschrieben samt Bond-Löschung, und
+die Provisionierung wartete die Selbst-Neustarts des Moduls nach `CMD_SET_REQ`
+nicht ab, wodurch Folgekommandos verloren gingen.) Bleibt ein Gerät nach
+PIN-Wechsel oder Werksreset beim Koppeln hängen, dort in den
+Bluetooth-Einstellungen den Sensor entfernen – die App erledigt das auf
+Android automatisch (Bond-Selbstheilung).
+
+Die Firmware heilt auch die umgekehrte Sackgasse selbst: hält das **Modul**
+noch einen alten Bond für ein Gerät, das seinen eigenen verloren hat, bricht
+das Pairing dort vor der PIN-Abfrage ab. Enden drei Verbindungen in Folge,
+ohne dass der Datenkanal aufging **und** ohne dass eine Sicherheitsmeldung
+(`CMD_SECURITY_IND`) kam, löscht die Firmware die Modul-Bonds und startet das
+Modul neu – danach koppelt das Gerät frisch. Kam dagegen eine
+Sicherheitsmeldung, war die Kopplung in Ordnung und es wird nichts gelöscht;
+sonst würde jeder App-seitige Abbruch einen frisch angelegten Bond wieder
+zerstören. Pro Sensorstart sind höchstens drei Heilungen möglich, nach jeder
+erfolgreichen Verbindung startet die Zählung neu.
+
+Auf App-Seite gehört dazu die Geduld beim Pairing: Das Einschalten der
+Notifications (Descriptor 2902) ist der Schreibzugriff, der die PIN-Abfrage
+überhaupt auslöst. Android meldet ihn sofort als `GATT_ERROR (133)` zurück,
+während der PIN-Dialog erst erscheint. Die App bricht deshalb nicht ab,
+sondern wartet den Abschluss der Kopplung ab (bis 60 s) und richtet die
+Verbindung danach neu ein.
 
 Im **Bootloader-Modus** (während des OTA-Updates) beantwortet der Bootloader
 zusätzlich `VER` mit `BLV;x.y.z` (seiner eigenen Version). Die App fragt das beim
