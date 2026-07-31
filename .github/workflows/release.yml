@@ -59,7 +59,9 @@ jobs:
       - name: Firmware bauen (alle Varianten)
         run: |
           mkdir -p dist
-          for hwv in 1000 1001 1003; do
+          # Variantenliste kommt aus Core/Inc/variants/ - eine neue Variante
+          # (Ordner mit sensor_cfg.h) wird automatisch mitgebaut.
+          for hwv in $(ls Core/Inc/variants); do
             make -j4 HW_VARIANT=$hwv
             cp "build/$hwv/CAN_FuellstandsensorBLE.bin" \
                "dist/Fuellstandsensor_v${{ steps.ver.outputs.fw }}_hwv${hwv}.bin"

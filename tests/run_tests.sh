@@ -33,7 +33,8 @@ run "config_store" "$OUT/test_config_store"
 $CC $CFLAGS -ICore/Inc -o "$OUT/test_hw_otp" tests/test_hw_otp.c
 run "hw_otp" "$OUT/test_hw_otp"
 
-for hwv in 1000 1001 1003; do
+# Variantenliste aus Core/Inc/variants/ - neue Varianten testen automatisch mit
+for hwv in $(ls Core/Inc/variants); do
 	$CC $CFLAGS -DHW_VARIANT=$hwv -ICore/Inc -ICore/Inc/variants/$hwv \
 		-o "$OUT/test_sensor_conv_$hwv" tests/test_sensor_conv.c
 	run "sensor_conv HW_VARIANT=$hwv" "$OUT/test_sensor_conv_$hwv"

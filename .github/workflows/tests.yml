@@ -96,7 +96,8 @@ jobs:
           fw=$(grep -oP '^#define\s+FW_VERSION\s+"\K[^"]+' Core/Inc/version.h | head -n1)
           sha=$(echo "$GITHUB_SHA" | cut -c1-7)
           mkdir -p dist
-          for hwv in 1000 1001 1003; do
+          # Variantenliste kommt aus Core/Inc/variants/ (wie im Release-Build)
+          for hwv in $(ls Core/Inc/variants); do
             make -j4 HW_VARIANT=$hwv
             cp "build/$hwv/CAN_FuellstandsensorBLE.bin" \
                "dist/Fuellstandsensor_v${fw}+${sha}_hwv${hwv}.bin"

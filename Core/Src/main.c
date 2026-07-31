@@ -132,6 +132,8 @@ volatile uint8_t run_mode = 1;
  volatile uint8_t setup_mode = 0;
 volatile int32_t raw_press = 0;	/* wird auch im EXTI-Callback gelesen;
 									   32 bit -> atomarer Zugriff auf dem M0+ (kein Torn Read) */
+volatile int32_t press_unfilt = 0;	/* letzter ungefilterter Messdruck (uBar, offset-
+									   korrigiert) fuer die Rohwert-Anzeige der App */
 
  //EEprom struct
  calib_data EEPROM_values;
@@ -152,7 +154,9 @@ uint32_t time_el = 0, last_run = 0, last_run_nmea=0;
 
  uint32_t claim_time = 0;			/* Zeitpunkt des letzten Address Claims (250-ms-Sendepause) */
 
- uint8_t wertung = 50;
+ uint16_t wertung = std_wertung;	/* EMA-Filter: Anteil ALTER Wert in Promille (0..990).
+									   Wird beim Boot aus dem Config geladen, per BLE
+									   "FILT" einstellbar (uint16: auch 900 passt rein). */
 
  //LED-Zeitvariablen
  uint32_t last_run_led = 0;
@@ -186,8 +190,8 @@ NMEA_parameter_Device dev_info_par;
 /* BLE (Proteus-e): Status-Streaming-Zeitpunkt */
 uint32_t last_run_ble = 0, ble_time = 1000;
 
-/* Einmaliger Abgleich Modul <-> Config nach dem Boot in drei Schritten:
- * 0 = Name, 1 = Sicherheitsmodus (SecFlags), 2 = Passkey (PIN), 3 = fertig.
+/* Einmaliger Abgleich Modul <-> Config nach dem Boot in zwei Schritten:
+ * 0 = Name, 1 = einmalige Security-Provisionierung, danach 2 = fertig.
  * Es wird jeweils erst gelesen und nur bei ABWEICHUNG geschrieben
  * (Modul-Flash ~10k Zyklen, jedes Schreiben loest einen Modul-Neustart aus). */
 static uint8_t  ble_sync_step = 0;
@@ -323,21 +327,21 @@ int main(void)
   	  DAC_EEPROM_values.dac_mx = 6205;	//alt:12409
     }
 
-  if (check_EEPROM())
+  get_EEPROM(&EEPROM_values);	/* liest max_val und - Marker-gesichert - den Nullpunkt-Offset */
+  if (!check_EEPROM())
   {
-	  get_EEPROM(&EEPROM_values);
-  }
-  else{
 	  /* Werkszustand: explizit als "unkalibriert" markieren. Ohne das blieb
 	   * calib_available auf 0x00 (Null-Initialisierung der globalen Variable)
-	   * - ausgerechnet der Marker fuer "kalibriert" -> App zeigte CAL=1. */
+	   * - ausgerechnet der Marker fuer "kalibriert" -> App zeigte CAL=1.
+	   * Der Offset wird NICHT verworfen: CAL0 (Nullpunkt) ist von der
+	   * 100%-Kalibrierung unabhaengig und wurde ggf. schon gesetzt. */
 	  EEPROM_values.calib_available = 0xFF;
 	  EEPROM_values.max_val = std_press;
-	  EEPROM_values.offset = std_offset;
   }
 
   get_param_eeprom(&dev_info_par, &device_param);
   get_name_eeprom(sensor_name);
+  wertung = get_filt_eeprom();
 
 
   init_Sensor();
@@ -426,10 +430,12 @@ int main(void)
 	  		}
 
 	  		sensor_data_rx = get_value();
+	  		press_unfilt = sensor_data_rx.pressure;	/* Rohwert fuer die App (STAT: P=) */
 
 	  		/* EMA-Filter: 'wertung'/1000 = Anteil des ALTEN gefilterten Werts.
-	  		 * wertung=50 -> 95 % neuer Messwert, 5 % alter Wert (Verhalten wie bisher,
-	  		 * fuer staerkere Glaettung wertung erhoehen, z.B. 900). */
+	  		 * Werkswert 50 -> 95 % neuer Messwert, praktisch ungefiltert;
+	  		 * per BLE "FILT 0..990" einstellbar, z.B. 900 -> Zeitkonstante ~1 s
+	  		 * bei 100 ms Messtakt (gegen schwappenden Tank). */
 	  		raw_press = (int32_t)(((int64_t)sensor_data_rx.pressure * (1000-wertung) + (int64_t)raw_press*wertung)/1000);
 	  		sensor_data_rx.pressure = (int32_t)raw_press;
 
@@ -447,8 +453,9 @@ int main(void)
 	  						break;
 	  				case 2:	setup_mode = 0;
 	  						EEPROM_values.calib_available = 0xFF;
-	  						save_EEPROM(&EEPROM_values);
 	  						EEPROM_values.max_val = std_press;
+	  						EEPROM_values.offset = std_offset;
+	  						save_EEPROM(&EEPROM_values);
 	  						break;
 	  				default: 	setup_mode = 0;
 	  							break;
@@ -784,6 +791,14 @@ int main(void)
 	  		// ############ Farbe der LED am Ausgang setzen ###################
 	  		set_led(LED_r, LED_g, LED_b, LED_brightness);	// Farbe der LED setzen
 	  	}
+
+#ifndef DEBUG
+	  	/* Bis zum naechsten Interrupt schlafen - spaetestens der SysTick weckt
+	  	 * nach 1 ms. Alle Zeitscheiben sind tickbasiert, funktional aendert
+	  	 * sich nichts, nur die Stromaufnahme aus dem Bus sinkt. Im Debug-
+	  	 * Build aus, damit der Debugger freie Bahn hat. */
+	  	__WFI();
+#endif
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

@@ -37,6 +37,10 @@ void set_adr_eeprom(uint8_t adr);
 void get_name_eeprom(char *buf);
 void set_name_eeprom(const char *name);
 
+/* EMA-Filter (Anteil alter Wert in Promille, Config-Bytes 57..59) */
+uint16_t get_filt_eeprom(void);
+void set_filt_eeprom(uint16_t w);
+
 /* Stuetzstellen-Tabelle pruefen (0..100, monoton nicht fallend). */
 uint8_t lin_table_valid(uint8_t *t);
 

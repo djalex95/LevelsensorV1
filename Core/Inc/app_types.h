@@ -50,6 +50,11 @@ typedef struct sensor_data{
 #define std_press SENSOR_STD_PRESS
 #define std_offset 0
 
+/* Werkswert des EMA-Filters: Anteil des ALTEN Werts in Promille (0..990).
+ * 50 -> 95 % neuer Messwert, praktisch ungefiltert (historisches Verhalten);
+ * per BLE-Kommando FILT einstellbar und im Config persistiert. */
+#define std_wertung 50
+
 /* Fehler-Flags in error_mode (Bitmaske; steuern die Fehler-LED und das
  * E=-Feld im BLE-STAT). ERROR_I2C war historisch 10 (Bits 1 und 3) -
  * jetzt echte Einzelbits. */

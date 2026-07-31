@@ -23,7 +23,14 @@ void get_EEPROM(calib_data *values)
 {
 	values->calib_available = cfg_data[0];
 	values->max_val = ((uint32_t)cfg_data[4]<<24)|((uint32_t)cfg_data[3]<<16)|((uint32_t)cfg_data[2]<<8)|(cfg_data[1]);
-	values->offset = std_offset;
+	if (cfg_data[7] == CFG_FIELD_MAGIC)
+	{
+		values->offset = (int16_t)((uint16_t)cfg_data[5] | ((uint16_t)cfg_data[6] << 8));
+	}
+	else
+	{
+		values->offset = std_offset;	/* Feld nie beschrieben (Altbestand) */
+	}
 }
 
 void save_EEPROM(calib_data *values)
@@ -36,6 +43,9 @@ void save_EEPROM(calib_data *values)
 	cfg_data[2] = (uint8_t)((values->max_val >> 8) & 0xFF);
 	cfg_data[3] = (uint8_t)((values->max_val >> 16) & 0xFF);
 	cfg_data[4] = (uint8_t)((values->max_val >> 24) & 0xFF);
+	cfg_data[5] = (uint8_t)((uint16_t)values->offset & 0xFF);
+	cfg_data[6] = (uint8_t)(((uint16_t)values->offset >> 8) & 0xFF);
+	cfg_data[7] = CFG_FIELD_MAGIC;
 
 	config_save();
 }
@@ -164,5 +174,29 @@ void set_name_eeprom(const char *name)
 	{
 		cfg_data[CFG_NAME_OFF + i] = 0x00;
 	}
+	config_save();
+}
+
+/* EMA-Filter: Anteil des alten Werts in Promille (0..990), Bytes 57..58
+ * mit Marker in 59. Ohne Marker oder mit Wert > 990 (Altbestand, Ex-PIN-
+ * Bytes, geloeschter Config) gilt der Werkswert. */
+uint16_t get_filt_eeprom(void)
+{
+	if (cfg_data[59] == CFG_FIELD_MAGIC)
+	{
+		uint16_t w = (uint16_t)cfg_data[57] | ((uint16_t)cfg_data[58] << 8);
+		if (w <= 990)
+		{
+			return w;
+		}
+	}
+	return std_wertung;
+}
+
+void set_filt_eeprom(uint16_t w)
+{
+	cfg_data[57] = (uint8_t)(w & 0xFF);
+	cfg_data[58] = (uint8_t)((w >> 8) & 0xFF);
+	cfg_data[59] = CFG_FIELD_MAGIC;
 	config_save();
 }

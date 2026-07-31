@@ -48,7 +48,7 @@ flowchart TD
     K2 --> L
     K3 --> L
     L -- "kalibriert" --> L1["Kalibrierwerte übernehmen"]
-    L -- "leer" --> L2["Werkswerte: calib_available = 0xFF<br/>max_val = std_press, offset = std_offset"]
+    L -- "leer" --> L2["Werkswerte: calib_available = 0xFF<br/>max_val = std_press<br/>Nullpunkt-Offset bleibt erhalten"]
     L1 --> M["get_param_eeprom(), get_name_eeprom()"]
     L2 --> M
     M --> N["init_Sensor()<br/>I2C-Drucksensor bereitmachen"]
@@ -96,6 +96,9 @@ Ein Durchlauf ist kurz und blockiert nirgends. Ganz oben wird der Watchdog
 bedient, danach wird einmal `HAL_GetTick()` gelesen und dieser eine Zeitstempel
 für alle folgenden Vergleiche verwendet – so kann eine Zeitscheibe nicht dadurch
 verrutschen, dass eine frühere Scheibe im selben Durchlauf Zeit gekostet hat.
+Am Ende jedes Durchlaufs legt `__WFI()` den Kern schlafen, bis der nächste
+Interrupt kommt – spätestens der SysTick nach einer Millisekunde. Im
+Debug-Build ist das abgeschaltet, damit der Debugger freie Bahn hat.
 
 ```mermaid
 flowchart TD
@@ -154,8 +157,9 @@ flowchart TD
 
     B4 --> L{"led_time abgelaufen?"}
     L -- "ja" --> L1["blink_LED()"]
-    L -- "nein" --> S
-    L1 --> S
+    L -- "nein" --> W2
+    L1 --> W2["__WFI: schlafen bis zum nächsten Interrupt"]
+    W2 --> S
 ```
 
 ### Die Zeitscheiben auf einen Blick

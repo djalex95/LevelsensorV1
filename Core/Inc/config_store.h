@@ -9,7 +9,8 @@
  * Layout des 64-Byte-Config-Blocks (cfg_data, Layout-Version 2):
  *   0      Kalibrierung vorhanden (0xFF = nein)
  *   1..4   max_val (uint32 LE)
- *   5..7   frei
+ *   5..6   Nullpunkt-Offset (int16 LE, uBar; gueltig nur mit Marker in 7)
+ *   7      Marker CFG_FIELD_MAGIC: Offset in 5..6 wurde beschrieben
  *   8      DAC-Kalibrierung vorhanden
  *   9..16  dac_mx, dac_c (je int32 LE)
  *   17     fluidType
@@ -19,7 +20,10 @@
  *   31     Geraete-/Tank-Instanz
  *   32     Layout-Version (2)
  *   33..56 Sensorname (24 Byte, 0x00-terminiert/-gepolstert; 0xFF = nie gesetzt)
- *   57..62 frei (ehemalige BLE-PIN, nicht mehr genutzt)
+ *   57..58 EMA-Filter 'wertung' (uint16 LE, Promille Altanteil 0..990;
+ *          gueltig nur mit Marker in 59)
+ *   59     Marker CFG_FIELD_MAGIC: wertung in 57..58 wurde beschrieben
+ *   60..62 frei (Rest der ehemaligen BLE-PIN, nicht mehr genutzt)
  *   63     Security-Provisioning-Marker (CFG_SECPROV_MAGIC = BLE-Sicherheit
  *          wurde nach Werksreset/Erstboot einmalig provisioniert; sonst 0xFF)
  *
@@ -41,7 +45,13 @@
 #define CFG_LAYOUT_V  2
 #define CFG_NAME_OFF  33          /* Sensorname (Installation Description)  */
 #define CFG_NAME_LEN  24
-/* 57..62 frei (ehemalige BLE-PIN, nicht mehr genutzt)                     */
+#define CFG_OFS_OFF   5           /* Nullpunkt-Offset int16 LE, Marker @7   */
+#define CFG_FILT_OFF  57          /* EMA-Filter uint16 LE, Marker @59       */
+/* Marker "Feld wurde beschrieben". Bewusst weder 0x00 noch 0xFF und keine
+ * ASCII-Ziffer - so wird eine frueher an 57..62 gespeicherte BLE-PIN oder
+ * ein geloeschter/genullter Altbestand nie als gueltiger Wert gelesen. */
+#define CFG_FIELD_MAGIC 0xA7
+/* 60..62 frei                                                             */
 #define CFG_SECPROV_OFF   63      /* Marker: BLE-Sicherheit einmalig provisioniert */
 /* Wert bewusst geaendert (war 0xA5): so provisionieren bereits gesetzte
  * Sensoren beim Firmware-Update einmalig neu -> SecFlags=0, Bonds geloescht. */

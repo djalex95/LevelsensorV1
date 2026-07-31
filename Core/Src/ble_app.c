@@ -26,6 +26,8 @@ extern uint16_t percent_val;
 extern char hw_id_str[];			/* Laufzeit-Kennung "1003A" (main.c) */
 extern volatile uint8_t error_mode;	/* ERROR_*-Bits (app_types.h) */
 extern volatile int32_t raw_press;
+extern volatile int32_t press_unfilt;	/* ungefilterter Messdruck (uBar, main.c) */
+extern uint16_t wertung;				/* EMA-Filter: Altanteil in Promille (main.c) */
 extern volatile uint8_t dev_info;
 
 /* Gewuenschter BLE-Modulname (max. 20 Zeichen, Proteus-Limit):
@@ -49,7 +51,7 @@ void ble_desired_name(char *buf)
 
 /*
  * Sendet den aktuellen Sensorzustand als maschinenlesbare Zeile an die App.
- * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>;HWV=<variante><rev>;E=<fehler>\n
+ * Format:  STAT;L=<%>;T=<C>;F=<typ>;C=<L>;I=<inst>;CAL=<0/1>;V=<x.y.z>;HWV=<variante><rev>;E=<fehler>;P=<uBar>\n
  * L: Füllstand in %, T: Temperatur in Grad C, F: Fluidtyp (0..15),
  * C: Kapazität (Liter), I: Instanz, CAL: 1 = kalibriert,
  * HWV: Hardware-Variante plus Platinen-Buchstabe, z. B. 1003A (die Zahl
@@ -57,6 +59,8 @@ void ble_desired_name(char *buf)
  * Das fruehere Feld HW= (Revision) ist entfallen. Die Kennung kommt aus
  * dem OTP, wenn das Geraet provisioniert ist (hw_otp.h, Issue #2).
  * E: Fehlerbits (ERROR_* aus app_types.h), 0 = kein Fehler.
+ * P: ungefilterter Messdruck in uBar (offsetkorrigiert, vor dem EMA-
+ *    Filter) - fuer Rohwert-Anzeige und Kalibrier-Dialoge in der App.
  */
 void ble_send_status(void)
 {
@@ -73,10 +77,10 @@ void ble_send_status(void)
 
 	int cal = (EEPROM_values.calib_available == 0x00) ? 1 : 0;
 
-	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HWV=%s;E=%u\n",
+	snprintf(line, sizeof(line), "STAT;L=%d.%d;T=%s%d.%02d;F=%d;C=%d;I=%d;CAL=%d;V=%s;HWV=%s;E=%u;P=%ld\n",
 			 p_int, p_frac, tsign, ta / 100, ta % 100,
 			 dev_info_par.fluidType, dev_info_par.cap, dev_info_par.devInstance, cal,
-			 FW_VERSION, hw_id_str, (unsigned)error_mode);
+			 FW_VERSION, hw_id_str, (unsigned)error_mode, (long)press_unfilt);
 
 	BLE_SendString(line);
 }
@@ -103,7 +107,10 @@ static void ble_send_lin(void)
  *   LIN            aktuelle Tankform-Kennlinie senden (LIN;...)
  *   LIN v0,...,v10 Kennlinie setzen (11 Werte 0..100, steigend)
  *   CAL100         aktuellen Druck als 100 % kalibrieren
- *   CALRESET       Kalibrierung auf Werkswert zurücksetzen
+ *   CAL0           aktuellen Druck als Nullpunkt uebernehmen (Tank leer!)
+ *   CALRESET       Kalibrierung (100 % und Nullpunkt) auf Werkswert zurücksetzen
+ *   FILT           Filterstaerke abfragen (FILT;<0..990>)
+ *   FILT <0..990>  Filterstaerke setzen (Anteil alter Wert in Promille)
  *   FLUID <0..15>  Fluidtyp setzen
  *   CAP <1..255>   Tankkapazität (Liter) setzen
  *   INST <0..15>   Instanz setzen
@@ -180,27 +187,59 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 			BLE_SendString("ERR CAL100 nodruck\n");
 		}
 	}
+	else if ((strncasecmp(cmd, "CAL0", 4) == 0) && (cmd[4] == '\0'))
+	{
+		/* Nullpunkt: aktuellen (gefilterten) Druck als 0 uebernehmen - bei
+		 * LEEREM Tank aufrufen. Die Sensortreiber ziehen den Offset direkt
+		 * nach dem Einlesen ab; raw_press enthaelt also schon den alten
+		 * Offset, deshalb wird aufaddiert. */
+		int32_t new_ofs = (int32_t)EEPROM_values.offset + raw_press;
+		if ((new_ofs >= -30000) && (new_ofs <= 30000))	/* max. +/-30 mBar Drift */
+		{
+			EEPROM_values.offset = (int16_t)new_ofs;
+			save_EEPROM(&EEPROM_values);
+			raw_press = 0;	/* Filterzustand auf den neuen Nullpunkt setzen */
+			snprintf(resp, sizeof(resp), "OK CAL0 %d\n", (int)EEPROM_values.offset);
+			BLE_SendString(resp);
+		}
+		else
+		{
+			BLE_SendString("ERR CAL0 range\n");
+		}
+	}
 	else if ((strncasecmp(cmd, "CAL", 3) == 0) && (cmd[3] == '\0'))
 	{
-		/* Abfrage des Kalibrierwerts fuer die Sicherung:
-		 *   CAL;<0|1>;<max_val>
+		/* Abfrage der Kalibrierwerte fuer die Sicherung:
+		 *   CAL;<0|1>;<max_val>;<offset>
 		 * max_val ist der Rohdruck bei 100 % - genau der Wert, den CAL100
-		 * aus raw_press bildet. Damit laesst sich eine Kalibrierung spaeter
-		 * ohne vollen Tank wiederherstellen. Die Pruefung auf das Stringende
-		 * grenzt sauber gegen CAL100 und CALRESET ab. */
-		snprintf(resp, sizeof(resp), "CAL;%d;%lu\n",
+		 * aus raw_press bildet, offset ist der Nullpunkt aus CAL0. Damit
+		 * laesst sich eine Kalibrierung spaeter ohne vollen Tank
+		 * wiederherstellen. Die Pruefung auf das Stringende grenzt sauber
+		 * gegen CAL0, CAL100 und CALRESET ab. */
+		snprintf(resp, sizeof(resp), "CAL;%d;%lu;%d\n",
 				 (EEPROM_values.calib_available == 0x00) ? 1 : 0,
-				 (unsigned long)EEPROM_values.max_val);
+				 (unsigned long)EEPROM_values.max_val,
+				 (int)EEPROM_values.offset);
 		BLE_SendString(resp);
 	}
 	else if (strncasecmp(cmd, "CAL ", 4) == 0)
 	{
-		/* Kalibrierwert direkt setzen (Wiederherstellung aus einer Sicherung).
-		 * Bewusst ohne Druckmessung - der Wert stammt aus dem Backup. */
+		/* Kalibrierwerte direkt setzen (Wiederherstellung aus einer Sicherung):
+		 * CAL <max_val>[,<offset>]. Bewusst ohne Druckmessung - die Werte
+		 * stammen aus dem Backup (Antwort der CAL-Abfrage). */
 		long v = atol(cmd + 4);
+		const char *sep = strchr(cmd + 4, ',');
 		if (v >= 1 && v <= 1000000L)
 		{
 			EEPROM_values.max_val = (uint32_t)v;
+			if (sep != NULL)
+			{
+				long o = atol(sep + 1);
+				if ((o >= -30000) && (o <= 30000))
+				{
+					EEPROM_values.offset = (int16_t)o;
+				}
+			}
 			EEPROM_values.calib_available = 0x00;
 			save_EEPROM(&EEPROM_values);
 			snprintf(resp, sizeof(resp), "OK CAL %lu\n",
@@ -215,9 +254,33 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 	else if (strncasecmp(cmd, "CALRESET", 8) == 0)
 	{
 		EEPROM_values.calib_available = 0xFF;
-		save_EEPROM(&EEPROM_values);
 		EEPROM_values.max_val = std_press;
+		EEPROM_values.offset = std_offset;
+		save_EEPROM(&EEPROM_values);
 		BLE_SendString("OK CALRESET\n");
+	}
+	else if ((strncasecmp(cmd, "FILT", 4) == 0) && (cmd[4] == '\0'))
+	{
+		snprintf(resp, sizeof(resp), "FILT;%u\n", (unsigned)wertung);
+		BLE_SendString(resp);
+	}
+	else if (strncasecmp(cmd, "FILT ", 5) == 0)
+	{
+		/* EMA-Filterstaerke: Anteil des alten Werts in Promille. 0 = aus,
+		 * 900 = Zeitkonstante ~1 s bei 100 ms Messtakt. Wirkt sofort und
+		 * wird im Config persistiert. */
+		int v = atoi(cmd + 5);
+		if ((v >= 0) && (v <= 990))
+		{
+			wertung = (uint16_t)v;
+			set_filt_eeprom(wertung);
+			snprintf(resp, sizeof(resp), "OK FILT %d\n", v);
+			BLE_SendString(resp);
+		}
+		else
+		{
+			BLE_SendString("ERR FILT\n");
+		}
 	}
 	else if (strncasecmp(cmd, "FACTORYRESET", 12) == 0)
 	{

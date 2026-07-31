@@ -31,7 +31,7 @@ periodischen Status als TX-Notification empfangen. Jede Nachricht endet mit `\n`
 ### Status (automatisch ca. jede Sekunde, solange verbunden)
 
 ```
-STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.2.0;HW=1000;HWV=1000
+STAT;L=73.5;T=23.45;F=1;C=150;I=0;CAL=1;V=1.3.0;HWV=1003A;E=0;P=68500
 ```
 
 Die App zerlegt die Zeile in `Schlüssel=Wert`-Paare; unbekannte oder
@@ -45,9 +45,10 @@ fehlende Felder werden toleriert (vorwärts-/rückwärtskompatibel).
 | `C` | Tankkapazität | Liter |
 | `I` | Geräteinstanz | 0..15 |
 | `CAL` | 100%-Kalibrierung vorhanden | 0 oder 1 |
-| `V` | Firmware-Version | z. B. `1.2.0` |
-| `HW` | Hardware-Revision | 4-stellig, z. B. `1000` |
-| `HWV` | Hardware-Variante (Messprinzip) | `1000`=Druck V1, `1001`=Druck V2, `1002`=Ultraschall |
+| `V` | Firmware-Version | z. B. `1.3.0` |
+| `HWV` | Hardware-Variante + Platinen-Buchstabe | z. B. `1003A` (`1000`=Druck V1, `1001`=Druck V2 ±10 kPa, `1003`=Druck V2 flach ±1 kPa) |
+| `E` | Fehlerbits (1=CAN, 2=I2C, 4=Hardware-Variante) | 0 = kein Fehler |
+| `P` | Messdruck, ungefiltert und offsetkorrigiert | µBar (auch negativ möglich) |
 
 Damit hat die App aus dem Stream bereits alle Anzeige- und Konfigurationswerte.
 
@@ -65,10 +66,14 @@ LIN;0,10,20,30,40,50,60,70,80,90,100
 OK CAP 150        Erfolg (mit Echo des gesetzten Werts)
 OK LIN            Kennlinie übernommen
 OK CAL100         100 % kalibriert
+OK CAL0 1234      Nullpunkt kalibriert (mit neuem Offset in µBar)
 OK CALRESET       Kalibrierung zurückgesetzt
+OK FILT 900       Filterstärke gesetzt
 ERR CAP           Wert ungültig
 ERR LIN           Kennlinie ungültig (nicht 0..100 oder nicht steigend)
 ERR CAL100 nodruck  Kalibrierung nicht möglich (kein Druck anliegend)
+ERR CAL0 range    Nullpunkt außerhalb ±30 mBar (Sensor prüfen)
+ERR FILT          Filterwert ungültig (erlaubt: 0..990)
 ERR ?             unbekanntes Kommando
 ```
 
@@ -83,27 +88,38 @@ ERR ?             unbekanntes Kommando
 | `FLUID n` | Fluidtyp setzen (0..15) | `OK FLUID n` / `ERR FLUID` |
 | `CAP n` | Kapazität setzen (1..255 L) | `OK CAP n` / `ERR CAP` |
 | `INST n` | Instanz setzen (0..15) | `OK INST n` / `ERR INST` |
-| `CAL` | Kalibrierwert abfragen (für die Sicherung) | `CAL;<0/1>;<max_val>` |
-| `CAL n` | Kalibrierwert direkt setzen (Wiederherstellung, 1..1000000) | `OK CAL n` / `ERR CAL` |
+| `CAL` | Kalibrierwerte abfragen (für die Sicherung) | `CAL;<0/1>;<max_val>;<offset>` |
+| `CAL n[,m]` | Kalibrierwerte direkt setzen (Wiederherstellung; n = max_val 1..1000000, m = Offset ±30000, optional) | `OK CAL n` / `ERR CAL` |
+| `CAL0` | aktuellen Druck als Nullpunkt übernehmen (**Tank leer!**) | `OK CAL0 m` / `ERR CAL0 range` |
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
-| `CALRESET` | Kalibrierung auf Werkswert zurücksetzen | `OK CALRESET` |
+| `CALRESET` | Kalibrierung (100 % und Nullpunkt) auf Werkswert zurücksetzen | `OK CALRESET` |
+| `FILT` | Filterstärke abfragen | `FILT;<0..990>` |
+| `FILT n` | Filterstärke setzen: Anteil des alten Werts in Promille (0 = aus, 900 ≈ 1 s Zeitkonstante bei 100 ms Messtakt) | `OK FILT n` / `ERR FILT` |
 | `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (beim nächsten Boot: BLE-Name wieder `LevelSense-<UID>`) | `OK FACTORYRESET`, dann Neustart |
 | `NAME text` | BLE-Modulnamen dauerhaft ändern (max. 20 Zeichen) | `OK NAME`, danach **startet das Modul neu** und die Verbindung trennt sich |
 | `DFU` | in den Firmware-Update-Modus wechseln | `OK DFU`, dann Neustart → Bootloader (siehe `../Bootloader/DESIGN.md`) |
 
 **Hinweis zu `CAL`:** `max_val` ist der Rohdruck bei 100 % Füllstand – genau
-der Wert, den `CAL100` aus dem anliegenden Druck bildet. Mit der Abfrage lässt
-sich die Kalibrierung sichern und mit `CAL n` später ohne vollen Tank
-wiederherstellen, etwa nach einem Gerätetausch. Ist der Sensor unkalibriert,
-meldet die Abfrage `CAL;0;…`. Da `max_val` Tankhöhe, Flüssigkeitsdichte und
+der Wert, den `CAL100` aus dem anliegenden Druck bildet; `offset` ist der
+Nullpunkt aus `CAL0` (µBar, wird vom Sensortreiber direkt vom Messwert
+abgezogen). Mit der Abfrage lässt sich die Kalibrierung sichern und mit
+`CAL n,m` später ohne vollen Tank wiederherstellen, etwa nach einem
+Gerätetausch. Ist der Sensor unkalibriert, meldet die Abfrage `CAL;0;…`.
+
+**Kalibrier-Reihenfolge:** erst bei leerem Tank `CAL0` (Nullpunkt), dann bei
+vollem Tank `CAL100`. Der Nullpunkt geht in den Messwert ein, aus dem `CAL100`
+seinen `max_val` bildet – andersherum stimmt die 100%-Marke danach nicht mehr.
+Zur Kontrolle zeigt das Feld `P` der `STAT`-Zeile den offsetkorrigierten,
+ungefilterten Druck: bei leerem Tank nach `CAL0` steht dort ~0. Da `max_val` Tankhöhe, Flüssigkeitsdichte und
 Sensorverstärkung zusammenfasst, gilt ein übertragener Wert am selben Tank als
 sehr guter Startwert, ersetzt aber bei hohem Genauigkeitsanspruch keine echte
 Nachkalibrierung.
 
 **Sicherung der Konfiguration:** Eine vollständige Sicherung besteht aus
-`CAL` (Kalibrierung), `LIN` (Tankform), `NAME` (Name) sowie `F`, `C` und `I`
-aus der `STAT`-Zeile. Beim Wiederherstellen werden `LIN …`, `FLUID …`,
-`CAP …`, `INST …`, `NAME …` und `CAL …` gesendet. Bewusst **nicht** Teil der
+`CAL` (Kalibrierung inkl. Nullpunkt), `LIN` (Tankform), `FILT` (Filterstärke),
+`NAME` (Name) sowie `F`, `C` und `I` aus der `STAT`-Zeile. Beim
+Wiederherstellen werden `LIN …`, `FLUID …`, `CAP …`, `INST …`, `NAME …`,
+`FILT …` und `CAL …` gesendet. Bewusst **nicht** Teil der
 Sicherung sind die geclaimte NMEA2000-Quelladresse (Byte 30 – würde auf dem
 Bus zu Adresskonflikten führen; sie wird beim Start ohnehin neu ausgehandelt)
 und der interne Provisioning-Marker. Die DAC-Kalibrierung liegt fest in der
@@ -161,6 +177,9 @@ Sensor gespeichert (überstehen einen Neustart und Stromausfall).
 | Fluidtyp / Kapazität / Instanz setzen | `FLUID` / `CAP` / `INST` |
 | Aktuelle Konfig anzeigen | aus `STAT` (F, C, I) |
 | 100%-Kalibrierung / Reset | `CAL100` / `CALRESET` |
+| Nullpunkt-Kalibrierung (Tank leer) | `CAL0`, Kontrolle über `P` aus `STAT` |
+| Glättung einstellen (schwappender Tank) | `FILT` lesen, `FILT n` setzen |
+| Rohdruck anzeigen (Diagnose) | `P` aus der `STAT`-Zeile |
 | Tankform lesen | `LIN` → Kennlinie |
 | Tankform-Assistent | `LIN` lesen, Liter→% wie im PC-Tool rechnen, `LIN v0,…,v10` schreiben |
 
