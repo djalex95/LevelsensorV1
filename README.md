@@ -46,3 +46,14 @@ pip install python-can        # einmalig, PEAK-Treiber muss installiert sein
 cd PC_Tools
 python nmea2000_gui.py
 ```
+
+## Versionsnummern
+
+Die Nummer hat drei Stellen, X.Y.Z, und jede Stelle hat eine feste Bedeutung:
+**X** steigt bei einer größeren Änderung, **Y** wenn ein kleineres Feature
+dazukommt (etwa eine neue Hardware-Variante), **Z** bei Bugfixes. Das gilt
+gleich in allen drei Repositories (Firmware, Bootloader, App).
+
+Die Firmware zählt in `FW_VERSION` (`Core/Inc/version.h`). Freigegeben wird über
+einen Tag `vX.Y.Z`; die CI bricht ab, wenn Tag und `FW_VERSION` nicht
+zusammenpassen.
