@@ -108,7 +108,8 @@ static void ble_send_lin(void)
  *   LIN v0,...,v10 Kennlinie setzen (11 Werte 0..100, steigend)
  *   CAL100         aktuellen Druck als 100 % kalibrieren
  *   CAL0           aktuellen Druck als Nullpunkt uebernehmen (Tank leer!)
- *   CALRESET       Kalibrierung (100 % und Nullpunkt) auf Werkswert zurücksetzen
+ *   CAL0RESET      nur den Nullpunkt auf Werkswert (100 % bleibt erhalten)
+ *   CALRESET       100%-Kalibrierung auf Werkswert (Nullpunkt bleibt)
  *   FILT           Filterstaerke abfragen (FILT;<0..990>)
  *   FILT <0..990>  Filterstaerke setzen (Anteil alter Wert in Promille)
  *   FLUID <0..15>  Fluidtyp setzen
@@ -175,9 +176,12 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 	}
 	else if (strncasecmp(cmd, "CAL100", 6) == 0)
 	{
-		if (raw_press >= 100)	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
+		/* Ungefilterter Wert: die App zeigt press_unfilt als Rohdruck an -
+		 * kalibriert wird genau das, was der Nutzer sieht. Der gefilterte
+		 * raw_press hinkt bei hoher FILT-Einstellung um Sekunden hinterher. */
+		if (press_unfilt >= 100)	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
 		{
-			EEPROM_values.max_val = raw_press / 100;
+			EEPROM_values.max_val = press_unfilt / 100;
 			EEPROM_values.calib_available = 0x00;
 			save_EEPROM(&EEPROM_values);
 			BLE_SendString("OK CAL100\n");
@@ -189,11 +193,13 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 	}
 	else if ((strncasecmp(cmd, "CAL0", 4) == 0) && (cmd[4] == '\0'))
 	{
-		/* Nullpunkt: aktuellen (gefilterten) Druck als 0 uebernehmen - bei
-		 * LEEREM Tank aufrufen. Die Sensortreiber ziehen den Offset direkt
-		 * nach dem Einlesen ab; raw_press enthaelt also schon den alten
-		 * Offset, deshalb wird aufaddiert. */
-		int32_t new_ofs = (int32_t)EEPROM_values.offset + raw_press;
+		/* Nullpunkt: aktuellen Druck als 0 uebernehmen - bei LEEREM Tank
+		 * aufrufen. Bewusst der UNGEFILTERTE Wert (press_unfilt): den zeigt
+		 * die App als Rohdruck an, und er reagiert sofort - der gefilterte
+		 * raw_press hinkt bei hoher FILT-Einstellung um Sekunden hinterher.
+		 * Die Sensortreiber ziehen den Offset direkt nach dem Einlesen ab;
+		 * press_unfilt enthaelt also schon den alten Offset -> aufaddieren. */
+		int32_t new_ofs = (int32_t)EEPROM_values.offset + press_unfilt;
 		if ((new_ofs >= -30000) && (new_ofs <= 30000))	/* max. +/-30 mBar Drift */
 		{
 			EEPROM_values.offset = (int16_t)new_ofs;
@@ -206,6 +212,16 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		{
 			BLE_SendString("ERR CAL0 range\n");
 		}
+	}
+	else if (strncasecmp(cmd, "CAL0RESET", 9) == 0)
+	{
+		/* Nur den Nullpunkt verwerfen, die 100%-Kalibrierung bleibt.
+		 * Filterzustand auf den wieder unkorrigierten Messwert setzen,
+		 * damit die Anzeige nicht mit grosser Zeitkonstante nachzieht. */
+		raw_press = press_unfilt + EEPROM_values.offset;
+		EEPROM_values.offset = std_offset;
+		save_EEPROM(&EEPROM_values);
+		BLE_SendString("OK CAL0RESET\n");
 	}
 	else if ((strncasecmp(cmd, "CAL", 3) == 0) && (cmd[3] == '\0'))
 	{
@@ -253,9 +269,10 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 	}
 	else if (strncasecmp(cmd, "CALRESET", 8) == 0)
 	{
+		/* Nur die 100%-Kalibrierung verwerfen - der Nullpunkt (CAL0) bleibt
+		 * stehen und hat mit CAL0RESET seinen eigenen Reset. */
 		EEPROM_values.calib_available = 0xFF;
 		EEPROM_values.max_val = std_press;
-		EEPROM_values.offset = std_offset;
 		save_EEPROM(&EEPROM_values);
 		BLE_SendString("OK CALRESET\n");
 	}

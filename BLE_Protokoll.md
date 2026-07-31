@@ -67,7 +67,8 @@ OK CAP 150        Erfolg (mit Echo des gesetzten Werts)
 OK LIN            Kennlinie übernommen
 OK CAL100         100 % kalibriert
 OK CAL0 1234      Nullpunkt kalibriert (mit neuem Offset in µBar)
-OK CALRESET       Kalibrierung zurückgesetzt
+OK CAL0RESET      Nullpunkt auf Werkswert zurückgesetzt
+OK CALRESET       100%-Kalibrierung zurückgesetzt (Nullpunkt bleibt)
 OK FILT 900       Filterstärke gesetzt
 ERR CAP           Wert ungültig
 ERR LIN           Kennlinie ungültig (nicht 0..100 oder nicht steigend)
@@ -90,9 +91,10 @@ ERR ?             unbekanntes Kommando
 | `INST n` | Instanz setzen (0..15) | `OK INST n` / `ERR INST` |
 | `CAL` | Kalibrierwerte abfragen (für die Sicherung) | `CAL;<0/1>;<max_val>;<offset>` |
 | `CAL n[,m]` | Kalibrierwerte direkt setzen (Wiederherstellung; n = max_val 1..1000000, m = Offset ±30000, optional) | `OK CAL n` / `ERR CAL` |
-| `CAL0` | aktuellen Druck als Nullpunkt übernehmen (**Tank leer!**) | `OK CAL0 m` / `ERR CAL0 range` |
+| `CAL0` | aktuellen Druck als Nullpunkt übernehmen (**Tank leer!**) | `OK CAL0 m` (m = neuer Offset) / `ERR CAL0 range` |
+| `CAL0RESET` | nur den Nullpunkt auf Werkswert zurücksetzen (100 % bleibt) | `OK CAL0RESET` |
 | `CAL100` | aktuellen Füllstand als 100 % kalibrieren | `OK CAL100` / `ERR CAL100 nodruck` |
-| `CALRESET` | Kalibrierung (100 % und Nullpunkt) auf Werkswert zurücksetzen | `OK CALRESET` |
+| `CALRESET` | 100%-Kalibrierung auf Werkswert zurücksetzen (Nullpunkt bleibt) | `OK CALRESET` |
 | `FILT` | Filterstärke abfragen | `FILT;<0..990>` |
 | `FILT n` | Filterstärke setzen: Anteil des alten Werts in Promille (0 = aus, 900 ≈ 1 s Zeitkonstante bei 100 ms Messtakt) | `OK FILT n` / `ERR FILT` |
 | `FACTORYRESET` | Werksreset: löscht Kalibrierung, Tankform, Instanz, Name und gespeicherte Adresse; Sensor startet neu (beim nächsten Boot: BLE-Name wieder `LevelSense-<UID>`) | `OK FACTORYRESET`, dann Neustart |
@@ -110,7 +112,12 @@ Gerätetausch. Ist der Sensor unkalibriert, meldet die Abfrage `CAL;0;…`.
 vollem Tank `CAL100`. Der Nullpunkt geht in den Messwert ein, aus dem `CAL100`
 seinen `max_val` bildet – andersherum stimmt die 100%-Marke danach nicht mehr.
 Zur Kontrolle zeigt das Feld `P` der `STAT`-Zeile den offsetkorrigierten,
-ungefilterten Druck: bei leerem Tank nach `CAL0` steht dort ~0. Da `max_val` Tankhöhe, Flüssigkeitsdichte und
+ungefilterten Druck: bei leerem Tank nach `CAL0` steht dort ~0.
+
+Beide Kommandos übernehmen den **ungefilterten** Messwert – also genau den
+Wert aus dem Feld `P`, unabhängig von der eingestellten Glättung (`FILT`).
+Die Glättung wirkt nur auf den laufenden Füllstand, nicht auf die
+Kalibrierung. Da `max_val` Tankhöhe, Flüssigkeitsdichte und
 Sensorverstärkung zusammenfasst, gilt ein übertragener Wert am selben Tank als
 sehr guter Startwert, ersetzt aber bei hohem Genauigkeitsanspruch keine echte
 Nachkalibrierung.

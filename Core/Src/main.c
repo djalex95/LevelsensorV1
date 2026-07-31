@@ -444,8 +444,9 @@ int main(void)
 	  			percent_val = linearize_percent(calc_percent(&EEPROM_values, raw_press));
 	  			set_volt(percent_val, &DAC_EEPROM_values);
 	  			switch (setup_mode) {
-	  				case 1: if (raw_press>=100){	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz) */
-	  							EEPROM_values.max_val = raw_press/100;
+	  				case 1: if (press_unfilt>=100){	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz);
+	  							   ungefiltert wie CAL100 - siehe ble_app.c */
+	  							EEPROM_values.max_val = press_unfilt/100;
 	  							EEPROM_values.calib_available = 0x00;
 	  							save_EEPROM(&EEPROM_values);
 	  						}
