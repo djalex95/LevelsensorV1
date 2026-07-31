@@ -1,0 +1,2460 @@
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 1
+
+
+   1              		.cpu cortex-m0plus
+   2              		.arch armv6s-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 6
+  11              		.eabi_attribute 34, 0
+  12              		.eabi_attribute 18, 4
+  13              		.file	"ble.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "Core/Src/ble.c"
+  18              		.section	.rodata.CHANNEL_OFFSET_TAB,"a"
+  19              		.align	2
+  22              	CHANNEL_OFFSET_TAB:
+  23 0000 081C3044 		.ascii	"\010\0340DXl\200"
+  23      586C80
+  24              		.section	.bss.ble_uart,"aw",%nobits
+  25              		.align	2
+  28              	ble_uart:
+  29 0000 00000000 		.space	4
+  30              		.section	.bss.rx_byte,"aw",%nobits
+  33              	rx_byte:
+  34 0000 00       		.space	1
+  35              		.global	ble_connected
+  36              		.section	.bss.ble_connected,"aw",%nobits
+  39              	ble_connected:
+  40 0000 00       		.space	1
+  41              		.global	ble_channel_open
+  42              		.section	.bss.ble_channel_open,"aw",%nobits
+  45              	ble_channel_open:
+  46 0000 00       		.space	1
+  47              		.global	ble_data_ready
+  48              		.section	.bss.ble_data_ready,"aw",%nobits
+  51              	ble_data_ready:
+  52 0000 00       		.space	1
+  53              		.global	ble_data_buf
+  54              		.section	.bss.ble_data_buf,"aw",%nobits
+  55              		.align	2
+  58              	ble_data_buf:
+  59 0000 00000000 		.space	243
+  59      00000000 
+  59      00000000 
+  59      00000000 
+  59      00000000 
+  60              		.global	ble_data_len
+  61              		.section	.bss.ble_data_len,"aw",%nobits
+  62              		.align	1
+  65              	ble_data_len:
+  66 0000 0000     		.space	2
+  67              		.section	.data.ble_mps,"aw"
+  70              	ble_mps:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 2
+
+
+  71 0000 13       		.byte	19
+  72              		.global	ble_setname_pending
+  73              		.section	.bss.ble_setname_pending,"aw",%nobits
+  76              	ble_setname_pending:
+  77 0000 00       		.space	1
+  78              		.section	.bss.ble_pending_name,"aw",%nobits
+  79              		.align	2
+  82              	ble_pending_name:
+  83 0000 00000000 		.space	21
+  83      00000000 
+  83      00000000 
+  83      00000000 
+  83      00000000 
+  84              		.global	ble_get_ready
+  85              		.section	.bss.ble_get_ready,"aw",%nobits
+  88              	ble_get_ready:
+  89 0000 00       		.space	1
+  90              		.global	ble_get_index
+  91              		.section	.data.ble_get_index,"aw"
+  94              	ble_get_index:
+  95 0000 FF       		.byte	-1
+  96              		.global	ble_get_value
+  97              		.section	.bss.ble_get_value,"aw",%nobits
+  98              		.align	2
+ 101              	ble_get_value:
+ 102 0000 00000000 		.space	21
+ 102      00000000 
+ 102      00000000 
+ 102      00000000 
+ 102      00000000 
+ 103              		.global	ble_get_len
+ 104              		.section	.bss.ble_get_len,"aw",%nobits
+ 105              		.align	1
+ 108              	ble_get_len:
+ 109 0000 0000     		.space	2
+ 110              		.section	.bss.pstate,"aw",%nobits
+ 113              	pstate:
+ 114 0000 00       		.space	1
+ 115              		.section	.bss.frame_cmd,"aw",%nobits
+ 118              	frame_cmd:
+ 119 0000 00       		.space	1
+ 120              		.section	.bss.frame_len,"aw",%nobits
+ 121              		.align	1
+ 124              	frame_len:
+ 125 0000 0000     		.space	2
+ 126              		.section	.bss.frame_pos,"aw",%nobits
+ 127              		.align	1
+ 130              	frame_pos:
+ 131 0000 0000     		.space	2
+ 132              		.section	.bss.frame_payload,"aw",%nobits
+ 133              		.align	2
+ 136              	frame_payload:
+ 137 0000 00000000 		.space	243
+ 137      00000000 
+ 137      00000000 
+ 137      00000000 
+ 137      00000000 
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 3
+
+
+ 138              		.section	.bss.frame_cs,"aw",%nobits
+ 141              	frame_cs:
+ 142 0000 00       		.space	1
+ 143              		.section	.text.xor_cs,"ax",%progbits
+ 144              		.align	1
+ 145              		.syntax unified
+ 146              		.code	16
+ 147              		.thumb_func
+ 149              	xor_cs:
+ 150              	.LFB363:
+   1:Core/Src/ble.c **** /*
+   2:Core/Src/ble.c ****  * ble.c
+   3:Core/Src/ble.c ****  *
+   4:Core/Src/ble.c ****  * Proteus-e (Würth 2612011024000) UART-Treiber – siehe ble.h.
+   5:Core/Src/ble.c ****  *
+   6:Core/Src/ble.c ****  *  Created on: Jun 9, 2024
+   7:Core/Src/ble.c ****  *      Author: a_hae
+   8:Core/Src/ble.c ****  */
+   9:Core/Src/ble.c **** #include "ble.h"
+  10:Core/Src/ble.c **** #include "main.h"		/* Pin-Defines BLE_RESET/BLE_MODE/BLE_BUSY, HAL */
+  11:Core/Src/ble.c **** #include <string.h>
+  12:Core/Src/ble.c **** 
+  13:Core/Src/ble.c **** static UART_HandleTypeDef *ble_uart = NULL;
+  14:Core/Src/ble.c **** static uint8_t rx_byte;					/* 1-Byte-Empfangspuffer für IT */
+  15:Core/Src/ble.c **** 
+  16:Core/Src/ble.c **** /* --- Zustand (in ISR geschrieben) --- */
+  17:Core/Src/ble.c **** volatile uint8_t ble_connected = 0;
+  18:Core/Src/ble.c **** volatile uint8_t ble_channel_open = 0;
+  19:Core/Src/ble.c **** volatile uint8_t ble_data_ready = 0;
+  20:Core/Src/ble.c **** uint8_t          ble_data_buf[BLE_MAX_PAYLOAD];
+  21:Core/Src/ble.c **** volatile uint16_t ble_data_len = 0;
+  22:Core/Src/ble.c **** 
+  23:Core/Src/ble.c **** /* Ausgehandelte max. Nutzdaten pro Frame (MPS, aus CMD_CHANNELOPEN_RSP).
+  24:Core/Src/ble.c ****  * Startwert = garantiertes Minimum (19). */
+  25:Core/Src/ble.c **** static uint8_t ble_mps = 19;
+  26:Core/Src/ble.c **** 
+  27:Core/Src/ble.c **** /* Aufgeschobene Namensänderung (wird nach dem Trennen angewendet) */
+  28:Core/Src/ble.c **** volatile uint8_t ble_setname_pending = 0;
+  29:Core/Src/ble.c **** static char ble_pending_name[21];
+  30:Core/Src/ble.c **** 
+  31:Core/Src/ble.c **** /* Ergebnis einer Einstellungs-Abfrage (BLE_RequestSetting) */
+  32:Core/Src/ble.c **** volatile uint8_t  ble_get_ready = 0;
+  33:Core/Src/ble.c **** uint8_t           ble_get_index = 0xFF;
+  34:Core/Src/ble.c **** uint8_t           ble_get_value[21];
+  35:Core/Src/ble.c **** volatile uint16_t ble_get_len = 0;
+  36:Core/Src/ble.c **** 
+  37:Core/Src/ble.c **** /* --- Frame-Parser-Zustand --- */
+  38:Core/Src/ble.c **** typedef enum { ST_STX = 0, ST_CMD, ST_LEN_L, ST_LEN_H, ST_PAYLOAD, ST_CS } parse_state;
+  39:Core/Src/ble.c **** static parse_state pstate = ST_STX;
+  40:Core/Src/ble.c **** static uint8_t  frame_cmd;
+  41:Core/Src/ble.c **** static uint16_t frame_len;
+  42:Core/Src/ble.c **** static uint16_t frame_pos;
+  43:Core/Src/ble.c **** static uint8_t  frame_payload[BLE_MAX_PAYLOAD];
+  44:Core/Src/ble.c **** static uint8_t  frame_cs;				/* laufender XOR über STX..letztes Payloadbyte */
+  45:Core/Src/ble.c **** 
+  46:Core/Src/ble.c **** /* ------------------------------------------------------------------ intern */
+  47:Core/Src/ble.c **** 
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 4
+
+
+  48:Core/Src/ble.c **** static uint8_t xor_cs(const uint8_t *d, uint16_t len)
+  49:Core/Src/ble.c **** {
+ 151              		.loc 1 49 1
+ 152              		.cfi_startproc
+ 153              		@ args = 0, pretend = 0, frame = 16
+ 154              		@ frame_needed = 1, uses_anonymous_args = 0
+ 155 0000 80B5     		push	{r7, lr}
+ 156              	.LCFI0:
+ 157              		.cfi_def_cfa_offset 8
+ 158              		.cfi_offset 7, -8
+ 159              		.cfi_offset 14, -4
+ 160 0002 84B0     		sub	sp, sp, #16
+ 161              	.LCFI1:
+ 162              		.cfi_def_cfa_offset 24
+ 163 0004 00AF     		add	r7, sp, #0
+ 164              	.LCFI2:
+ 165              		.cfi_def_cfa_register 7
+ 166 0006 7860     		str	r0, [r7, #4]
+ 167 0008 0A00     		movs	r2, r1
+ 168 000a BB1C     		adds	r3, r7, #2
+ 169 000c 1A80     		strh	r2, [r3]
+  50:Core/Src/ble.c **** 	uint8_t cs = 0;
+ 170              		.loc 1 50 10
+ 171 000e 0F23     		movs	r3, #15
+ 172 0010 FB18     		adds	r3, r7, r3
+ 173 0012 0022     		movs	r2, #0
+ 174 0014 1A70     		strb	r2, [r3]
+ 175              	.LBB2:
+  51:Core/Src/ble.c **** 	for (uint16_t i = 0; i < len; i++)
+ 176              		.loc 1 51 16
+ 177 0016 0C23     		movs	r3, #12
+ 178 0018 FB18     		adds	r3, r7, r3
+ 179 001a 0022     		movs	r2, #0
+ 180 001c 1A80     		strh	r2, [r3]
+ 181              		.loc 1 51 2
+ 182 001e 10E0     		b	.L2
+ 183              	.L3:
+  52:Core/Src/ble.c **** 	{
+  53:Core/Src/ble.c **** 		cs ^= d[i];
+ 184              		.loc 1 53 10
+ 185 0020 0C20     		movs	r0, #12
+ 186 0022 3B18     		adds	r3, r7, r0
+ 187 0024 1B88     		ldrh	r3, [r3]
+ 188 0026 7A68     		ldr	r2, [r7, #4]
+ 189 0028 D318     		adds	r3, r2, r3
+ 190 002a 1978     		ldrb	r1, [r3]
+ 191              		.loc 1 53 6
+ 192 002c 0F22     		movs	r2, #15
+ 193 002e BB18     		adds	r3, r7, r2
+ 194 0030 BA18     		adds	r2, r7, r2
+ 195 0032 1278     		ldrb	r2, [r2]
+ 196 0034 4A40     		eors	r2, r1
+ 197 0036 1A70     		strb	r2, [r3]
+  51:Core/Src/ble.c **** 	for (uint16_t i = 0; i < len; i++)
+ 198              		.loc 1 51 33 discriminator 3
+ 199 0038 3B18     		adds	r3, r7, r0
+ 200 003a 1A88     		ldrh	r2, [r3]
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 5
+
+
+ 201 003c 3B18     		adds	r3, r7, r0
+ 202 003e 0132     		adds	r2, r2, #1
+ 203 0040 1A80     		strh	r2, [r3]
+ 204              	.L2:
+  51:Core/Src/ble.c **** 	for (uint16_t i = 0; i < len; i++)
+ 205              		.loc 1 51 25 discriminator 1
+ 206 0042 0C23     		movs	r3, #12
+ 207 0044 FA18     		adds	r2, r7, r3
+ 208 0046 BB1C     		adds	r3, r7, #2
+ 209 0048 1288     		ldrh	r2, [r2]
+ 210 004a 1B88     		ldrh	r3, [r3]
+ 211 004c 9A42     		cmp	r2, r3
+ 212 004e E7D3     		bcc	.L3
+ 213              	.LBE2:
+  54:Core/Src/ble.c **** 	}
+  55:Core/Src/ble.c **** 	return cs;
+ 214              		.loc 1 55 9
+ 215 0050 0F23     		movs	r3, #15
+ 216 0052 FB18     		adds	r3, r7, r3
+ 217 0054 1B78     		ldrb	r3, [r3]
+  56:Core/Src/ble.c **** }
+ 218              		.loc 1 56 1
+ 219 0056 1800     		movs	r0, r3
+ 220 0058 BD46     		mov	sp, r7
+ 221 005a 04B0     		add	sp, sp, #16
+ 222              		@ sp needed
+ 223 005c 80BD     		pop	{r7, pc}
+ 224              		.cfi_endproc
+ 225              	.LFE363:
+ 227              		.section	.text.ble_dispatch,"ax",%progbits
+ 228              		.align	1
+ 229              		.syntax unified
+ 230              		.code	16
+ 231              		.thumb_func
+ 233              	ble_dispatch:
+ 234              	.LFB364:
+  57:Core/Src/ble.c **** 
+  58:Core/Src/ble.c **** /* Ein vollständig empfangenes, geprüftes Frame verarbeiten (ISR-Kontext). */
+  59:Core/Src/ble.c **** static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
+  60:Core/Src/ble.c **** {
+ 235              		.loc 1 60 1
+ 236              		.cfi_startproc
+ 237              		@ args = 0, pretend = 0, frame = 16
+ 238              		@ frame_needed = 1, uses_anonymous_args = 0
+ 239 0000 90B5     		push	{r4, r7, lr}
+ 240              	.LCFI3:
+ 241              		.cfi_def_cfa_offset 12
+ 242              		.cfi_offset 4, -12
+ 243              		.cfi_offset 7, -8
+ 244              		.cfi_offset 14, -4
+ 245 0002 85B0     		sub	sp, sp, #20
+ 246              	.LCFI4:
+ 247              		.cfi_def_cfa_offset 32
+ 248 0004 00AF     		add	r7, sp, #0
+ 249              	.LCFI5:
+ 250              		.cfi_def_cfa_register 7
+ 251 0006 3960     		str	r1, [r7]
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 6
+
+
+ 252 0008 1100     		movs	r1, r2
+ 253 000a FB1D     		adds	r3, r7, #7
+ 254 000c 021C     		adds	r2, r0, #0
+ 255 000e 1A70     		strb	r2, [r3]
+ 256 0010 3B1D     		adds	r3, r7, #4
+ 257 0012 0A1C     		adds	r2, r1, #0
+ 258 0014 1A80     		strh	r2, [r3]
+  61:Core/Src/ble.c **** 	switch (cmd)
+ 259              		.loc 1 61 2
+ 260 0016 FB1D     		adds	r3, r7, #7
+ 261 0018 1B78     		ldrb	r3, [r3]
+ 262 001a C62B     		cmp	r3, #198
+ 263 001c 15D0     		beq	.L6
+ 264 001e 00DD     		ble	.LCB106
+ 265 0020 89E0     		b	.L17	@long jump
+ 266              	.LCB106:
+ 267 0022 872B     		cmp	r3, #135
+ 268 0024 28D0     		beq	.L8
+ 269 0026 00DD     		ble	.LCB110
+ 270 0028 85E0     		b	.L17	@long jump
+ 271              	.LCB110:
+ 272 002a 862B     		cmp	r3, #134
+ 273 002c 06D0     		beq	.L9
+ 274 002e 00DD     		ble	.LCB114
+ 275 0030 81E0     		b	.L17	@long jump
+ 276              	.LCB114:
+ 277 0032 502B     		cmp	r3, #80
+ 278 0034 27D0     		beq	.L10
+ 279 0036 842B     		cmp	r3, #132
+ 280 0038 5AD0     		beq	.L11
+  62:Core/Src/ble.c **** 	{
+  63:Core/Src/ble.c **** 	case CMD_CONNECT_IND:
+  64:Core/Src/ble.c **** 		ble_connected = 1;
+  65:Core/Src/ble.c **** 		ble_channel_open = 0;		/* Kanal erst nach CHANNELOPEN_RSP */
+  66:Core/Src/ble.c **** 		break;
+  67:Core/Src/ble.c **** 
+  68:Core/Src/ble.c **** 	case CMD_CHANNELOPEN_RSP:
+  69:Core/Src/ble.c **** 		/* Payload = Status(1) + BTMAC(6) + MPS(1). MPS = max. Nutzdaten/Frame. */
+  70:Core/Src/ble.c **** 		if (len >= 8 && payload[7] >= 19 && payload[7] <= BLE_MAX_PAYLOAD)
+  71:Core/Src/ble.c **** 		{
+  72:Core/Src/ble.c **** 			ble_mps = payload[7];
+  73:Core/Src/ble.c **** 		}
+  74:Core/Src/ble.c **** 		ble_channel_open = 1;		/* jetzt darf gesendet werden */
+  75:Core/Src/ble.c **** 		break;
+  76:Core/Src/ble.c **** 
+  77:Core/Src/ble.c **** 	case CMD_DISCONNECT_IND:
+  78:Core/Src/ble.c **** 		ble_connected = 0;
+  79:Core/Src/ble.c **** 		ble_channel_open = 0;
+  80:Core/Src/ble.c **** 		break;
+  81:Core/Src/ble.c **** 
+  82:Core/Src/ble.c **** 	case CMD_GET_CNF:
+  83:Core/Src/ble.c **** 		/* Antwort auf CMD_GET_REQ: Status(1, 0x00 = ok) + Einstellungswert.
+  84:Core/Src/ble.c **** 		 * Die CNF enthaelt den Settings-Index NICHT - er wird beim Request
+  85:Core/Src/ble.c **** 		 * in ble_get_index gemerkt (immer nur eine Anfrage offen). */
+  86:Core/Src/ble.c **** 		if (!ble_get_ready && (ble_get_index != 0xFF) && len >= 1
+  87:Core/Src/ble.c **** 				&& payload[0] == 0x00)
+  88:Core/Src/ble.c **** 		{
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 7
+
+
+  89:Core/Src/ble.c **** 			uint16_t nl = len - 1;
+  90:Core/Src/ble.c **** 			if (nl > 20)
+  91:Core/Src/ble.c **** 			{
+  92:Core/Src/ble.c **** 				nl = 20;
+  93:Core/Src/ble.c **** 			}
+  94:Core/Src/ble.c **** 			memcpy(ble_get_value, payload + 1, nl);
+  95:Core/Src/ble.c **** 			ble_get_value[nl] = '\0';
+  96:Core/Src/ble.c **** 			ble_get_len = nl;
+  97:Core/Src/ble.c **** 			ble_get_ready = 1;
+  98:Core/Src/ble.c **** 		}
+  99:Core/Src/ble.c **** 		break;
+ 100:Core/Src/ble.c **** 
+ 101:Core/Src/ble.c **** 	case CMD_DATA_IND:
+ 102:Core/Src/ble.c **** 		/* Payload = BTMAC(6) + RSSI(1) + Nutzdaten. Nur die Nutzdaten übernehmen,
+ 103:Core/Src/ble.c **** 		 * und nur wenn die Hauptschleife das letzte Paket abgeholt hat. */
+ 104:Core/Src/ble.c **** 		if (!ble_data_ready && len > 7 && (uint16_t)(len - 7) <= BLE_MAX_PAYLOAD)
+ 105:Core/Src/ble.c **** 		{
+ 106:Core/Src/ble.c **** 			memcpy(ble_data_buf, payload + 7, len - 7);
+ 107:Core/Src/ble.c **** 			ble_data_len = len - 7;
+ 108:Core/Src/ble.c **** 			ble_data_ready = 1;
+ 109:Core/Src/ble.c **** 		}
+ 110:Core/Src/ble.c **** 		break;
+ 111:Core/Src/ble.c **** 
+ 112:Core/Src/ble.c **** 	default:
+ 113:Core/Src/ble.c **** 		/* CMD_DATA_CNF, CMD_TXCOMPLETE_RSP, CMD_SECURITY_IND, GETSTATE_CNF … ignorieren */
+ 114:Core/Src/ble.c **** 		break;
+ 281              		.loc 1 114 3
+ 282 003a 7CE0     		b	.L17
+ 283              	.L9:
+  64:Core/Src/ble.c **** 		ble_channel_open = 0;		/* Kanal erst nach CHANNELOPEN_RSP */
+ 284              		.loc 1 64 17
+ 285 003c 424B     		ldr	r3, .L21
+ 286 003e 0122     		movs	r2, #1
+ 287 0040 1A70     		strb	r2, [r3]
+  65:Core/Src/ble.c **** 		break;
+ 288              		.loc 1 65 20
+ 289 0042 424B     		ldr	r3, .L21+4
+ 290 0044 0022     		movs	r2, #0
+ 291 0046 1A70     		strb	r2, [r3]
+  66:Core/Src/ble.c **** 
+ 292              		.loc 1 66 3
+ 293 0048 7AE0     		b	.L12
+ 294              	.L6:
+  70:Core/Src/ble.c **** 		{
+ 295              		.loc 1 70 6
+ 296 004a 3B1D     		adds	r3, r7, #4
+ 297 004c 1B88     		ldrh	r3, [r3]
+ 298 004e 072B     		cmp	r3, #7
+ 299 0050 0ED9     		bls	.L13
+  70:Core/Src/ble.c **** 		{
+ 300              		.loc 1 70 26 discriminator 1
+ 301 0052 3B68     		ldr	r3, [r7]
+ 302 0054 0733     		adds	r3, r3, #7
+ 303 0056 1B78     		ldrb	r3, [r3]
+  70:Core/Src/ble.c **** 		{
+ 304              		.loc 1 70 16 discriminator 1
+ 305 0058 122B     		cmp	r3, #18
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 8
+
+
+ 306 005a 09D9     		bls	.L13
+  70:Core/Src/ble.c **** 		{
+ 307              		.loc 1 70 46 discriminator 2
+ 308 005c 3B68     		ldr	r3, [r7]
+ 309 005e 0733     		adds	r3, r3, #7
+ 310 0060 1B78     		ldrb	r3, [r3]
+  70:Core/Src/ble.c **** 		{
+ 311              		.loc 1 70 36 discriminator 2
+ 312 0062 F32B     		cmp	r3, #243
+ 313 0064 04D8     		bhi	.L13
+  72:Core/Src/ble.c **** 		}
+ 314              		.loc 1 72 21
+ 315 0066 3B68     		ldr	r3, [r7]
+ 316 0068 0733     		adds	r3, r3, #7
+ 317 006a 1A78     		ldrb	r2, [r3]
+  72:Core/Src/ble.c **** 		}
+ 318              		.loc 1 72 12
+ 319 006c 384B     		ldr	r3, .L21+8
+ 320 006e 1A70     		strb	r2, [r3]
+ 321              	.L13:
+  74:Core/Src/ble.c **** 		break;
+ 322              		.loc 1 74 20
+ 323 0070 364B     		ldr	r3, .L21+4
+ 324 0072 0122     		movs	r2, #1
+ 325 0074 1A70     		strb	r2, [r3]
+  75:Core/Src/ble.c **** 
+ 326              		.loc 1 75 3
+ 327 0076 63E0     		b	.L12
+ 328              	.L8:
+  78:Core/Src/ble.c **** 		ble_channel_open = 0;
+ 329              		.loc 1 78 17
+ 330 0078 334B     		ldr	r3, .L21
+ 331 007a 0022     		movs	r2, #0
+ 332 007c 1A70     		strb	r2, [r3]
+  79:Core/Src/ble.c **** 		break;
+ 333              		.loc 1 79 20
+ 334 007e 334B     		ldr	r3, .L21+4
+ 335 0080 0022     		movs	r2, #0
+ 336 0082 1A70     		strb	r2, [r3]
+  80:Core/Src/ble.c **** 
+ 337              		.loc 1 80 3
+ 338 0084 5CE0     		b	.L12
+ 339              	.L10:
+  86:Core/Src/ble.c **** 				&& payload[0] == 0x00)
+ 340              		.loc 1 86 7
+ 341 0086 334B     		ldr	r3, .L21+12
+ 342 0088 1B78     		ldrb	r3, [r3]
+ 343 008a DBB2     		uxtb	r3, r3
+  86:Core/Src/ble.c **** 				&& payload[0] == 0x00)
+ 344              		.loc 1 86 6
+ 345 008c 002B     		cmp	r3, #0
+ 346 008e 54D1     		bne	.L18
+  86:Core/Src/ble.c **** 				&& payload[0] == 0x00)
+ 347              		.loc 1 86 40 discriminator 1
+ 348 0090 314B     		ldr	r3, .L21+16
+ 349 0092 1B78     		ldrb	r3, [r3]
+  86:Core/Src/ble.c **** 				&& payload[0] == 0x00)
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 9
+
+
+ 350              		.loc 1 86 22 discriminator 1
+ 351 0094 FF2B     		cmp	r3, #255
+ 352 0096 50D0     		beq	.L18
+  86:Core/Src/ble.c **** 				&& payload[0] == 0x00)
+ 353              		.loc 1 86 49 discriminator 2
+ 354 0098 3B1D     		adds	r3, r7, #4
+ 355 009a 1B88     		ldrh	r3, [r3]
+ 356 009c 002B     		cmp	r3, #0
+ 357 009e 4CD0     		beq	.L18
+  87:Core/Src/ble.c **** 		{
+ 358              		.loc 1 87 15
+ 359 00a0 3B68     		ldr	r3, [r7]
+ 360 00a2 1B78     		ldrb	r3, [r3]
+  87:Core/Src/ble.c **** 		{
+ 361              		.loc 1 87 5
+ 362 00a4 002B     		cmp	r3, #0
+ 363 00a6 48D1     		bne	.L18
+ 364              	.LBB3:
+  89:Core/Src/ble.c **** 			if (nl > 20)
+ 365              		.loc 1 89 13
+ 366 00a8 0E21     		movs	r1, #14
+ 367 00aa 7B18     		adds	r3, r7, r1
+ 368 00ac 3A1D     		adds	r2, r7, #4
+ 369 00ae 1288     		ldrh	r2, [r2]
+ 370 00b0 013A     		subs	r2, r2, #1
+ 371 00b2 1A80     		strh	r2, [r3]
+  90:Core/Src/ble.c **** 			{
+ 372              		.loc 1 90 7
+ 373 00b4 7B18     		adds	r3, r7, r1
+ 374 00b6 1B88     		ldrh	r3, [r3]
+ 375 00b8 142B     		cmp	r3, #20
+ 376 00ba 02D9     		bls	.L15
+  92:Core/Src/ble.c **** 			}
+ 377              		.loc 1 92 8
+ 378 00bc 7B18     		adds	r3, r7, r1
+ 379 00be 1422     		movs	r2, #20
+ 380 00c0 1A80     		strh	r2, [r3]
+ 381              	.L15:
+  94:Core/Src/ble.c **** 			ble_get_value[nl] = '\0';
+ 382              		.loc 1 94 34
+ 383 00c2 3B68     		ldr	r3, [r7]
+ 384 00c4 591C     		adds	r1, r3, #1
+  94:Core/Src/ble.c **** 			ble_get_value[nl] = '\0';
+ 385              		.loc 1 94 4
+ 386 00c6 0E24     		movs	r4, #14
+ 387 00c8 3B19     		adds	r3, r7, r4
+ 388 00ca 1A88     		ldrh	r2, [r3]
+ 389 00cc 234B     		ldr	r3, .L21+20
+ 390 00ce 1800     		movs	r0, r3
+ 391 00d0 FFF7FEFF 		bl	memcpy
+  95:Core/Src/ble.c **** 			ble_get_len = nl;
+ 392              		.loc 1 95 17
+ 393 00d4 2000     		movs	r0, r4
+ 394 00d6 3B18     		adds	r3, r7, r0
+ 395 00d8 1B88     		ldrh	r3, [r3]
+  95:Core/Src/ble.c **** 			ble_get_len = nl;
+ 396              		.loc 1 95 22
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 10
+
+
+ 397 00da 204A     		ldr	r2, .L21+20
+ 398 00dc 0021     		movs	r1, #0
+ 399 00de D154     		strb	r1, [r2, r3]
+  96:Core/Src/ble.c **** 			ble_get_ready = 1;
+ 400              		.loc 1 96 16
+ 401 00e0 1F4B     		ldr	r3, .L21+24
+ 402 00e2 3A18     		adds	r2, r7, r0
+ 403 00e4 1288     		ldrh	r2, [r2]
+ 404 00e6 1A80     		strh	r2, [r3]
+  97:Core/Src/ble.c **** 		}
+ 405              		.loc 1 97 18
+ 406 00e8 1A4B     		ldr	r3, .L21+12
+ 407 00ea 0122     		movs	r2, #1
+ 408 00ec 1A70     		strb	r2, [r3]
+ 409              	.LBE3:
+  99:Core/Src/ble.c **** 
+ 410              		.loc 1 99 3
+ 411 00ee 24E0     		b	.L18
+ 412              	.L11:
+ 104:Core/Src/ble.c **** 		{
+ 413              		.loc 1 104 7
+ 414 00f0 1C4B     		ldr	r3, .L21+28
+ 415 00f2 1B78     		ldrb	r3, [r3]
+ 416 00f4 DBB2     		uxtb	r3, r3
+ 104:Core/Src/ble.c **** 		{
+ 417              		.loc 1 104 6
+ 418 00f6 002B     		cmp	r3, #0
+ 419 00f8 21D1     		bne	.L19
+ 104:Core/Src/ble.c **** 		{
+ 420              		.loc 1 104 23 discriminator 1
+ 421 00fa 3B1D     		adds	r3, r7, #4
+ 422 00fc 1B88     		ldrh	r3, [r3]
+ 423 00fe 072B     		cmp	r3, #7
+ 424 0100 1DD9     		bls	.L19
+ 104:Core/Src/ble.c **** 		{
+ 425              		.loc 1 104 37 discriminator 2
+ 426 0102 3B1D     		adds	r3, r7, #4
+ 427 0104 1B88     		ldrh	r3, [r3]
+ 428 0106 073B     		subs	r3, r3, #7
+ 429 0108 9BB2     		uxth	r3, r3
+ 104:Core/Src/ble.c **** 		{
+ 430              		.loc 1 104 34 discriminator 2
+ 431 010a F32B     		cmp	r3, #243
+ 432 010c 17D8     		bhi	.L19
+ 106:Core/Src/ble.c **** 			ble_data_len = len - 7;
+ 433              		.loc 1 106 33
+ 434 010e 3B68     		ldr	r3, [r7]
+ 435 0110 D91D     		adds	r1, r3, #7
+ 106:Core/Src/ble.c **** 			ble_data_len = len - 7;
+ 436              		.loc 1 106 42
+ 437 0112 3B1D     		adds	r3, r7, #4
+ 438 0114 1B88     		ldrh	r3, [r3]
+ 439 0116 073B     		subs	r3, r3, #7
+ 106:Core/Src/ble.c **** 			ble_data_len = len - 7;
+ 440              		.loc 1 106 4
+ 441 0118 1A00     		movs	r2, r3
+ 442 011a 134B     		ldr	r3, .L21+32
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 11
+
+
+ 443 011c 1800     		movs	r0, r3
+ 444 011e FFF7FEFF 		bl	memcpy
+ 107:Core/Src/ble.c **** 			ble_data_ready = 1;
+ 445              		.loc 1 107 23
+ 446 0122 3B1D     		adds	r3, r7, #4
+ 447 0124 1B88     		ldrh	r3, [r3]
+ 448 0126 073B     		subs	r3, r3, #7
+ 449 0128 9AB2     		uxth	r2, r3
+ 107:Core/Src/ble.c **** 			ble_data_ready = 1;
+ 450              		.loc 1 107 17
+ 451 012a 104B     		ldr	r3, .L21+36
+ 452 012c 1A80     		strh	r2, [r3]
+ 108:Core/Src/ble.c **** 		}
+ 453              		.loc 1 108 19
+ 454 012e 0D4B     		ldr	r3, .L21+28
+ 455 0130 0122     		movs	r2, #1
+ 456 0132 1A70     		strb	r2, [r3]
+ 110:Core/Src/ble.c **** 
+ 457              		.loc 1 110 3
+ 458 0134 03E0     		b	.L19
+ 459              	.L17:
+ 460              		.loc 1 114 3
+ 461 0136 C046     		nop
+ 462 0138 02E0     		b	.L20
+ 463              	.L18:
+  99:Core/Src/ble.c **** 
+ 464              		.loc 1 99 3
+ 465 013a C046     		nop
+ 466 013c 00E0     		b	.L20
+ 467              	.L19:
+ 110:Core/Src/ble.c **** 
+ 468              		.loc 1 110 3
+ 469 013e C046     		nop
+ 470              	.L12:
+ 471              	.L20:
+ 115:Core/Src/ble.c **** 	}
+ 116:Core/Src/ble.c **** }
+ 472              		.loc 1 116 1
+ 473 0140 C046     		nop
+ 474 0142 BD46     		mov	sp, r7
+ 475 0144 05B0     		add	sp, sp, #20
+ 476              		@ sp needed
+ 477 0146 90BD     		pop	{r4, r7, pc}
+ 478              	.L22:
+ 479              		.align	2
+ 480              	.L21:
+ 481 0148 00000000 		.word	ble_connected
+ 482 014c 00000000 		.word	ble_channel_open
+ 483 0150 00000000 		.word	ble_mps
+ 484 0154 00000000 		.word	ble_get_ready
+ 485 0158 00000000 		.word	ble_get_index
+ 486 015c 00000000 		.word	ble_get_value
+ 487 0160 00000000 		.word	ble_get_len
+ 488 0164 00000000 		.word	ble_data_ready
+ 489 0168 00000000 		.word	ble_data_buf
+ 490 016c 00000000 		.word	ble_data_len
+ 491              		.cfi_endproc
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 12
+
+
+ 492              	.LFE364:
+ 494              		.section	.text.BLE_ProcessByte,"ax",%progbits
+ 495              		.align	1
+ 496              		.global	BLE_ProcessByte
+ 497              		.syntax unified
+ 498              		.code	16
+ 499              		.thumb_func
+ 501              	BLE_ProcessByte:
+ 502              	.LFB365:
+ 117:Core/Src/ble.c **** 
+ 118:Core/Src/ble.c **** /* ------------------------------------------------------------------ API */
+ 119:Core/Src/ble.c **** 
+ 120:Core/Src/ble.c **** void BLE_ProcessByte(uint8_t b)
+ 121:Core/Src/ble.c **** {
+ 503              		.loc 1 121 1
+ 504              		.cfi_startproc
+ 505              		@ args = 0, pretend = 0, frame = 8
+ 506              		@ frame_needed = 1, uses_anonymous_args = 0
+ 507 0000 80B5     		push	{r7, lr}
+ 508              	.LCFI6:
+ 509              		.cfi_def_cfa_offset 8
+ 510              		.cfi_offset 7, -8
+ 511              		.cfi_offset 14, -4
+ 512 0002 82B0     		sub	sp, sp, #8
+ 513              	.LCFI7:
+ 514              		.cfi_def_cfa_offset 16
+ 515 0004 00AF     		add	r7, sp, #0
+ 516              	.LCFI8:
+ 517              		.cfi_def_cfa_register 7
+ 518 0006 0200     		movs	r2, r0
+ 519 0008 FB1D     		adds	r3, r7, #7
+ 520 000a 1A70     		strb	r2, [r3]
+ 122:Core/Src/ble.c **** 	switch (pstate)
+ 521              		.loc 1 122 2
+ 522 000c 4D4B     		ldr	r3, .L43
+ 523 000e 1B78     		ldrb	r3, [r3]
+ 524 0010 052B     		cmp	r3, #5
+ 525 0012 00D9     		bls	.LCB333
+ 526 0014 8BE0     		b	.L24	@long jump
+ 527              	.LCB333:
+ 528 0016 9A00     		lsls	r2, r3, #2
+ 529 0018 4B4B     		ldr	r3, .L43+4
+ 530 001a D318     		adds	r3, r2, r3
+ 531 001c 1B68     		ldr	r3, [r3]
+ 532 001e 9F46     		mov	pc, r3
+ 533              		.section	.rodata.BLE_ProcessByte,"a",%progbits
+ 534              		.align	2
+ 535              	.L26:
+ 536 0000 20000000 		.word	.L31
+ 537 0004 3A000000 		.word	.L30
+ 538 0008 5A000000 		.word	.L29
+ 539 000c 7C000000 		.word	.L28
+ 540 0010 D0000000 		.word	.L27
+ 541 0014 0A010000 		.word	.L25
+ 542              		.section	.text.BLE_ProcessByte
+ 543              	.L31:
+ 123:Core/Src/ble.c **** 	{
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 13
+
+
+ 124:Core/Src/ble.c **** 	case ST_STX:
+ 125:Core/Src/ble.c **** 		if (b == BLE_STX)
+ 544              		.loc 1 125 6
+ 545 0020 FB1D     		adds	r3, r7, #7
+ 546 0022 1B78     		ldrb	r3, [r3]
+ 547 0024 022B     		cmp	r3, #2
+ 548 0026 00D0     		beq	.LCB348
+ 549 0028 85E0     		b	.L40	@long jump
+ 550              	.LCB348:
+ 126:Core/Src/ble.c **** 		{
+ 127:Core/Src/ble.c **** 			frame_cs = b;
+ 551              		.loc 1 127 13
+ 552 002a 484B     		ldr	r3, .L43+8
+ 553 002c FA1D     		adds	r2, r7, #7
+ 554 002e 1278     		ldrb	r2, [r2]
+ 555 0030 1A70     		strb	r2, [r3]
+ 128:Core/Src/ble.c **** 			pstate = ST_CMD;
+ 556              		.loc 1 128 11
+ 557 0032 444B     		ldr	r3, .L43
+ 558 0034 0122     		movs	r2, #1
+ 559 0036 1A70     		strb	r2, [r3]
+ 129:Core/Src/ble.c **** 		}
+ 130:Core/Src/ble.c **** 		break;
+ 560              		.loc 1 130 3
+ 561 0038 7DE0     		b	.L40
+ 562              	.L30:
+ 131:Core/Src/ble.c **** 
+ 132:Core/Src/ble.c **** 	case ST_CMD:
+ 133:Core/Src/ble.c **** 		frame_cmd = b;
+ 563              		.loc 1 133 13
+ 564 003a 454B     		ldr	r3, .L43+12
+ 565 003c FA1D     		adds	r2, r7, #7
+ 566 003e 1278     		ldrb	r2, [r2]
+ 567 0040 1A70     		strb	r2, [r3]
+ 134:Core/Src/ble.c **** 		frame_cs ^= b;
+ 568              		.loc 1 134 12
+ 569 0042 424B     		ldr	r3, .L43+8
+ 570 0044 1A78     		ldrb	r2, [r3]
+ 571 0046 FB1D     		adds	r3, r7, #7
+ 572 0048 1B78     		ldrb	r3, [r3]
+ 573 004a 5340     		eors	r3, r2
+ 574 004c DAB2     		uxtb	r2, r3
+ 575 004e 3F4B     		ldr	r3, .L43+8
+ 576 0050 1A70     		strb	r2, [r3]
+ 135:Core/Src/ble.c **** 		pstate = ST_LEN_L;
+ 577              		.loc 1 135 10
+ 578 0052 3C4B     		ldr	r3, .L43
+ 579 0054 0222     		movs	r2, #2
+ 580 0056 1A70     		strb	r2, [r3]
+ 136:Core/Src/ble.c **** 		break;
+ 581              		.loc 1 136 3
+ 582 0058 70E0     		b	.L33
+ 583              	.L29:
+ 137:Core/Src/ble.c **** 
+ 138:Core/Src/ble.c **** 	case ST_LEN_L:
+ 139:Core/Src/ble.c **** 		frame_len = b;
+ 584              		.loc 1 139 13
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 14
+
+
+ 585 005a FB1D     		adds	r3, r7, #7
+ 586 005c 1B78     		ldrb	r3, [r3]
+ 587 005e 9AB2     		uxth	r2, r3
+ 588 0060 3C4B     		ldr	r3, .L43+16
+ 589 0062 1A80     		strh	r2, [r3]
+ 140:Core/Src/ble.c **** 		frame_cs ^= b;
+ 590              		.loc 1 140 12
+ 591 0064 394B     		ldr	r3, .L43+8
+ 592 0066 1A78     		ldrb	r2, [r3]
+ 593 0068 FB1D     		adds	r3, r7, #7
+ 594 006a 1B78     		ldrb	r3, [r3]
+ 595 006c 5340     		eors	r3, r2
+ 596 006e DAB2     		uxtb	r2, r3
+ 597 0070 364B     		ldr	r3, .L43+8
+ 598 0072 1A70     		strb	r2, [r3]
+ 141:Core/Src/ble.c **** 		pstate = ST_LEN_H;
+ 599              		.loc 1 141 10
+ 600 0074 334B     		ldr	r3, .L43
+ 601 0076 0322     		movs	r2, #3
+ 602 0078 1A70     		strb	r2, [r3]
+ 142:Core/Src/ble.c **** 		break;
+ 603              		.loc 1 142 3
+ 604 007a 5FE0     		b	.L33
+ 605              	.L28:
+ 143:Core/Src/ble.c **** 
+ 144:Core/Src/ble.c **** 	case ST_LEN_H:
+ 145:Core/Src/ble.c **** 		frame_len |= (uint16_t)b << 8;
+ 606              		.loc 1 145 13
+ 607 007c FB1D     		adds	r3, r7, #7
+ 608 007e 1B78     		ldrb	r3, [r3]
+ 609 0080 1BB2     		sxth	r3, r3
+ 610 0082 1B02     		lsls	r3, r3, #8
+ 611 0084 1AB2     		sxth	r2, r3
+ 612 0086 334B     		ldr	r3, .L43+16
+ 613 0088 1B88     		ldrh	r3, [r3]
+ 614 008a 1BB2     		sxth	r3, r3
+ 615 008c 1343     		orrs	r3, r2
+ 616 008e 1BB2     		sxth	r3, r3
+ 617 0090 9AB2     		uxth	r2, r3
+ 618 0092 304B     		ldr	r3, .L43+16
+ 619 0094 1A80     		strh	r2, [r3]
+ 146:Core/Src/ble.c **** 		frame_cs ^= b;
+ 620              		.loc 1 146 12
+ 621 0096 2D4B     		ldr	r3, .L43+8
+ 622 0098 1A78     		ldrb	r2, [r3]
+ 623 009a FB1D     		adds	r3, r7, #7
+ 624 009c 1B78     		ldrb	r3, [r3]
+ 625 009e 5340     		eors	r3, r2
+ 626 00a0 DAB2     		uxtb	r2, r3
+ 627 00a2 2A4B     		ldr	r3, .L43+8
+ 628 00a4 1A70     		strb	r2, [r3]
+ 147:Core/Src/ble.c **** 		frame_pos = 0;
+ 629              		.loc 1 147 13
+ 630 00a6 2C4B     		ldr	r3, .L43+20
+ 631 00a8 0022     		movs	r2, #0
+ 632 00aa 1A80     		strh	r2, [r3]
+ 148:Core/Src/ble.c **** 		if (frame_len > BLE_MAX_PAYLOAD)
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 15
+
+
+ 633              		.loc 1 148 17
+ 634 00ac 294B     		ldr	r3, .L43+16
+ 635 00ae 1B88     		ldrh	r3, [r3]
+ 636              		.loc 1 148 6
+ 637 00b0 F32B     		cmp	r3, #243
+ 638 00b2 03D9     		bls	.L34
+ 149:Core/Src/ble.c **** 		{
+ 150:Core/Src/ble.c **** 			pstate = ST_STX;		/* unplausibel -> verwerfen */
+ 639              		.loc 1 150 11
+ 640 00b4 234B     		ldr	r3, .L43
+ 641 00b6 0022     		movs	r2, #0
+ 642 00b8 1A70     		strb	r2, [r3]
+ 151:Core/Src/ble.c **** 		}
+ 152:Core/Src/ble.c **** 		else
+ 153:Core/Src/ble.c **** 		{
+ 154:Core/Src/ble.c **** 			pstate = (frame_len == 0) ? ST_CS : ST_PAYLOAD;
+ 155:Core/Src/ble.c **** 		}
+ 156:Core/Src/ble.c **** 		break;
+ 643              		.loc 1 156 3
+ 644 00ba 3FE0     		b	.L33
+ 645              	.L34:
+ 154:Core/Src/ble.c **** 		}
+ 646              		.loc 1 154 24
+ 647 00bc 254B     		ldr	r3, .L43+16
+ 648 00be 1B88     		ldrh	r3, [r3]
+ 154:Core/Src/ble.c **** 		}
+ 649              		.loc 1 154 38
+ 650 00c0 002B     		cmp	r3, #0
+ 651 00c2 01D1     		bne	.L36
+ 154:Core/Src/ble.c **** 		}
+ 652              		.loc 1 154 38 is_stmt 0 discriminator 1
+ 653 00c4 0522     		movs	r2, #5
+ 654 00c6 00E0     		b	.L37
+ 655              	.L36:
+ 154:Core/Src/ble.c **** 		}
+ 656              		.loc 1 154 38 discriminator 2
+ 657 00c8 0422     		movs	r2, #4
+ 658              	.L37:
+ 154:Core/Src/ble.c **** 		}
+ 659              		.loc 1 154 11 is_stmt 1 discriminator 4
+ 660 00ca 1E4B     		ldr	r3, .L43
+ 661 00cc 1A70     		strb	r2, [r3]
+ 662              		.loc 1 156 3
+ 663 00ce 35E0     		b	.L33
+ 664              	.L27:
+ 157:Core/Src/ble.c **** 
+ 158:Core/Src/ble.c **** 	case ST_PAYLOAD:
+ 159:Core/Src/ble.c **** 		frame_payload[frame_pos++] = b;
+ 665              		.loc 1 159 26
+ 666 00d0 214B     		ldr	r3, .L43+20
+ 667 00d2 1B88     		ldrh	r3, [r3]
+ 668 00d4 5A1C     		adds	r2, r3, #1
+ 669 00d6 91B2     		uxth	r1, r2
+ 670 00d8 1F4A     		ldr	r2, .L43+20
+ 671 00da 1180     		strh	r1, [r2]
+ 672 00dc 1900     		movs	r1, r3
+ 673              		.loc 1 159 30
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 16
+
+
+ 674 00de 1F4B     		ldr	r3, .L43+24
+ 675 00e0 FA1D     		adds	r2, r7, #7
+ 676 00e2 1278     		ldrb	r2, [r2]
+ 677 00e4 5A54     		strb	r2, [r3, r1]
+ 160:Core/Src/ble.c **** 		frame_cs ^= b;
+ 678              		.loc 1 160 12
+ 679 00e6 194B     		ldr	r3, .L43+8
+ 680 00e8 1A78     		ldrb	r2, [r3]
+ 681 00ea FB1D     		adds	r3, r7, #7
+ 682 00ec 1B78     		ldrb	r3, [r3]
+ 683 00ee 5340     		eors	r3, r2
+ 684 00f0 DAB2     		uxtb	r2, r3
+ 685 00f2 164B     		ldr	r3, .L43+8
+ 686 00f4 1A70     		strb	r2, [r3]
+ 161:Core/Src/ble.c **** 		if (frame_pos >= frame_len)
+ 687              		.loc 1 161 17
+ 688 00f6 184B     		ldr	r3, .L43+20
+ 689 00f8 1A88     		ldrh	r2, [r3]
+ 690 00fa 164B     		ldr	r3, .L43+16
+ 691 00fc 1B88     		ldrh	r3, [r3]
+ 692              		.loc 1 161 6
+ 693 00fe 9A42     		cmp	r2, r3
+ 694 0100 1BD3     		bcc	.L41
+ 162:Core/Src/ble.c **** 		{
+ 163:Core/Src/ble.c **** 			pstate = ST_CS;
+ 695              		.loc 1 163 11
+ 696 0102 104B     		ldr	r3, .L43
+ 697 0104 0522     		movs	r2, #5
+ 698 0106 1A70     		strb	r2, [r3]
+ 164:Core/Src/ble.c **** 		}
+ 165:Core/Src/ble.c **** 		break;
+ 699              		.loc 1 165 3
+ 700 0108 17E0     		b	.L41
+ 701              	.L25:
+ 166:Core/Src/ble.c **** 
+ 167:Core/Src/ble.c **** 	case ST_CS:
+ 168:Core/Src/ble.c **** 		if (b == frame_cs)			/* Prüfsumme ok */
+ 702              		.loc 1 168 9
+ 703 010a 104B     		ldr	r3, .L43+8
+ 704 010c 1B78     		ldrb	r3, [r3]
+ 705              		.loc 1 168 6
+ 706 010e FA1D     		adds	r2, r7, #7
+ 707 0110 1278     		ldrb	r2, [r2]
+ 708 0112 9A42     		cmp	r2, r3
+ 709 0114 07D1     		bne	.L39
+ 169:Core/Src/ble.c **** 		{
+ 170:Core/Src/ble.c **** 			ble_dispatch(frame_cmd, frame_payload, frame_len);
+ 710              		.loc 1 170 4
+ 711 0116 0E4B     		ldr	r3, .L43+12
+ 712 0118 1878     		ldrb	r0, [r3]
+ 713 011a 0E4B     		ldr	r3, .L43+16
+ 714 011c 1A88     		ldrh	r2, [r3]
+ 715 011e 0F4B     		ldr	r3, .L43+24
+ 716 0120 1900     		movs	r1, r3
+ 717 0122 FFF7FEFF 		bl	ble_dispatch
+ 718              	.L39:
+ 171:Core/Src/ble.c **** 		}
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 17
+
+
+ 172:Core/Src/ble.c **** 		pstate = ST_STX;
+ 719              		.loc 1 172 10
+ 720 0126 074B     		ldr	r3, .L43
+ 721 0128 0022     		movs	r2, #0
+ 722 012a 1A70     		strb	r2, [r3]
+ 173:Core/Src/ble.c **** 		break;
+ 723              		.loc 1 173 3
+ 724 012c 06E0     		b	.L33
+ 725              	.L24:
+ 174:Core/Src/ble.c **** 
+ 175:Core/Src/ble.c **** 	default:
+ 176:Core/Src/ble.c **** 		pstate = ST_STX;
+ 726              		.loc 1 176 10
+ 727 012e 054B     		ldr	r3, .L43
+ 728 0130 0022     		movs	r2, #0
+ 729 0132 1A70     		strb	r2, [r3]
+ 177:Core/Src/ble.c **** 		break;
+ 730              		.loc 1 177 3
+ 731 0134 02E0     		b	.L33
+ 732              	.L40:
+ 130:Core/Src/ble.c **** 
+ 733              		.loc 1 130 3
+ 734 0136 C046     		nop
+ 735 0138 00E0     		b	.L42
+ 736              	.L41:
+ 165:Core/Src/ble.c **** 
+ 737              		.loc 1 165 3
+ 738 013a C046     		nop
+ 739              	.L33:
+ 740              	.L42:
+ 178:Core/Src/ble.c **** 	}
+ 179:Core/Src/ble.c **** }
+ 741              		.loc 1 179 1
+ 742 013c C046     		nop
+ 743 013e BD46     		mov	sp, r7
+ 744 0140 02B0     		add	sp, sp, #8
+ 745              		@ sp needed
+ 746 0142 80BD     		pop	{r7, pc}
+ 747              	.L44:
+ 748              		.align	2
+ 749              	.L43:
+ 750 0144 00000000 		.word	pstate
+ 751 0148 00000000 		.word	.L26
+ 752 014c 00000000 		.word	frame_cs
+ 753 0150 00000000 		.word	frame_cmd
+ 754 0154 00000000 		.word	frame_len
+ 755 0158 00000000 		.word	frame_pos
+ 756 015c 00000000 		.word	frame_payload
+ 757              		.cfi_endproc
+ 758              	.LFE365:
+ 760              		.section	.text.BLE_SendData,"ax",%progbits
+ 761              		.align	1
+ 762              		.global	BLE_SendData
+ 763              		.syntax unified
+ 764              		.code	16
+ 765              		.thumb_func
+ 767              	BLE_SendData:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 18
+
+
+ 768              	.LFB366:
+ 180:Core/Src/ble.c **** 
+ 181:Core/Src/ble.c **** /*
+ 182:Core/Src/ble.c ****  * Sendet Nutzdaten über den offenen Kanal (CMD_DATA_REQ). Längere Daten werden
+ 183:Core/Src/ble.c ****  * in MPS-große Frames zerlegt. Der BUSY/UART_ENABLE-Pin wird NICHT abgefragt:
+ 184:Core/Src/ble.c ****  * im Command mode ist er ein Modul-Eingang (Pull-up), kein Busy-Ausgang – die
+ 185:Core/Src/ble.c ****  * UART ist per Default aktiv.
+ 186:Core/Src/ble.c ****  */
+ 187:Core/Src/ble.c **** uint8_t BLE_SendData(const uint8_t *data, uint16_t len)
+ 188:Core/Src/ble.c **** {
+ 769              		.loc 1 188 1
+ 770              		.cfi_startproc
+ 771              		@ args = 0, pretend = 0, frame = 264
+ 772              		@ frame_needed = 1, uses_anonymous_args = 0
+ 773 0000 B0B5     		push	{r4, r5, r7, lr}
+ 774              	.LCFI9:
+ 775              		.cfi_def_cfa_offset 16
+ 776              		.cfi_offset 4, -16
+ 777              		.cfi_offset 5, -12
+ 778              		.cfi_offset 7, -8
+ 779              		.cfi_offset 14, -4
+ 780 0002 C2B0     		sub	sp, sp, #264
+ 781              	.LCFI10:
+ 782              		.cfi_def_cfa_offset 280
+ 783 0004 00AF     		add	r7, sp, #0
+ 784              	.LCFI11:
+ 785              		.cfi_def_cfa_register 7
+ 786 0006 7860     		str	r0, [r7, #4]
+ 787 0008 0A00     		movs	r2, r1
+ 788 000a 514B     		ldr	r3, .L55
+ 789 000c 8421     		movs	r1, #132
+ 790 000e 4900     		lsls	r1, r1, #1
+ 791 0010 5B18     		adds	r3, r3, r1
+ 792 0012 DB19     		adds	r3, r3, r7
+ 793 0014 1A80     		strh	r2, [r3]
+ 189:Core/Src/ble.c **** 	uint8_t frame[BLE_FRAME_MAX];
+ 190:Core/Src/ble.c **** 	uint16_t sent = 0;
+ 794              		.loc 1 190 11
+ 795 0016 FB1D     		adds	r3, r7, #7
+ 796 0018 FF33     		adds	r3, r3, #255
+ 797 001a 0022     		movs	r2, #0
+ 798 001c 1A80     		strh	r2, [r3]
+ 191:Core/Src/ble.c **** 
+ 192:Core/Src/ble.c **** 	if (!ble_channel_open || ble_uart == NULL || len == 0)
+ 799              		.loc 1 192 6
+ 800 001e 4D4B     		ldr	r3, .L55+4
+ 801 0020 1B78     		ldrb	r3, [r3]
+ 802 0022 DBB2     		uxtb	r3, r3
+ 803              		.loc 1 192 5
+ 804 0024 002B     		cmp	r3, #0
+ 805 0026 0AD0     		beq	.L46
+ 806              		.loc 1 192 36 discriminator 1
+ 807 0028 4B4B     		ldr	r3, .L55+8
+ 808 002a 1B68     		ldr	r3, [r3]
+ 809              		.loc 1 192 24 discriminator 1
+ 810 002c 002B     		cmp	r3, #0
+ 811 002e 06D0     		beq	.L46
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 19
+
+
+ 812              		.loc 1 192 44 discriminator 2
+ 813 0030 474B     		ldr	r3, .L55
+ 814 0032 5B18     		adds	r3, r3, r1
+ 815 0034 DB19     		adds	r3, r3, r7
+ 816 0036 1B88     		ldrh	r3, [r3]
+ 817 0038 002B     		cmp	r3, #0
+ 818 003a 00D0     		beq	.LCB589
+ 819 003c 76E0     		b	.L49	@long jump
+ 820              	.LCB589:
+ 821              	.L46:
+ 193:Core/Src/ble.c **** 	{
+ 194:Core/Src/ble.c **** 		return 0;
+ 822              		.loc 1 194 10
+ 823 003e 0023     		movs	r3, #0
+ 824 0040 81E0     		b	.L54
+ 825              	.L53:
+ 826              	.LBB4:
+ 195:Core/Src/ble.c **** 	}
+ 196:Core/Src/ble.c **** 
+ 197:Core/Src/ble.c **** 	while (sent < len)
+ 198:Core/Src/ble.c **** 	{
+ 199:Core/Src/ble.c **** 		uint16_t chunk = len - sent;
+ 827              		.loc 1 199 12
+ 828 0042 7B1D     		adds	r3, r7, #5
+ 829 0044 FF33     		adds	r3, r3, #255
+ 830 0046 424A     		ldr	r2, .L55
+ 831 0048 8421     		movs	r1, #132
+ 832 004a 4900     		lsls	r1, r1, #1
+ 833 004c 5218     		adds	r2, r2, r1
+ 834 004e D119     		adds	r1, r2, r7
+ 835 0050 FA1D     		adds	r2, r7, #7
+ 836 0052 FF32     		adds	r2, r2, #255
+ 837 0054 0988     		ldrh	r1, [r1]
+ 838 0056 1288     		ldrh	r2, [r2]
+ 839 0058 8A1A     		subs	r2, r1, r2
+ 840 005a 1A80     		strh	r2, [r3]
+ 200:Core/Src/ble.c **** 		if (chunk > ble_mps)
+ 841              		.loc 1 200 13
+ 842 005c 3F4B     		ldr	r3, .L55+12
+ 843 005e 1B78     		ldrb	r3, [r3]
+ 844 0060 1A00     		movs	r2, r3
+ 845              		.loc 1 200 6
+ 846 0062 7B1D     		adds	r3, r7, #5
+ 847 0064 FF33     		adds	r3, r3, #255
+ 848 0066 1B88     		ldrh	r3, [r3]
+ 849 0068 9342     		cmp	r3, r2
+ 850 006a 04D9     		bls	.L50
+ 201:Core/Src/ble.c **** 		{
+ 202:Core/Src/ble.c **** 			chunk = ble_mps;
+ 851              		.loc 1 202 10
+ 852 006c 3B4B     		ldr	r3, .L55+12
+ 853 006e 1A78     		ldrb	r2, [r3]
+ 854 0070 7B1D     		adds	r3, r7, #5
+ 855 0072 FF33     		adds	r3, r3, #255
+ 856 0074 1A80     		strh	r2, [r3]
+ 857              	.L50:
+ 203:Core/Src/ble.c **** 		}
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 20
+
+
+ 204:Core/Src/ble.c **** 
+ 205:Core/Src/ble.c **** 		frame[0] = BLE_STX;
+ 858              		.loc 1 205 12
+ 859 0076 0C25     		movs	r5, #12
+ 860 0078 7B19     		adds	r3, r7, r5
+ 861 007a 0222     		movs	r2, #2
+ 862 007c 1A70     		strb	r2, [r3]
+ 206:Core/Src/ble.c **** 		frame[1] = CMD_DATA_REQ;
+ 863              		.loc 1 206 12
+ 864 007e 7B19     		adds	r3, r7, r5
+ 865 0080 0422     		movs	r2, #4
+ 866 0082 5A70     		strb	r2, [r3, #1]
+ 207:Core/Src/ble.c **** 		frame[2] = (uint8_t)(chunk & 0xFF);
+ 867              		.loc 1 207 14
+ 868 0084 7B1D     		adds	r3, r7, #5
+ 869 0086 FF33     		adds	r3, r3, #255
+ 870 0088 1B88     		ldrh	r3, [r3]
+ 871 008a DAB2     		uxtb	r2, r3
+ 872              		.loc 1 207 12
+ 873 008c 7B19     		adds	r3, r7, r5
+ 874 008e 9A70     		strb	r2, [r3, #2]
+ 208:Core/Src/ble.c **** 		frame[3] = (uint8_t)((chunk >> 8) & 0xFF);
+ 875              		.loc 1 208 14
+ 876 0090 7B1D     		adds	r3, r7, #5
+ 877 0092 FF33     		adds	r3, r3, #255
+ 878 0094 1B88     		ldrh	r3, [r3]
+ 879 0096 1B0A     		lsrs	r3, r3, #8
+ 880 0098 9BB2     		uxth	r3, r3
+ 881 009a DAB2     		uxtb	r2, r3
+ 882              		.loc 1 208 12
+ 883 009c 7B19     		adds	r3, r7, r5
+ 884 009e DA70     		strb	r2, [r3, #3]
+ 209:Core/Src/ble.c **** 		memcpy(&frame[4], data + sent, chunk);
+ 885              		.loc 1 209 3
+ 886 00a0 FB1D     		adds	r3, r7, #7
+ 887 00a2 FF33     		adds	r3, r3, #255
+ 888 00a4 1B88     		ldrh	r3, [r3]
+ 889              		.loc 1 209 26
+ 890 00a6 7A68     		ldr	r2, [r7, #4]
+ 891 00a8 D118     		adds	r1, r2, r3
+ 892              		.loc 1 209 3
+ 893 00aa 7B1D     		adds	r3, r7, #5
+ 894 00ac FF33     		adds	r3, r3, #255
+ 895 00ae 1A88     		ldrh	r2, [r3]
+ 896 00b0 7B19     		adds	r3, r7, r5
+ 897 00b2 0433     		adds	r3, r3, #4
+ 898 00b4 1800     		movs	r0, r3
+ 899 00b6 FFF7FEFF 		bl	memcpy
+ 210:Core/Src/ble.c **** 		frame[4 + chunk] = xor_cs(frame, 4 + chunk);
+ 900              		.loc 1 210 22
+ 901 00ba 7B1D     		adds	r3, r7, #5
+ 902 00bc FF33     		adds	r3, r3, #255
+ 903 00be 1B88     		ldrh	r3, [r3]
+ 904 00c0 0433     		adds	r3, r3, #4
+ 905 00c2 9AB2     		uxth	r2, r3
+ 906              		.loc 1 210 11
+ 907 00c4 7B1D     		adds	r3, r7, #5
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 21
+
+
+ 908 00c6 FF33     		adds	r3, r3, #255
+ 909 00c8 1B88     		ldrh	r3, [r3]
+ 910 00ca 1C1D     		adds	r4, r3, #4
+ 911              		.loc 1 210 22
+ 912 00cc 7B19     		adds	r3, r7, r5
+ 913 00ce 1100     		movs	r1, r2
+ 914 00d0 1800     		movs	r0, r3
+ 915 00d2 FFF7FEFF 		bl	xor_cs
+ 916 00d6 0300     		movs	r3, r0
+ 917 00d8 1A00     		movs	r2, r3
+ 918              		.loc 1 210 20 discriminator 1
+ 919 00da 7B19     		adds	r3, r7, r5
+ 920 00dc 1A55     		strb	r2, [r3, r4]
+ 211:Core/Src/ble.c **** 
+ 212:Core/Src/ble.c **** 		if (HAL_UART_Transmit(ble_uart, frame, 5 + chunk, 200) != HAL_OK)
+ 921              		.loc 1 212 7
+ 922 00de 1E4B     		ldr	r3, .L55+8
+ 923 00e0 1868     		ldr	r0, [r3]
+ 924 00e2 7B1D     		adds	r3, r7, #5
+ 925 00e4 FF33     		adds	r3, r3, #255
+ 926 00e6 1B88     		ldrh	r3, [r3]
+ 927 00e8 0533     		adds	r3, r3, #5
+ 928 00ea 9AB2     		uxth	r2, r3
+ 929 00ec 7919     		adds	r1, r7, r5
+ 930 00ee C823     		movs	r3, #200
+ 931 00f0 FFF7FEFF 		bl	HAL_UART_Transmit
+ 932 00f4 031E     		subs	r3, r0, #0
+ 933              		.loc 1 212 6 discriminator 1
+ 934 00f6 01D0     		beq	.L51
+ 213:Core/Src/ble.c **** 		{
+ 214:Core/Src/ble.c **** 			return 0;
+ 935              		.loc 1 214 11
+ 936 00f8 0023     		movs	r3, #0
+ 937 00fa 24E0     		b	.L54
+ 938              	.L51:
+ 215:Core/Src/ble.c **** 		}
+ 216:Core/Src/ble.c **** 		sent += chunk;
+ 939              		.loc 1 216 8
+ 940 00fc FB1D     		adds	r3, r7, #7
+ 941 00fe FF33     		adds	r3, r3, #255
+ 942 0100 F91D     		adds	r1, r7, #7
+ 943 0102 FF31     		adds	r1, r1, #255
+ 944 0104 7A1D     		adds	r2, r7, #5
+ 945 0106 FF32     		adds	r2, r2, #255
+ 946 0108 0988     		ldrh	r1, [r1]
+ 947 010a 1288     		ldrh	r2, [r2]
+ 948 010c 8A18     		adds	r2, r1, r2
+ 949 010e 1A80     		strh	r2, [r3]
+ 217:Core/Src/ble.c **** 
+ 218:Core/Src/ble.c **** 		if (sent < len)
+ 950              		.loc 1 218 6
+ 951 0110 FA1D     		adds	r2, r7, #7
+ 952 0112 FF32     		adds	r2, r2, #255
+ 953 0114 0E4B     		ldr	r3, .L55
+ 954 0116 8421     		movs	r1, #132
+ 955 0118 4900     		lsls	r1, r1, #1
+ 956 011a 5B18     		adds	r3, r3, r1
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 22
+
+
+ 957 011c DB19     		adds	r3, r3, r7
+ 958 011e 1288     		ldrh	r2, [r2]
+ 959 0120 1B88     		ldrh	r3, [r3]
+ 960 0122 9A42     		cmp	r2, r3
+ 961 0124 02D2     		bcs	.L49
+ 219:Core/Src/ble.c **** 		{
+ 220:Core/Src/ble.c **** 			HAL_Delay(5);	/* Modul kurz Zeit zum Verarbeiten geben */
+ 962              		.loc 1 220 4
+ 963 0126 0520     		movs	r0, #5
+ 964 0128 FFF7FEFF 		bl	HAL_Delay
+ 965              	.L49:
+ 966              	.LBE4:
+ 197:Core/Src/ble.c **** 	{
+ 967              		.loc 1 197 14
+ 968 012c FA1D     		adds	r2, r7, #7
+ 969 012e FF32     		adds	r2, r2, #255
+ 970 0130 074B     		ldr	r3, .L55
+ 971 0132 8421     		movs	r1, #132
+ 972 0134 4900     		lsls	r1, r1, #1
+ 973 0136 5B18     		adds	r3, r3, r1
+ 974 0138 DB19     		adds	r3, r3, r7
+ 975 013a 1288     		ldrh	r2, [r2]
+ 976 013c 1B88     		ldrh	r3, [r3]
+ 977 013e 9A42     		cmp	r2, r3
+ 978 0140 00D2     		bcs	.LCB736
+ 979 0142 7EE7     		b	.L53	@long jump
+ 980              	.LCB736:
+ 221:Core/Src/ble.c **** 		}
+ 222:Core/Src/ble.c **** 	}
+ 223:Core/Src/ble.c **** 	return 1;
+ 981              		.loc 1 223 9
+ 982 0144 0123     		movs	r3, #1
+ 983              	.L54:
+ 224:Core/Src/ble.c **** }
+ 984              		.loc 1 224 1
+ 985 0146 1800     		movs	r0, r3
+ 986 0148 BD46     		mov	sp, r7
+ 987 014a 42B0     		add	sp, sp, #264
+ 988              		@ sp needed
+ 989 014c B0BD     		pop	{r4, r5, r7, pc}
+ 990              	.L56:
+ 991 014e C046     		.align	2
+ 992              	.L55:
+ 993 0150 FAFEFFFF 		.word	-262
+ 994 0154 00000000 		.word	ble_channel_open
+ 995 0158 00000000 		.word	ble_uart
+ 996 015c 00000000 		.word	ble_mps
+ 997              		.cfi_endproc
+ 998              	.LFE366:
+ 1000              		.section	.text.BLE_SendString,"ax",%progbits
+ 1001              		.align	1
+ 1002              		.global	BLE_SendString
+ 1003              		.syntax unified
+ 1004              		.code	16
+ 1005              		.thumb_func
+ 1007              	BLE_SendString:
+ 1008              	.LFB367:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 23
+
+
+ 225:Core/Src/ble.c **** 
+ 226:Core/Src/ble.c **** uint8_t BLE_SendString(const char *s)
+ 227:Core/Src/ble.c **** {
+ 1009              		.loc 1 227 1
+ 1010              		.cfi_startproc
+ 1011              		@ args = 0, pretend = 0, frame = 8
+ 1012              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1013 0000 80B5     		push	{r7, lr}
+ 1014              	.LCFI12:
+ 1015              		.cfi_def_cfa_offset 8
+ 1016              		.cfi_offset 7, -8
+ 1017              		.cfi_offset 14, -4
+ 1018 0002 82B0     		sub	sp, sp, #8
+ 1019              	.LCFI13:
+ 1020              		.cfi_def_cfa_offset 16
+ 1021 0004 00AF     		add	r7, sp, #0
+ 1022              	.LCFI14:
+ 1023              		.cfi_def_cfa_register 7
+ 1024 0006 7860     		str	r0, [r7, #4]
+ 228:Core/Src/ble.c **** 	return BLE_SendData((const uint8_t *)s, (uint16_t)strlen(s));
+ 1025              		.loc 1 228 52
+ 1026 0008 7B68     		ldr	r3, [r7, #4]
+ 1027 000a 1800     		movs	r0, r3
+ 1028 000c FFF7FEFF 		bl	strlen
+ 1029 0010 0300     		movs	r3, r0
+ 1030              		.loc 1 228 9 discriminator 1
+ 1031 0012 9AB2     		uxth	r2, r3
+ 1032 0014 7B68     		ldr	r3, [r7, #4]
+ 1033 0016 1100     		movs	r1, r2
+ 1034 0018 1800     		movs	r0, r3
+ 1035 001a FFF7FEFF 		bl	BLE_SendData
+ 1036 001e 0300     		movs	r3, r0
+ 229:Core/Src/ble.c **** }
+ 1037              		.loc 1 229 1
+ 1038 0020 1800     		movs	r0, r3
+ 1039 0022 BD46     		mov	sp, r7
+ 1040 0024 02B0     		add	sp, sp, #8
+ 1041              		@ sp needed
+ 1042 0026 80BD     		pop	{r7, pc}
+ 1043              		.cfi_endproc
+ 1044              	.LFE367:
+ 1046              		.section	.text.ble_send_set,"ax",%progbits
+ 1047              		.align	1
+ 1048              		.syntax unified
+ 1049              		.code	16
+ 1050              		.thumb_func
+ 1052              	ble_send_set:
+ 1053              	.LFB368:
+ 230:Core/Src/ble.c **** 
+ 231:Core/Src/ble.c **** /* Sendet CMD_SET_REQ fuer eine Einstellung (nur im ACTION_IDLE erlaubt).
+ 232:Core/Src/ble.c ****  * STX | 0x11 | Len(2) | SettingsIndex(1) | Wert | CS, Len = 1 + Wertlaenge. */
+ 233:Core/Src/ble.c **** static void ble_send_set(uint8_t idx, const uint8_t *data, uint16_t n)
+ 234:Core/Src/ble.c **** {
+ 1054              		.loc 1 234 1
+ 1055              		.cfi_startproc
+ 1056              		@ args = 0, pretend = 0, frame = 264
+ 1057              		@ frame_needed = 1, uses_anonymous_args = 0
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 24
+
+
+ 1058 0000 F0B5     		push	{r4, r5, r6, r7, lr}
+ 1059              	.LCFI15:
+ 1060              		.cfi_def_cfa_offset 20
+ 1061              		.cfi_offset 4, -20
+ 1062              		.cfi_offset 5, -16
+ 1063              		.cfi_offset 6, -12
+ 1064              		.cfi_offset 7, -8
+ 1065              		.cfi_offset 14, -4
+ 1066 0002 C3B0     		sub	sp, sp, #268
+ 1067              	.LCFI16:
+ 1068              		.cfi_def_cfa_offset 288
+ 1069 0004 00AF     		add	r7, sp, #0
+ 1070              	.LCFI17:
+ 1071              		.cfi_def_cfa_register 7
+ 1072 0006 3960     		str	r1, [r7]
+ 1073 0008 1100     		movs	r1, r2
+ 1074 000a 304B     		ldr	r3, .L60
+ 1075 000c 8424     		movs	r4, #132
+ 1076 000e 6400     		lsls	r4, r4, #1
+ 1077 0010 1B19     		adds	r3, r3, r4
+ 1078 0012 DB19     		adds	r3, r3, r7
+ 1079 0014 021C     		adds	r2, r0, #0
+ 1080 0016 1A70     		strb	r2, [r3]
+ 1081 0018 2D4B     		ldr	r3, .L60+4
+ 1082 001a 2000     		movs	r0, r4
+ 1083 001c 1B18     		adds	r3, r3, r0
+ 1084 001e DB19     		adds	r3, r3, r7
+ 1085 0020 0A1C     		adds	r2, r1, #0
+ 1086 0022 1A80     		strh	r2, [r3]
+ 235:Core/Src/ble.c **** 	uint8_t frame[BLE_FRAME_MAX];
+ 236:Core/Src/ble.c **** 	uint16_t len = 1 + n;
+ 1087              		.loc 1 236 11
+ 1088 0024 FB1D     		adds	r3, r7, #7
+ 1089 0026 FF33     		adds	r3, r3, #255
+ 1090 0028 294A     		ldr	r2, .L60+4
+ 1091 002a 0100     		movs	r1, r0
+ 1092 002c 5218     		adds	r2, r2, r1
+ 1093 002e D219     		adds	r2, r2, r7
+ 1094 0030 1288     		ldrh	r2, [r2]
+ 1095 0032 0132     		adds	r2, r2, #1
+ 1096 0034 1A80     		strh	r2, [r3]
+ 237:Core/Src/ble.c **** 
+ 238:Core/Src/ble.c **** 	frame[0] = BLE_STX;
+ 1097              		.loc 1 238 11
+ 1098 0036 0C25     		movs	r5, #12
+ 1099 0038 7B19     		adds	r3, r7, r5
+ 1100 003a 0222     		movs	r2, #2
+ 1101 003c 1A70     		strb	r2, [r3]
+ 239:Core/Src/ble.c **** 	frame[1] = CMD_SET_REQ;
+ 1102              		.loc 1 239 11
+ 1103 003e 7B19     		adds	r3, r7, r5
+ 1104 0040 1122     		movs	r2, #17
+ 1105 0042 5A70     		strb	r2, [r3, #1]
+ 240:Core/Src/ble.c **** 	frame[2] = (uint8_t)(len & 0xFF);
+ 1106              		.loc 1 240 13
+ 1107 0044 FB1D     		adds	r3, r7, #7
+ 1108 0046 FF33     		adds	r3, r3, #255
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 25
+
+
+ 1109 0048 1B88     		ldrh	r3, [r3]
+ 1110 004a DAB2     		uxtb	r2, r3
+ 1111              		.loc 1 240 11
+ 1112 004c 7B19     		adds	r3, r7, r5
+ 1113 004e 9A70     		strb	r2, [r3, #2]
+ 241:Core/Src/ble.c **** 	frame[3] = (uint8_t)((len >> 8) & 0xFF);
+ 1114              		.loc 1 241 13
+ 1115 0050 FB1D     		adds	r3, r7, #7
+ 1116 0052 FF33     		adds	r3, r3, #255
+ 1117 0054 1B88     		ldrh	r3, [r3]
+ 1118 0056 1B0A     		lsrs	r3, r3, #8
+ 1119 0058 9BB2     		uxth	r3, r3
+ 1120 005a DAB2     		uxtb	r2, r3
+ 1121              		.loc 1 241 11
+ 1122 005c 7B19     		adds	r3, r7, r5
+ 1123 005e DA70     		strb	r2, [r3, #3]
+ 242:Core/Src/ble.c **** 	frame[4] = idx;
+ 1124              		.loc 1 242 11
+ 1125 0060 7B19     		adds	r3, r7, r5
+ 1126 0062 1A4A     		ldr	r2, .L60
+ 1127 0064 0E00     		movs	r6, r1
+ 1128 0066 9219     		adds	r2, r2, r6
+ 1129 0068 D219     		adds	r2, r2, r7
+ 1130 006a 1278     		ldrb	r2, [r2]
+ 1131 006c 1A71     		strb	r2, [r3, #4]
+ 243:Core/Src/ble.c **** 	memcpy(&frame[5], data, n);
+ 1132              		.loc 1 243 2
+ 1133 006e 184B     		ldr	r3, .L60+4
+ 1134 0070 9B19     		adds	r3, r3, r6
+ 1135 0072 DB19     		adds	r3, r3, r7
+ 1136 0074 1A88     		ldrh	r2, [r3]
+ 1137 0076 3968     		ldr	r1, [r7]
+ 1138 0078 7B19     		adds	r3, r7, r5
+ 1139 007a 0533     		adds	r3, r3, #5
+ 1140 007c 1800     		movs	r0, r3
+ 1141 007e FFF7FEFF 		bl	memcpy
+ 244:Core/Src/ble.c **** 	frame[5 + n] = xor_cs(frame, 5 + n);
+ 1142              		.loc 1 244 17
+ 1143 0082 134B     		ldr	r3, .L60+4
+ 1144 0084 9B19     		adds	r3, r3, r6
+ 1145 0086 DB19     		adds	r3, r3, r7
+ 1146 0088 1B88     		ldrh	r3, [r3]
+ 1147 008a 0533     		adds	r3, r3, #5
+ 1148 008c 9AB2     		uxth	r2, r3
+ 1149              		.loc 1 244 10
+ 1150 008e 104B     		ldr	r3, .L60+4
+ 1151 0090 9B19     		adds	r3, r3, r6
+ 1152 0092 DB19     		adds	r3, r3, r7
+ 1153 0094 1B88     		ldrh	r3, [r3]
+ 1154 0096 5C1D     		adds	r4, r3, #5
+ 1155              		.loc 1 244 17
+ 1156 0098 7B19     		adds	r3, r7, r5
+ 1157 009a 1100     		movs	r1, r2
+ 1158 009c 1800     		movs	r0, r3
+ 1159 009e FFF7FEFF 		bl	xor_cs
+ 1160 00a2 0300     		movs	r3, r0
+ 1161 00a4 1A00     		movs	r2, r3
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 26
+
+
+ 1162              		.loc 1 244 15 discriminator 1
+ 1163 00a6 7B19     		adds	r3, r7, r5
+ 1164 00a8 1A55     		strb	r2, [r3, r4]
+ 245:Core/Src/ble.c **** 
+ 246:Core/Src/ble.c **** 	HAL_UART_Transmit(ble_uart, frame, 6 + n, 200);
+ 1165              		.loc 1 246 2
+ 1166 00aa 0A4B     		ldr	r3, .L60+8
+ 1167 00ac 1868     		ldr	r0, [r3]
+ 1168 00ae 084B     		ldr	r3, .L60+4
+ 1169 00b0 9B19     		adds	r3, r3, r6
+ 1170 00b2 DB19     		adds	r3, r3, r7
+ 1171 00b4 1B88     		ldrh	r3, [r3]
+ 1172 00b6 0633     		adds	r3, r3, #6
+ 1173 00b8 9AB2     		uxth	r2, r3
+ 1174 00ba 7919     		adds	r1, r7, r5
+ 1175 00bc C823     		movs	r3, #200
+ 1176 00be FFF7FEFF 		bl	HAL_UART_Transmit
+ 247:Core/Src/ble.c **** }
+ 1177              		.loc 1 247 1
+ 1178 00c2 C046     		nop
+ 1179 00c4 BD46     		mov	sp, r7
+ 1180 00c6 43B0     		add	sp, sp, #268
+ 1181              		@ sp needed
+ 1182 00c8 F0BD     		pop	{r4, r5, r6, r7, pc}
+ 1183              	.L61:
+ 1184 00ca C046     		.align	2
+ 1185              	.L60:
+ 1186 00cc FFFEFFFF 		.word	-257
+ 1187 00d0 FCFEFFFF 		.word	-260
+ 1188 00d4 00000000 		.word	ble_uart
+ 1189              		.cfi_endproc
+ 1190              	.LFE368:
+ 1192              		.section	.text.ble_send_cmd0,"ax",%progbits
+ 1193              		.align	1
+ 1194              		.syntax unified
+ 1195              		.code	16
+ 1196              		.thumb_func
+ 1198              	ble_send_cmd0:
+ 1199              	.LFB369:
+ 248:Core/Src/ble.c **** 
+ 249:Core/Src/ble.c **** /* Sendet ein Kommando ohne Payload (z. B. RESET, DISCONNECT, DELETEBONDS). */
+ 250:Core/Src/ble.c **** static void ble_send_cmd0(uint8_t cmd)
+ 251:Core/Src/ble.c **** {
+ 1200              		.loc 1 251 1
+ 1201              		.cfi_startproc
+ 1202              		@ args = 0, pretend = 0, frame = 16
+ 1203              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1204 0000 90B5     		push	{r4, r7, lr}
+ 1205              	.LCFI18:
+ 1206              		.cfi_def_cfa_offset 12
+ 1207              		.cfi_offset 4, -12
+ 1208              		.cfi_offset 7, -8
+ 1209              		.cfi_offset 14, -4
+ 1210 0002 85B0     		sub	sp, sp, #20
+ 1211              	.LCFI19:
+ 1212              		.cfi_def_cfa_offset 32
+ 1213 0004 00AF     		add	r7, sp, #0
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 27
+
+
+ 1214              	.LCFI20:
+ 1215              		.cfi_def_cfa_register 7
+ 1216 0006 0200     		movs	r2, r0
+ 1217 0008 FB1D     		adds	r3, r7, #7
+ 1218 000a 1A70     		strb	r2, [r3]
+ 252:Core/Src/ble.c **** 	uint8_t frame[5];
+ 253:Core/Src/ble.c **** 
+ 254:Core/Src/ble.c **** 	frame[0] = BLE_STX;
+ 1219              		.loc 1 254 11
+ 1220 000c 0824     		movs	r4, #8
+ 1221 000e 3B19     		adds	r3, r7, r4
+ 1222 0010 0222     		movs	r2, #2
+ 1223 0012 1A70     		strb	r2, [r3]
+ 255:Core/Src/ble.c **** 	frame[1] = cmd;
+ 1224              		.loc 1 255 11
+ 1225 0014 3B19     		adds	r3, r7, r4
+ 1226 0016 FA1D     		adds	r2, r7, #7
+ 1227 0018 1278     		ldrb	r2, [r2]
+ 1228 001a 5A70     		strb	r2, [r3, #1]
+ 256:Core/Src/ble.c **** 	frame[2] = 0;
+ 1229              		.loc 1 256 11
+ 1230 001c 3B19     		adds	r3, r7, r4
+ 1231 001e 0022     		movs	r2, #0
+ 1232 0020 9A70     		strb	r2, [r3, #2]
+ 257:Core/Src/ble.c **** 	frame[3] = 0;
+ 1233              		.loc 1 257 11
+ 1234 0022 3B19     		adds	r3, r7, r4
+ 1235 0024 0022     		movs	r2, #0
+ 1236 0026 DA70     		strb	r2, [r3, #3]
+ 258:Core/Src/ble.c **** 	frame[4] = xor_cs(frame, 4);
+ 1237              		.loc 1 258 13
+ 1238 0028 3B19     		adds	r3, r7, r4
+ 1239 002a 0421     		movs	r1, #4
+ 1240 002c 1800     		movs	r0, r3
+ 1241 002e FFF7FEFF 		bl	xor_cs
+ 1242 0032 0300     		movs	r3, r0
+ 1243 0034 1A00     		movs	r2, r3
+ 1244              		.loc 1 258 11 discriminator 1
+ 1245 0036 2100     		movs	r1, r4
+ 1246 0038 7B18     		adds	r3, r7, r1
+ 1247 003a 1A71     		strb	r2, [r3, #4]
+ 259:Core/Src/ble.c **** 	HAL_UART_Transmit(ble_uart, frame, 5, 100);
+ 1248              		.loc 1 259 2
+ 1249 003c 054B     		ldr	r3, .L63
+ 1250 003e 1868     		ldr	r0, [r3]
+ 1251 0040 7918     		adds	r1, r7, r1
+ 1252 0042 6423     		movs	r3, #100
+ 1253 0044 0522     		movs	r2, #5
+ 1254 0046 FFF7FEFF 		bl	HAL_UART_Transmit
+ 260:Core/Src/ble.c **** }
+ 1255              		.loc 1 260 1
+ 1256 004a C046     		nop
+ 1257 004c BD46     		mov	sp, r7
+ 1258 004e 05B0     		add	sp, sp, #20
+ 1259              		@ sp needed
+ 1260 0050 90BD     		pop	{r4, r7, pc}
+ 1261              	.L64:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 28
+
+
+ 1262 0052 C046     		.align	2
+ 1263              	.L63:
+ 1264 0054 00000000 		.word	ble_uart
+ 1265              		.cfi_endproc
+ 1266              	.LFE369:
+ 1268              		.section	.text.ble_send_setname,"ax",%progbits
+ 1269              		.align	1
+ 1270              		.syntax unified
+ 1271              		.code	16
+ 1272              		.thumb_func
+ 1274              	ble_send_setname:
+ 1275              	.LFB370:
+ 261:Core/Src/ble.c **** 
+ 262:Core/Src/ble.c **** /* CMD_SET_REQ zum Umbenennen; das Modul startet danach selbst neu. */
+ 263:Core/Src/ble.c **** static void ble_send_setname(const char *name)
+ 264:Core/Src/ble.c **** {
+ 1276              		.loc 1 264 1
+ 1277              		.cfi_startproc
+ 1278              		@ args = 0, pretend = 0, frame = 16
+ 1279              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1280 0000 80B5     		push	{r7, lr}
+ 1281              	.LCFI21:
+ 1282              		.cfi_def_cfa_offset 8
+ 1283              		.cfi_offset 7, -8
+ 1284              		.cfi_offset 14, -4
+ 1285 0002 84B0     		sub	sp, sp, #16
+ 1286              	.LCFI22:
+ 1287              		.cfi_def_cfa_offset 24
+ 1288 0004 00AF     		add	r7, sp, #0
+ 1289              	.LCFI23:
+ 1290              		.cfi_def_cfa_register 7
+ 1291 0006 7860     		str	r0, [r7, #4]
+ 265:Core/Src/ble.c **** 	uint16_t nl = (uint16_t)strlen(name);
+ 1292              		.loc 1 265 26
+ 1293 0008 7B68     		ldr	r3, [r7, #4]
+ 1294 000a 1800     		movs	r0, r3
+ 1295 000c FFF7FEFF 		bl	strlen
+ 1296 0010 0200     		movs	r2, r0
+ 1297              		.loc 1 265 11 discriminator 1
+ 1298 0012 0E21     		movs	r1, #14
+ 1299 0014 7B18     		adds	r3, r7, r1
+ 1300 0016 1A80     		strh	r2, [r3]
+ 266:Core/Src/ble.c **** 	if (nl > 20) nl = 20;
+ 1301              		.loc 1 266 5
+ 1302 0018 0A00     		movs	r2, r1
+ 1303 001a BB18     		adds	r3, r7, r2
+ 1304 001c 1B88     		ldrh	r3, [r3]
+ 1305 001e 142B     		cmp	r3, #20
+ 1306 0020 02D9     		bls	.L66
+ 1307              		.loc 1 266 18 discriminator 1
+ 1308 0022 BB18     		adds	r3, r7, r2
+ 1309 0024 1422     		movs	r2, #20
+ 1310 0026 1A80     		strh	r2, [r3]
+ 1311              	.L66:
+ 267:Core/Src/ble.c **** 	ble_send_set(CFG_IDX_DEVICENAME, (const uint8_t *)name, nl);
+ 1312              		.loc 1 267 2
+ 1313 0028 0E23     		movs	r3, #14
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 29
+
+
+ 1314 002a FB18     		adds	r3, r7, r3
+ 1315 002c 1A88     		ldrh	r2, [r3]
+ 1316 002e 7B68     		ldr	r3, [r7, #4]
+ 1317 0030 1900     		movs	r1, r3
+ 1318 0032 0220     		movs	r0, #2
+ 1319 0034 FFF7FEFF 		bl	ble_send_set
+ 268:Core/Src/ble.c **** }
+ 1320              		.loc 1 268 1
+ 1321 0038 C046     		nop
+ 1322 003a BD46     		mov	sp, r7
+ 1323 003c 04B0     		add	sp, sp, #16
+ 1324              		@ sp needed
+ 1325 003e 80BD     		pop	{r7, pc}
+ 1326              		.cfi_endproc
+ 1327              	.LFE370:
+ 1329              		.section	.text.BLE_SetDeviceName,"ax",%progbits
+ 1330              		.align	1
+ 1331              		.global	BLE_SetDeviceName
+ 1332              		.syntax unified
+ 1333              		.code	16
+ 1334              		.thumb_func
+ 1336              	BLE_SetDeviceName:
+ 1337              	.LFB371:
+ 269:Core/Src/ble.c **** 
+ 270:Core/Src/ble.c **** uint8_t BLE_SetDeviceName(const char *name)
+ 271:Core/Src/ble.c **** {
+ 1338              		.loc 1 271 1
+ 1339              		.cfi_startproc
+ 1340              		@ args = 0, pretend = 0, frame = 8
+ 1341              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1342 0000 80B5     		push	{r7, lr}
+ 1343              	.LCFI24:
+ 1344              		.cfi_def_cfa_offset 8
+ 1345              		.cfi_offset 7, -8
+ 1346              		.cfi_offset 14, -4
+ 1347 0002 82B0     		sub	sp, sp, #8
+ 1348              	.LCFI25:
+ 1349              		.cfi_def_cfa_offset 16
+ 1350 0004 00AF     		add	r7, sp, #0
+ 1351              	.LCFI26:
+ 1352              		.cfi_def_cfa_register 7
+ 1353 0006 7860     		str	r0, [r7, #4]
+ 272:Core/Src/ble.c **** 	if (ble_uart == NULL)
+ 1354              		.loc 1 272 15
+ 1355 0008 114B     		ldr	r3, .L72
+ 1356 000a 1B68     		ldr	r3, [r3]
+ 1357              		.loc 1 272 5
+ 1358 000c 002B     		cmp	r3, #0
+ 1359 000e 01D1     		bne	.L68
+ 273:Core/Src/ble.c **** 	{
+ 274:Core/Src/ble.c **** 		return 0;
+ 1360              		.loc 1 274 10
+ 1361 0010 0023     		movs	r3, #0
+ 1362 0012 19E0     		b	.L69
+ 1363              	.L68:
+ 275:Core/Src/ble.c **** 	}
+ 276:Core/Src/ble.c **** 	strncpy(ble_pending_name, name, 20);
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 30
+
+
+ 1364              		.loc 1 276 2
+ 1365 0014 7968     		ldr	r1, [r7, #4]
+ 1366 0016 0F4B     		ldr	r3, .L72+4
+ 1367 0018 1422     		movs	r2, #20
+ 1368 001a 1800     		movs	r0, r3
+ 1369 001c FFF7FEFF 		bl	strncpy
+ 277:Core/Src/ble.c **** 	ble_pending_name[20] = '\0';
+ 1370              		.loc 1 277 23
+ 1371 0020 0C4B     		ldr	r3, .L72+4
+ 1372 0022 0022     		movs	r2, #0
+ 1373 0024 1A75     		strb	r2, [r3, #20]
+ 278:Core/Src/ble.c **** 
+ 279:Core/Src/ble.c **** 	if (ble_connected)
+ 1374              		.loc 1 279 6
+ 1375 0026 0C4B     		ldr	r3, .L72+8
+ 1376 0028 1B78     		ldrb	r3, [r3]
+ 1377 002a DBB2     		uxtb	r3, r3
+ 1378              		.loc 1 279 5
+ 1379 002c 002B     		cmp	r3, #0
+ 1380 002e 06D0     		beq	.L70
+ 280:Core/Src/ble.c **** 	{
+ 281:Core/Src/ble.c **** 		/* CMD_SET_REQ ist im verbundenen Zustand nicht erlaubt -> erst trennen.
+ 282:Core/Src/ble.c **** 		 * Die Hauptschleife wendet den Namen nach CMD_DISCONNECT_IND an. */
+ 283:Core/Src/ble.c **** 		ble_setname_pending = 1;
+ 1381              		.loc 1 283 23
+ 1382 0030 0A4B     		ldr	r3, .L72+12
+ 1383 0032 0122     		movs	r2, #1
+ 1384 0034 1A70     		strb	r2, [r3]
+ 284:Core/Src/ble.c **** 		ble_send_cmd0(CMD_DISCONNECT_REQ);
+ 1385              		.loc 1 284 3
+ 1386 0036 0720     		movs	r0, #7
+ 1387 0038 FFF7FEFF 		bl	ble_send_cmd0
+ 1388 003c 03E0     		b	.L71
+ 1389              	.L70:
+ 285:Core/Src/ble.c **** 	}
+ 286:Core/Src/ble.c **** 	else
+ 287:Core/Src/ble.c **** 	{
+ 288:Core/Src/ble.c **** 		ble_send_setname(ble_pending_name);
+ 1390              		.loc 1 288 3
+ 1391 003e 054B     		ldr	r3, .L72+4
+ 1392 0040 1800     		movs	r0, r3
+ 1393 0042 FFF7FEFF 		bl	ble_send_setname
+ 1394              	.L71:
+ 289:Core/Src/ble.c **** 	}
+ 290:Core/Src/ble.c **** 	return 1;
+ 1395              		.loc 1 290 9
+ 1396 0046 0123     		movs	r3, #1
+ 1397              	.L69:
+ 291:Core/Src/ble.c **** }
+ 1398              		.loc 1 291 1
+ 1399 0048 1800     		movs	r0, r3
+ 1400 004a BD46     		mov	sp, r7
+ 1401 004c 02B0     		add	sp, sp, #8
+ 1402              		@ sp needed
+ 1403 004e 80BD     		pop	{r7, pc}
+ 1404              	.L73:
+ 1405              		.align	2
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 31
+
+
+ 1406              	.L72:
+ 1407 0050 00000000 		.word	ble_uart
+ 1408 0054 00000000 		.word	ble_pending_name
+ 1409 0058 00000000 		.word	ble_connected
+ 1410 005c 00000000 		.word	ble_setname_pending
+ 1411              		.cfi_endproc
+ 1412              	.LFE371:
+ 1414              		.section	.text.BLE_RequestSetting,"ax",%progbits
+ 1415              		.align	1
+ 1416              		.global	BLE_RequestSetting
+ 1417              		.syntax unified
+ 1418              		.code	16
+ 1419              		.thumb_func
+ 1421              	BLE_RequestSetting:
+ 1422              	.LFB372:
+ 292:Core/Src/ble.c **** 
+ 293:Core/Src/ble.c **** /* Fragt eine im Modul-Flash gespeicherte Einstellung ab (CMD_GET_REQ).
+ 294:Core/Src/ble.c ****  * Lesen ist - anders als CMD_SET_REQ - jederzeit erlaubt. Die Antwort
+ 295:Core/Src/ble.c ****  * (CMD_GET_CNF) verarbeitet ble_dispatch() asynchron. */
+ 296:Core/Src/ble.c **** uint8_t BLE_RequestSetting(uint8_t idx)
+ 297:Core/Src/ble.c **** {
+ 1423              		.loc 1 297 1
+ 1424              		.cfi_startproc
+ 1425              		@ args = 0, pretend = 0, frame = 16
+ 1426              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1427 0000 90B5     		push	{r4, r7, lr}
+ 1428              	.LCFI27:
+ 1429              		.cfi_def_cfa_offset 12
+ 1430              		.cfi_offset 4, -12
+ 1431              		.cfi_offset 7, -8
+ 1432              		.cfi_offset 14, -4
+ 1433 0002 85B0     		sub	sp, sp, #20
+ 1434              	.LCFI28:
+ 1435              		.cfi_def_cfa_offset 32
+ 1436 0004 00AF     		add	r7, sp, #0
+ 1437              	.LCFI29:
+ 1438              		.cfi_def_cfa_register 7
+ 1439 0006 0200     		movs	r2, r0
+ 1440 0008 FB1D     		adds	r3, r7, #7
+ 1441 000a 1A70     		strb	r2, [r3]
+ 298:Core/Src/ble.c **** 	uint8_t frame[6];
+ 299:Core/Src/ble.c **** 
+ 300:Core/Src/ble.c **** 	if (ble_uart == NULL)
+ 1442              		.loc 1 300 15
+ 1443 000c 1B4B     		ldr	r3, .L78
+ 1444 000e 1B68     		ldr	r3, [r3]
+ 1445              		.loc 1 300 5
+ 1446 0010 002B     		cmp	r3, #0
+ 1447 0012 01D1     		bne	.L75
+ 301:Core/Src/ble.c **** 	{
+ 302:Core/Src/ble.c **** 		return 0;
+ 1448              		.loc 1 302 10
+ 1449 0014 0023     		movs	r3, #0
+ 1450 0016 2CE0     		b	.L77
+ 1451              	.L75:
+ 303:Core/Src/ble.c **** 	}
+ 304:Core/Src/ble.c **** 	ble_get_ready = 0;
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 32
+
+
+ 1452              		.loc 1 304 16
+ 1453 0018 194B     		ldr	r3, .L78+4
+ 1454 001a 0022     		movs	r2, #0
+ 1455 001c 1A70     		strb	r2, [r3]
+ 305:Core/Src/ble.c **** 	ble_get_index = idx;
+ 1456              		.loc 1 305 16
+ 1457 001e 194B     		ldr	r3, .L78+8
+ 1458 0020 FA1D     		adds	r2, r7, #7
+ 1459 0022 1278     		ldrb	r2, [r2]
+ 1460 0024 1A70     		strb	r2, [r3]
+ 306:Core/Src/ble.c **** 	frame[0] = BLE_STX;
+ 1461              		.loc 1 306 11
+ 1462 0026 0824     		movs	r4, #8
+ 1463 0028 3B19     		adds	r3, r7, r4
+ 1464 002a 0222     		movs	r2, #2
+ 1465 002c 1A70     		strb	r2, [r3]
+ 307:Core/Src/ble.c **** 	frame[1] = CMD_GET_REQ;
+ 1466              		.loc 1 307 11
+ 1467 002e 3B19     		adds	r3, r7, r4
+ 1468 0030 1022     		movs	r2, #16
+ 1469 0032 5A70     		strb	r2, [r3, #1]
+ 308:Core/Src/ble.c **** 	frame[2] = 1;					/* Len = 1: nur der Settings-Index */
+ 1470              		.loc 1 308 11
+ 1471 0034 3B19     		adds	r3, r7, r4
+ 1472 0036 0122     		movs	r2, #1
+ 1473 0038 9A70     		strb	r2, [r3, #2]
+ 309:Core/Src/ble.c **** 	frame[3] = 0;
+ 1474              		.loc 1 309 11
+ 1475 003a 3B19     		adds	r3, r7, r4
+ 1476 003c 0022     		movs	r2, #0
+ 1477 003e DA70     		strb	r2, [r3, #3]
+ 310:Core/Src/ble.c **** 	frame[4] = idx;
+ 1478              		.loc 1 310 11
+ 1479 0040 3B19     		adds	r3, r7, r4
+ 1480 0042 FA1D     		adds	r2, r7, #7
+ 1481 0044 1278     		ldrb	r2, [r2]
+ 1482 0046 1A71     		strb	r2, [r3, #4]
+ 311:Core/Src/ble.c **** 	frame[5] = xor_cs(frame, 5);
+ 1483              		.loc 1 311 13
+ 1484 0048 3B19     		adds	r3, r7, r4
+ 1485 004a 0521     		movs	r1, #5
+ 1486 004c 1800     		movs	r0, r3
+ 1487 004e FFF7FEFF 		bl	xor_cs
+ 1488 0052 0300     		movs	r3, r0
+ 1489 0054 1A00     		movs	r2, r3
+ 1490              		.loc 1 311 11 discriminator 1
+ 1491 0056 2100     		movs	r1, r4
+ 1492 0058 7B18     		adds	r3, r7, r1
+ 1493 005a 5A71     		strb	r2, [r3, #5]
+ 312:Core/Src/ble.c **** 
+ 313:Core/Src/ble.c **** 	return (HAL_UART_Transmit(ble_uart, frame, 6, 100) == HAL_OK) ? 1 : 0;
+ 1494              		.loc 1 313 10
+ 1495 005c 074B     		ldr	r3, .L78
+ 1496 005e 1868     		ldr	r0, [r3]
+ 1497 0060 7918     		adds	r1, r7, r1
+ 1498 0062 6423     		movs	r3, #100
+ 1499 0064 0622     		movs	r2, #6
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 33
+
+
+ 1500 0066 FFF7FEFF 		bl	HAL_UART_Transmit
+ 1501 006a 0300     		movs	r3, r0
+ 1502              		.loc 1 313 68 discriminator 1
+ 1503 006c 5A42     		rsbs	r2, r3, #0
+ 1504 006e 5341     		adcs	r3, r3, r2
+ 1505 0070 DBB2     		uxtb	r3, r3
+ 1506              	.L77:
+ 314:Core/Src/ble.c **** }
+ 1507              		.loc 1 314 1
+ 1508 0072 1800     		movs	r0, r3
+ 1509 0074 BD46     		mov	sp, r7
+ 1510 0076 05B0     		add	sp, sp, #20
+ 1511              		@ sp needed
+ 1512 0078 90BD     		pop	{r4, r7, pc}
+ 1513              	.L79:
+ 1514 007a C046     		.align	2
+ 1515              	.L78:
+ 1516 007c 00000000 		.word	ble_uart
+ 1517 0080 00000000 		.word	ble_get_ready
+ 1518 0084 00000000 		.word	ble_get_index
+ 1519              		.cfi_endproc
+ 1520              	.LFE372:
+ 1522              		.section	.text.BLE_ProvisionSecurity,"ax",%progbits
+ 1523              		.align	1
+ 1524              		.global	BLE_ProvisionSecurity
+ 1525              		.syntax unified
+ 1526              		.code	16
+ 1527              		.thumb_func
+ 1529              	BLE_ProvisionSecurity:
+ 1530              	.LFB373:
+ 315:Core/Src/ble.c **** 
+ 316:Core/Src/ble.c **** /* Einmalige Sicherheits-Provisionierung: RF_SecFlags setzen, Bond-Tabelle
+ 317:Core/Src/ble.c ****  * leeren und Modul EINMAL neu starten. Nur im getrennten Zustand aufrufen.
+ 318:Core/Src/ble.c ****  * Wird nach Werksreset/Erstboot (oder einmalig nach diesem Firmware-Update,
+ 319:Core/Src/ble.c ****  * via SECPROV-Marker) ausgefuehrt. Aktuell wird die BLE-Schnittstelle damit
+ 320:Core/Src/ble.c ****  * OHNE Verschluesselung betrieben (flags = 0) - eine PIN-Absicherung hat sich
+ 321:Core/Src/ble.c ****  * mit diesem Modul + Android als nicht zuverlaessig erwiesen. */
+ 322:Core/Src/ble.c **** uint8_t BLE_ProvisionSecurity(uint8_t flags)
+ 323:Core/Src/ble.c **** {
+ 1531              		.loc 1 323 1
+ 1532              		.cfi_startproc
+ 1533              		@ args = 0, pretend = 0, frame = 8
+ 1534              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1535 0000 80B5     		push	{r7, lr}
+ 1536              	.LCFI30:
+ 1537              		.cfi_def_cfa_offset 8
+ 1538              		.cfi_offset 7, -8
+ 1539              		.cfi_offset 14, -4
+ 1540 0002 82B0     		sub	sp, sp, #8
+ 1541              	.LCFI31:
+ 1542              		.cfi_def_cfa_offset 16
+ 1543 0004 00AF     		add	r7, sp, #0
+ 1544              	.LCFI32:
+ 1545              		.cfi_def_cfa_register 7
+ 1546 0006 0200     		movs	r2, r0
+ 1547 0008 FB1D     		adds	r3, r7, #7
+ 1548 000a 1A70     		strb	r2, [r3]
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 34
+
+
+ 324:Core/Src/ble.c **** 	if (ble_uart == NULL)
+ 1549              		.loc 1 324 15
+ 1550 000c 114B     		ldr	r3, .L83
+ 1551 000e 1B68     		ldr	r3, [r3]
+ 1552              		.loc 1 324 5
+ 1553 0010 002B     		cmp	r3, #0
+ 1554 0012 01D1     		bne	.L81
+ 325:Core/Src/ble.c **** 	{
+ 326:Core/Src/ble.c **** 		return 0;
+ 1555              		.loc 1 326 10
+ 1556 0014 0023     		movs	r3, #0
+ 1557 0016 18E0     		b	.L82
+ 1558              	.L81:
+ 327:Core/Src/ble.c **** 	}
+ 328:Core/Src/ble.c **** 	ble_send_set(CFG_IDX_SECFLAGS, &flags, 1);
+ 1559              		.loc 1 328 2
+ 1560 0018 FB1D     		adds	r3, r7, #7
+ 1561 001a 0122     		movs	r2, #1
+ 1562 001c 1900     		movs	r1, r3
+ 1563 001e 0C20     		movs	r0, #12
+ 1564 0020 FFF7FEFF 		bl	ble_send_set
+ 329:Core/Src/ble.c **** 	HAL_Delay(50);
+ 1565              		.loc 1 329 2
+ 1566 0024 3220     		movs	r0, #50
+ 1567 0026 FFF7FEFF 		bl	HAL_Delay
+ 330:Core/Src/ble.c **** 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
+ 1568              		.loc 1 330 2
+ 1569 002a 0E20     		movs	r0, #14
+ 1570 002c FFF7FEFF 		bl	ble_send_cmd0
+ 331:Core/Src/ble.c **** 	HAL_Delay(50);
+ 1571              		.loc 1 331 2
+ 1572 0030 3220     		movs	r0, #50
+ 1573 0032 FFF7FEFF 		bl	HAL_Delay
+ 332:Core/Src/ble.c **** 	ble_send_cmd0(CMD_RESET_REQ);	/* Einstellungen aktivieren, frisch starten */
+ 1574              		.loc 1 332 2
+ 1575 0036 0020     		movs	r0, #0
+ 1576 0038 FFF7FEFF 		bl	ble_send_cmd0
+ 333:Core/Src/ble.c **** 	/* Ein Reset trennt die Funkverbindung, das Modul sendet dabei KEIN
+ 334:Core/Src/ble.c **** 	 * CMD_DISCONNECT_IND -> Zustand hier selbst zuruecksetzen. */
+ 335:Core/Src/ble.c **** 	ble_connected = 0;
+ 1577              		.loc 1 335 16
+ 1578 003c 064B     		ldr	r3, .L83+4
+ 1579 003e 0022     		movs	r2, #0
+ 1580 0040 1A70     		strb	r2, [r3]
+ 336:Core/Src/ble.c **** 	ble_channel_open = 0;
+ 1581              		.loc 1 336 19
+ 1582 0042 064B     		ldr	r3, .L83+8
+ 1583 0044 0022     		movs	r2, #0
+ 1584 0046 1A70     		strb	r2, [r3]
+ 337:Core/Src/ble.c **** 	return 1;
+ 1585              		.loc 1 337 9
+ 1586 0048 0123     		movs	r3, #1
+ 1587              	.L82:
+ 338:Core/Src/ble.c **** }
+ 1588              		.loc 1 338 1
+ 1589 004a 1800     		movs	r0, r3
+ 1590 004c BD46     		mov	sp, r7
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 35
+
+
+ 1591 004e 02B0     		add	sp, sp, #8
+ 1592              		@ sp needed
+ 1593 0050 80BD     		pop	{r7, pc}
+ 1594              	.L84:
+ 1595 0052 C046     		.align	2
+ 1596              	.L83:
+ 1597 0054 00000000 		.word	ble_uart
+ 1598 0058 00000000 		.word	ble_connected
+ 1599 005c 00000000 		.word	ble_channel_open
+ 1600              		.cfi_endproc
+ 1601              	.LFE373:
+ 1603              		.section	.text.BLE_Disconnect,"ax",%progbits
+ 1604              		.align	1
+ 1605              		.global	BLE_Disconnect
+ 1606              		.syntax unified
+ 1607              		.code	16
+ 1608              		.thumb_func
+ 1610              	BLE_Disconnect:
+ 1611              	.LFB374:
+ 339:Core/Src/ble.c **** 
+ 340:Core/Src/ble.c **** void BLE_Disconnect(void)
+ 341:Core/Src/ble.c **** {
+ 1612              		.loc 1 341 1
+ 1613              		.cfi_startproc
+ 1614              		@ args = 0, pretend = 0, frame = 0
+ 1615              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1616 0000 80B5     		push	{r7, lr}
+ 1617              	.LCFI33:
+ 1618              		.cfi_def_cfa_offset 8
+ 1619              		.cfi_offset 7, -8
+ 1620              		.cfi_offset 14, -4
+ 1621 0002 00AF     		add	r7, sp, #0
+ 1622              	.LCFI34:
+ 1623              		.cfi_def_cfa_register 7
+ 342:Core/Src/ble.c **** 	if (ble_uart != NULL)
+ 1624              		.loc 1 342 15
+ 1625 0004 044B     		ldr	r3, .L88
+ 1626 0006 1B68     		ldr	r3, [r3]
+ 1627              		.loc 1 342 5
+ 1628 0008 002B     		cmp	r3, #0
+ 1629 000a 02D0     		beq	.L87
+ 343:Core/Src/ble.c **** 	{
+ 344:Core/Src/ble.c **** 		ble_send_cmd0(CMD_DISCONNECT_REQ);
+ 1630              		.loc 1 344 3
+ 1631 000c 0720     		movs	r0, #7
+ 1632 000e FFF7FEFF 		bl	ble_send_cmd0
+ 1633              	.L87:
+ 345:Core/Src/ble.c **** 	}
+ 346:Core/Src/ble.c **** }
+ 1634              		.loc 1 346 1
+ 1635 0012 C046     		nop
+ 1636 0014 BD46     		mov	sp, r7
+ 1637              		@ sp needed
+ 1638 0016 80BD     		pop	{r7, pc}
+ 1639              	.L89:
+ 1640              		.align	2
+ 1641              	.L88:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 36
+
+
+ 1642 0018 00000000 		.word	ble_uart
+ 1643              		.cfi_endproc
+ 1644              	.LFE374:
+ 1646              		.section	.text.BLE_ApplyPendingName,"ax",%progbits
+ 1647              		.align	1
+ 1648              		.global	BLE_ApplyPendingName
+ 1649              		.syntax unified
+ 1650              		.code	16
+ 1651              		.thumb_func
+ 1653              	BLE_ApplyPendingName:
+ 1654              	.LFB375:
+ 347:Core/Src/ble.c **** 
+ 348:Core/Src/ble.c **** void BLE_ApplyPendingName(void)
+ 349:Core/Src/ble.c **** {
+ 1655              		.loc 1 349 1
+ 1656              		.cfi_startproc
+ 1657              		@ args = 0, pretend = 0, frame = 0
+ 1658              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1659 0000 80B5     		push	{r7, lr}
+ 1660              	.LCFI35:
+ 1661              		.cfi_def_cfa_offset 8
+ 1662              		.cfi_offset 7, -8
+ 1663              		.cfi_offset 14, -4
+ 1664 0002 00AF     		add	r7, sp, #0
+ 1665              	.LCFI36:
+ 1666              		.cfi_def_cfa_register 7
+ 350:Core/Src/ble.c **** 	ble_setname_pending = 0;
+ 1667              		.loc 1 350 22
+ 1668 0004 044B     		ldr	r3, .L91
+ 1669 0006 0022     		movs	r2, #0
+ 1670 0008 1A70     		strb	r2, [r3]
+ 351:Core/Src/ble.c **** 	ble_send_setname(ble_pending_name);
+ 1671              		.loc 1 351 2
+ 1672 000a 044B     		ldr	r3, .L91+4
+ 1673 000c 1800     		movs	r0, r3
+ 1674 000e FFF7FEFF 		bl	ble_send_setname
+ 352:Core/Src/ble.c **** }
+ 1675              		.loc 1 352 1
+ 1676 0012 C046     		nop
+ 1677 0014 BD46     		mov	sp, r7
+ 1678              		@ sp needed
+ 1679 0016 80BD     		pop	{r7, pc}
+ 1680              	.L92:
+ 1681              		.align	2
+ 1682              	.L91:
+ 1683 0018 00000000 		.word	ble_setname_pending
+ 1684 001c 00000000 		.word	ble_pending_name
+ 1685              		.cfi_endproc
+ 1686              	.LFE375:
+ 1688              		.section	.text.BLE_Init,"ax",%progbits
+ 1689              		.align	1
+ 1690              		.global	BLE_Init
+ 1691              		.syntax unified
+ 1692              		.code	16
+ 1693              		.thumb_func
+ 1695              	BLE_Init:
+ 1696              	.LFB376:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 37
+
+
+ 353:Core/Src/ble.c **** 
+ 354:Core/Src/ble.c **** void BLE_Init(UART_HandleTypeDef *huart)
+ 355:Core/Src/ble.c **** {
+ 1697              		.loc 1 355 1
+ 1698              		.cfi_startproc
+ 1699              		@ args = 0, pretend = 0, frame = 8
+ 1700              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1701 0000 80B5     		push	{r7, lr}
+ 1702              	.LCFI37:
+ 1703              		.cfi_def_cfa_offset 8
+ 1704              		.cfi_offset 7, -8
+ 1705              		.cfi_offset 14, -4
+ 1706 0002 82B0     		sub	sp, sp, #8
+ 1707              	.LCFI38:
+ 1708              		.cfi_def_cfa_offset 16
+ 1709 0004 00AF     		add	r7, sp, #0
+ 1710              	.LCFI39:
+ 1711              		.cfi_def_cfa_register 7
+ 1712 0006 7860     		str	r0, [r7, #4]
+ 356:Core/Src/ble.c **** 	ble_uart = huart;
+ 1713              		.loc 1 356 11
+ 1714 0008 184B     		ldr	r3, .L94
+ 1715 000a 7A68     		ldr	r2, [r7, #4]
+ 1716 000c 1A60     		str	r2, [r3]
+ 357:Core/Src/ble.c **** 	pstate = ST_STX;
+ 1717              		.loc 1 357 9
+ 1718 000e 184B     		ldr	r3, .L94+4
+ 1719 0010 0022     		movs	r2, #0
+ 1720 0012 1A70     		strb	r2, [r3]
+ 358:Core/Src/ble.c **** 	ble_connected = 0;
+ 1721              		.loc 1 358 16
+ 1722 0014 174B     		ldr	r3, .L94+8
+ 1723 0016 0022     		movs	r2, #0
+ 1724 0018 1A70     		strb	r2, [r3]
+ 359:Core/Src/ble.c **** 	ble_channel_open = 0;
+ 1725              		.loc 1 359 19
+ 1726 001a 174B     		ldr	r3, .L94+12
+ 1727 001c 0022     		movs	r2, #0
+ 1728 001e 1A70     		strb	r2, [r3]
+ 360:Core/Src/ble.c **** 	ble_data_ready = 0;
+ 1729              		.loc 1 360 17
+ 1730 0020 164B     		ldr	r3, .L94+16
+ 1731 0022 0022     		movs	r2, #0
+ 1732 0024 1A70     		strb	r2, [r3]
+ 361:Core/Src/ble.c **** 
+ 362:Core/Src/ble.c **** 	/* MODE low = Kommando-Modus (Standard); Reset-Sequenz (aktiv low). */
+ 363:Core/Src/ble.c **** 	HAL_GPIO_WritePin(BLE_MODE_GPIO_Port, BLE_MODE_Pin, GPIO_PIN_RESET);
+ 1733              		.loc 1 363 2
+ 1734 0026 8023     		movs	r3, #128
+ 1735 0028 9B00     		lsls	r3, r3, #2
+ 1736 002a 1548     		ldr	r0, .L94+20
+ 1737 002c 0022     		movs	r2, #0
+ 1738 002e 1900     		movs	r1, r3
+ 1739 0030 FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 364:Core/Src/ble.c **** 	HAL_GPIO_WritePin(BLE_RESET_GPIO_Port, BLE_RESET_Pin, GPIO_PIN_RESET);
+ 1740              		.loc 1 364 2
+ 1741 0034 A023     		movs	r3, #160
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 38
+
+
+ 1742 0036 DB05     		lsls	r3, r3, #23
+ 1743 0038 0022     		movs	r2, #0
+ 1744 003a 2021     		movs	r1, #32
+ 1745 003c 1800     		movs	r0, r3
+ 1746 003e FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 365:Core/Src/ble.c **** 	HAL_Delay(10);
+ 1747              		.loc 1 365 2
+ 1748 0042 0A20     		movs	r0, #10
+ 1749 0044 FFF7FEFF 		bl	HAL_Delay
+ 366:Core/Src/ble.c **** 
+ 367:Core/Src/ble.c **** 	/* Byteweisen Empfang starten, dann Reset lösen – so gehen keine
+ 368:Core/Src/ble.c **** 	 * Startup-Meldungen des Moduls verloren. */
+ 369:Core/Src/ble.c **** 	HAL_UART_Receive_IT(ble_uart, &rx_byte, 1);
+ 1750              		.loc 1 369 2
+ 1751 0048 084B     		ldr	r3, .L94
+ 1752 004a 1B68     		ldr	r3, [r3]
+ 1753 004c 0D49     		ldr	r1, .L94+24
+ 1754 004e 0122     		movs	r2, #1
+ 1755 0050 1800     		movs	r0, r3
+ 1756 0052 FFF7FEFF 		bl	HAL_UART_Receive_IT
+ 370:Core/Src/ble.c **** 	HAL_GPIO_WritePin(BLE_RESET_GPIO_Port, BLE_RESET_Pin, GPIO_PIN_SET);
+ 1757              		.loc 1 370 2
+ 1758 0056 A023     		movs	r3, #160
+ 1759 0058 DB05     		lsls	r3, r3, #23
+ 1760 005a 0122     		movs	r2, #1
+ 1761 005c 2021     		movs	r1, #32
+ 1762 005e 1800     		movs	r0, r3
+ 1763 0060 FFF7FEFF 		bl	HAL_GPIO_WritePin
+ 371:Core/Src/ble.c **** 	/* Modul bootet und beginnt selbstständig zu advertisen (~ einige 100 ms). */
+ 372:Core/Src/ble.c **** }
+ 1764              		.loc 1 372 1
+ 1765 0064 C046     		nop
+ 1766 0066 BD46     		mov	sp, r7
+ 1767 0068 02B0     		add	sp, sp, #8
+ 1768              		@ sp needed
+ 1769 006a 80BD     		pop	{r7, pc}
+ 1770              	.L95:
+ 1771              		.align	2
+ 1772              	.L94:
+ 1773 006c 00000000 		.word	ble_uart
+ 1774 0070 00000000 		.word	pstate
+ 1775 0074 00000000 		.word	ble_connected
+ 1776 0078 00000000 		.word	ble_channel_open
+ 1777 007c 00000000 		.word	ble_data_ready
+ 1778 0080 00040050 		.word	1342178304
+ 1779 0084 00000000 		.word	rx_byte
+ 1780              		.cfi_endproc
+ 1781              	.LFE376:
+ 1783              		.section	.text.HAL_UART_RxCpltCallback,"ax",%progbits
+ 1784              		.align	1
+ 1785              		.global	HAL_UART_RxCpltCallback
+ 1786              		.syntax unified
+ 1787              		.code	16
+ 1788              		.thumb_func
+ 1790              	HAL_UART_RxCpltCallback:
+ 1791              	.LFB377:
+ 373:Core/Src/ble.c **** 
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 39
+
+
+ 374:Core/Src/ble.c **** /* UART-Empfangs-Callback: Byte in den Parser geben und neu scharf schalten. */
+ 375:Core/Src/ble.c **** void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
+ 376:Core/Src/ble.c **** {
+ 1792              		.loc 1 376 1
+ 1793              		.cfi_startproc
+ 1794              		@ args = 0, pretend = 0, frame = 8
+ 1795              		@ frame_needed = 1, uses_anonymous_args = 0
+ 1796 0000 80B5     		push	{r7, lr}
+ 1797              	.LCFI40:
+ 1798              		.cfi_def_cfa_offset 8
+ 1799              		.cfi_offset 7, -8
+ 1800              		.cfi_offset 14, -4
+ 1801 0002 82B0     		sub	sp, sp, #8
+ 1802              	.LCFI41:
+ 1803              		.cfi_def_cfa_offset 16
+ 1804 0004 00AF     		add	r7, sp, #0
+ 1805              	.LCFI42:
+ 1806              		.cfi_def_cfa_register 7
+ 1807 0006 7860     		str	r0, [r7, #4]
+ 377:Core/Src/ble.c **** 	if (huart->Instance == ble_uart->Instance)
+ 1808              		.loc 1 377 11
+ 1809 0008 7B68     		ldr	r3, [r7, #4]
+ 1810 000a 1A68     		ldr	r2, [r3]
+ 1811              		.loc 1 377 33
+ 1812 000c 094B     		ldr	r3, .L99
+ 1813 000e 1B68     		ldr	r3, [r3]
+ 1814 0010 1B68     		ldr	r3, [r3]
+ 1815              		.loc 1 377 5
+ 1816 0012 9A42     		cmp	r2, r3
+ 1817 0014 0AD1     		bne	.L98
+ 378:Core/Src/ble.c **** 	{
+ 379:Core/Src/ble.c **** 		BLE_ProcessByte(rx_byte);
+ 1818              		.loc 1 379 3
+ 1819 0016 084B     		ldr	r3, .L99+4
+ 1820 0018 1B78     		ldrb	r3, [r3]
+ 1821 001a 1800     		movs	r0, r3
+ 1822 001c FFF7FEFF 		bl	BLE_ProcessByte
+ 380:Core/Src/ble.c **** 		HAL_UART_Receive_IT(huart, &rx_byte, 1);
+ 1823              		.loc 1 380 3
+ 1824 0020 0549     		ldr	r1, .L99+4
+ 1825 0022 7B68     		ldr	r3, [r7, #4]
+ 1826 0024 0122     		movs	r2, #1
+ 1827 0026 1800     		movs	r0, r3
+ 1828 0028 FFF7FEFF 		bl	HAL_UART_Receive_IT
+ 1829              	.L98:
+ 381:Core/Src/ble.c **** 	}
+ 382:Core/Src/ble.c **** }
+ 1830              		.loc 1 382 1
+ 1831 002c C046     		nop
+ 1832 002e BD46     		mov	sp, r7
+ 1833 0030 02B0     		add	sp, sp, #8
+ 1834              		@ sp needed
+ 1835 0032 80BD     		pop	{r7, pc}
+ 1836              	.L100:
+ 1837              		.align	2
+ 1838              	.L99:
+ 1839 0034 00000000 		.word	ble_uart
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 40
+
+
+ 1840 0038 00000000 		.word	rx_byte
+ 1841              		.cfi_endproc
+ 1842              	.LFE377:
+ 1844              		.text
+ 1845              	.Letext0:
+ 1846              		.file 2 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 1847              		.file 3 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 1848              		.file 4 "Drivers/CMSIS/Device/ST/STM32G0xx/Include/stm32g0b1xx.h"
+ 1849              		.file 5 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 1850              		.file 6 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_def.h"
+ 1851              		.file 7 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_gpio.h"
+ 1852              		.file 8 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_dma.h"
+ 1853              		.file 9 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_uart.h"
+ 1854              		.file 10 "Core/Inc/ble.h"
+ 1855              		.file 11 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_dma.h"
+ 1856              		.file 12 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltool
+ 1857              		.file 13 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal.h"
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 41
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 ble.c
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:19     .rodata.CHANNEL_OFFSET_TAB:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:22     .rodata.CHANNEL_OFFSET_TAB:00000000 CHANNEL_OFFSET_TAB
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:25     .bss.ble_uart:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:28     .bss.ble_uart:00000000 ble_uart
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:33     .bss.rx_byte:00000000 rx_byte
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:34     .bss.rx_byte:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:39     .bss.ble_connected:00000000 ble_connected
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:40     .bss.ble_connected:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:45     .bss.ble_channel_open:00000000 ble_channel_open
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:46     .bss.ble_channel_open:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:51     .bss.ble_data_ready:00000000 ble_data_ready
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:52     .bss.ble_data_ready:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:58     .bss.ble_data_buf:00000000 ble_data_buf
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:55     .bss.ble_data_buf:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:65     .bss.ble_data_len:00000000 ble_data_len
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:62     .bss.ble_data_len:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:70     .data.ble_mps:00000000 ble_mps
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:76     .bss.ble_setname_pending:00000000 ble_setname_pending
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:77     .bss.ble_setname_pending:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:79     .bss.ble_pending_name:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:82     .bss.ble_pending_name:00000000 ble_pending_name
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:88     .bss.ble_get_ready:00000000 ble_get_ready
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:89     .bss.ble_get_ready:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:94     .data.ble_get_index:00000000 ble_get_index
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:101    .bss.ble_get_value:00000000 ble_get_value
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:98     .bss.ble_get_value:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:108    .bss.ble_get_len:00000000 ble_get_len
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:105    .bss.ble_get_len:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:113    .bss.pstate:00000000 pstate
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:114    .bss.pstate:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:118    .bss.frame_cmd:00000000 frame_cmd
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:119    .bss.frame_cmd:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:121    .bss.frame_len:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:124    .bss.frame_len:00000000 frame_len
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:127    .bss.frame_pos:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:130    .bss.frame_pos:00000000 frame_pos
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:133    .bss.frame_payload:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:136    .bss.frame_payload:00000000 frame_payload
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:141    .bss.frame_cs:00000000 frame_cs
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:142    .bss.frame_cs:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:144    .text.xor_cs:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:149    .text.xor_cs:00000000 xor_cs
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:228    .text.ble_dispatch:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:233    .text.ble_dispatch:00000000 ble_dispatch
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:481    .text.ble_dispatch:00000148 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:495    .text.BLE_ProcessByte:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:501    .text.BLE_ProcessByte:00000000 BLE_ProcessByte
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:534    .rodata.BLE_ProcessByte:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:750    .text.BLE_ProcessByte:00000144 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:761    .text.BLE_SendData:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:767    .text.BLE_SendData:00000000 BLE_SendData
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:993    .text.BLE_SendData:00000150 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1001   .text.BLE_SendString:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1007   .text.BLE_SendString:00000000 BLE_SendString
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1047   .text.ble_send_set:00000000 $t
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s 			page 42
+
+
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1052   .text.ble_send_set:00000000 ble_send_set
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1186   .text.ble_send_set:000000cc $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1193   .text.ble_send_cmd0:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1198   .text.ble_send_cmd0:00000000 ble_send_cmd0
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1264   .text.ble_send_cmd0:00000054 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1269   .text.ble_send_setname:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1274   .text.ble_send_setname:00000000 ble_send_setname
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1330   .text.BLE_SetDeviceName:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1336   .text.BLE_SetDeviceName:00000000 BLE_SetDeviceName
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1407   .text.BLE_SetDeviceName:00000050 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1415   .text.BLE_RequestSetting:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1421   .text.BLE_RequestSetting:00000000 BLE_RequestSetting
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1516   .text.BLE_RequestSetting:0000007c $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1523   .text.BLE_ProvisionSecurity:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1529   .text.BLE_ProvisionSecurity:00000000 BLE_ProvisionSecurity
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1597   .text.BLE_ProvisionSecurity:00000054 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1604   .text.BLE_Disconnect:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1610   .text.BLE_Disconnect:00000000 BLE_Disconnect
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1642   .text.BLE_Disconnect:00000018 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1647   .text.BLE_ApplyPendingName:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1653   .text.BLE_ApplyPendingName:00000000 BLE_ApplyPendingName
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1683   .text.BLE_ApplyPendingName:00000018 $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1689   .text.BLE_Init:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1695   .text.BLE_Init:00000000 BLE_Init
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1773   .text.BLE_Init:0000006c $d
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1784   .text.HAL_UART_RxCpltCallback:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1790   .text.HAL_UART_RxCpltCallback:00000000 HAL_UART_RxCpltCallback
+C:\Users\a_hae\AppData\Local\Temp\cc6tnRkA.s:1839   .text.HAL_UART_RxCpltCallback:00000034 $d
+
+UNDEFINED SYMBOLS
+memcpy
+HAL_UART_Transmit
+HAL_Delay
+strlen
+strncpy
+HAL_GPIO_WritePin
+HAL_UART_Receive_IT

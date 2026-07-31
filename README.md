@@ -21,17 +21,15 @@ sind per Taster oder über ein PC-Tool (PEAK PCAN-USB) möglich.
 
 ## Struktur
 
-Dieses Repository enthält die Firmware und das PC-Tool. Die **Handy-App**
-(Flutter) und der **OTA-Bootloader** liegen in eigenen Repositories
-(`Fuellstandsensor-App` bzw. `BootloaderCube`).
+Dieses Repository enthält die Firmware. Handy-App, OTA-Bootloader,
+Provisionierungs-Tool und PC-Programm liegen in eigenen Repositories
+(`Fuellstandsensor-App`, `BootloaderCube`, `LevelSense-Provision`,
+`LevelSense-NMEA2000`).
 
 - `Core/`, `Drivers/` – **Firmware** (STM32CubeIDE-Projekt).
   Kernquellen: main.c, nmea2000.c (NMEA2000), ble.c (Proteus-e),
   config_store.c (Flash-Speicher).
-- `PC_Tools/` – **PC-Programm** (Python, PEAK PCAN-USB)
-  - `nmea2000_gui.py` – grafische Oberfläche (Live-Anzeige, Kalibrierung, Tankform)
-  - `nmea2000_reader.py` – Dekodier-Bibliothek / Konsolen-Mitlese-Tool
-  - `BLE_Protokoll.md` – Spezifikation des BLE-Textprotokolls
+- `BLE_Protokoll.md` – Spezifikation des BLE-Textprotokolls für die Handy-App
 - `Inbetriebnahme.md` – Kurzanleitung zur Inbetriebnahme
 
 ## Firmware bauen
@@ -39,20 +37,22 @@ Dieses Repository enthält die Firmware und das PC-Tool. Die **Handy-App**
 Projekt in STM32CubeIDE öffnen und die Debug-Konfiguration bauen/flashen.
 Ziel-MCU: STM32G0B1KBU6N.
 
-## PC-Tool starten
+## PC-Tool
 
-```
-pip install python-can        # einmalig, PEAK-Treiber muss installiert sein
-cd PC_Tools
-python nmea2000_gui.py
-```
+Das PC-Programm für PEAK PCAN-USB – Live-Anzeige, Konfiguration, Kalibrierung,
+Tankform – liegt im Repository `LevelSense-NMEA2000`. Dort gibt es unter
+Releases eine fertige Windows-.exe; der PEAK-Treiber muss installiert sein.
+
+Ändert sich das proprietäre Protokoll auf PGN 126720 (`Core/Src/nmea_app.c`)
+oder die Werksadresse (`Core/Src/app_config.c`), gehört die Änderung dort im
+selben Zug nachgezogen.
 
 ## Versionsnummern
 
 Die Nummer hat drei Stellen, X.Y.Z, und jede Stelle hat eine feste Bedeutung:
 **X** steigt bei einer größeren Änderung, **Y** wenn ein kleineres Feature
 dazukommt (etwa eine neue Hardware-Variante), **Z** bei Bugfixes. Das gilt
-gleich in allen drei Repositories (Firmware, Bootloader, App).
+gleich in allen Repositories; jedes zählt dabei seine eigene Nummer.
 
 Die Firmware zählt in `FW_VERSION` (`Core/Inc/version.h`). Freigegeben wird über
 einen Tag `vX.Y.Z`; die CI bricht ab, wenn Tag und `FW_VERSION` nicht

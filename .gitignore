@@ -16,13 +16,10 @@
 # .project, .cproject, .ioc und .launch werden bewusst mitversioniert,
 # damit das CubeIDE-Projekt direkt geöffnet werden kann.
 
-# ===== Python (PC_Tools) =====
+# ===== Python =====
 __pycache__/
 *.pyc
 *.pyo
-build/
-dist/
-*.spec
 
 # ===== Sicherungskopien / IDE / OS =====
 *.bak

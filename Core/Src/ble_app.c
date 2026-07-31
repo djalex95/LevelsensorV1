@@ -97,7 +97,7 @@ static void ble_send_lin(void)
 
 /*
  * Verarbeitet ein Textkommando von der App (CMD_DATA_IND). Vollstaendige
- * Spezifikation in PC_Tools/BLE_Protokoll.md. Unterstützt (case-insensitive):
+ * Spezifikation in BLE_Protokoll.md. Unterstützt (case-insensitive):
  *   VER            Firmware-Version senden (VER;x.y.z)
  *   GET            aktuellen Status sofort senden (STAT;...)
  *   LIN            aktuelle Tankform-Kennlinie senden (LIN;...)

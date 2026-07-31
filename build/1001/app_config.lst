@@ -1,0 +1,1328 @@
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 1
+
+
+   1              		.cpu cortex-m0plus
+   2              		.arch armv6s-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 6
+  11              		.eabi_attribute 34, 0
+  12              		.eabi_attribute 18, 4
+  13              		.file	"app_config.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "Core/Src/app_config.c"
+  18              		.section	.rodata.CHANNEL_OFFSET_TAB,"a"
+  19              		.align	2
+  22              	CHANNEL_OFFSET_TAB:
+  23 0000 081C3044 		.ascii	"\010\0340DXl\200"
+  23      586C80
+  24              		.section	.text.check_EEPROM,"ax",%progbits
+  25              		.align	1
+  26              		.global	check_EEPROM
+  27              		.syntax unified
+  28              		.code	16
+  29              		.thumb_func
+  31              	check_EEPROM:
+  32              	.LFB363:
+   1:Core/Src/app_config.c **** /*
+   2:Core/Src/app_config.c ****  * app_config.c
+   3:Core/Src/app_config.c ****  *
+   4:Core/Src/app_config.c ****  * Konfigurations-/EEPROM-Helfer (siehe app_config.h). Aus main.c
+   5:Core/Src/app_config.c ****  * herausgezogen; Verhalten unveraendert. Arbeitet auf dem RAM-Cache
+   6:Core/Src/app_config.c ****  * cfg_data[] (config_store.c) und schreibt Aenderungen ueber config_save().
+   7:Core/Src/app_config.c ****  */
+   8:Core/Src/app_config.c **** #include "app_config.h"
+   9:Core/Src/app_config.c **** #include "config_store.h"
+  10:Core/Src/app_config.c **** #include <string.h>
+  11:Core/Src/app_config.c **** 
+  12:Core/Src/app_config.c **** uint8_t check_EEPROM(void)
+  13:Core/Src/app_config.c **** {
+  33              		.loc 1 13 1
+  34              		.cfi_startproc
+  35              		@ args = 0, pretend = 0, frame = 0
+  36              		@ frame_needed = 1, uses_anonymous_args = 0
+  37 0000 80B5     		push	{r7, lr}
+  38              	.LCFI0:
+  39              		.cfi_def_cfa_offset 8
+  40              		.cfi_offset 7, -8
+  41              		.cfi_offset 14, -4
+  42 0002 00AF     		add	r7, sp, #0
+  43              	.LCFI1:
+  44              		.cfi_def_cfa_register 7
+  14:Core/Src/app_config.c **** 	if (cfg_data[0] == 0xFF){
+  45              		.loc 1 14 14
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 2
+
+
+  46 0004 044B     		ldr	r3, .L4
+  47 0006 1B78     		ldrb	r3, [r3]
+  48              		.loc 1 14 5
+  49 0008 FF2B     		cmp	r3, #255
+  50 000a 01D1     		bne	.L2
+  15:Core/Src/app_config.c **** 		return 0;
+  51              		.loc 1 15 10
+  52 000c 0023     		movs	r3, #0
+  53 000e 00E0     		b	.L3
+  54              	.L2:
+  16:Core/Src/app_config.c **** 	}
+  17:Core/Src/app_config.c **** 	else{
+  18:Core/Src/app_config.c **** 		return 1;
+  55              		.loc 1 18 10
+  56 0010 0123     		movs	r3, #1
+  57              	.L3:
+  19:Core/Src/app_config.c **** 	}
+  20:Core/Src/app_config.c **** }
+  58              		.loc 1 20 1
+  59 0012 1800     		movs	r0, r3
+  60 0014 BD46     		mov	sp, r7
+  61              		@ sp needed
+  62 0016 80BD     		pop	{r7, pc}
+  63              	.L5:
+  64              		.align	2
+  65              	.L4:
+  66 0018 00000000 		.word	cfg_data
+  67              		.cfi_endproc
+  68              	.LFE363:
+  70              		.section	.text.get_EEPROM,"ax",%progbits
+  71              		.align	1
+  72              		.global	get_EEPROM
+  73              		.syntax unified
+  74              		.code	16
+  75              		.thumb_func
+  77              	get_EEPROM:
+  78              	.LFB364:
+  21:Core/Src/app_config.c **** 
+  22:Core/Src/app_config.c **** void get_EEPROM(calib_data *values)
+  23:Core/Src/app_config.c **** {
+  79              		.loc 1 23 1
+  80              		.cfi_startproc
+  81              		@ args = 0, pretend = 0, frame = 8
+  82              		@ frame_needed = 1, uses_anonymous_args = 0
+  83 0000 80B5     		push	{r7, lr}
+  84              	.LCFI2:
+  85              		.cfi_def_cfa_offset 8
+  86              		.cfi_offset 7, -8
+  87              		.cfi_offset 14, -4
+  88 0002 82B0     		sub	sp, sp, #8
+  89              	.LCFI3:
+  90              		.cfi_def_cfa_offset 16
+  91 0004 00AF     		add	r7, sp, #0
+  92              	.LCFI4:
+  93              		.cfi_def_cfa_register 7
+  94 0006 7860     		str	r0, [r7, #4]
+  24:Core/Src/app_config.c **** 	values->calib_available = cfg_data[0];
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 3
+
+
+  95              		.loc 1 24 36
+  96 0008 0D4B     		ldr	r3, .L7
+  97 000a 1A78     		ldrb	r2, [r3]
+  98              		.loc 1 24 26
+  99 000c 7B68     		ldr	r3, [r7, #4]
+ 100 000e 1A70     		strb	r2, [r3]
+  25:Core/Src/app_config.c **** 	values->max_val = ((uint32_t)cfg_data[4]<<24)|((uint32_t)cfg_data[3]<<16)|((uint32_t)cfg_data[2]<<
+ 101              		.loc 1 25 39
+ 102 0010 0B4B     		ldr	r3, .L7
+ 103 0012 1B79     		ldrb	r3, [r3, #4]
+ 104              		.loc 1 25 42
+ 105 0014 1A06     		lsls	r2, r3, #24
+ 106              		.loc 1 25 67
+ 107 0016 0A4B     		ldr	r3, .L7
+ 108 0018 DB78     		ldrb	r3, [r3, #3]
+ 109              		.loc 1 25 70
+ 110 001a 1B04     		lsls	r3, r3, #16
+ 111              		.loc 1 25 47
+ 112 001c 1A43     		orrs	r2, r3
+ 113              		.loc 1 25 95
+ 114 001e 084B     		ldr	r3, .L7
+ 115 0020 9B78     		ldrb	r3, [r3, #2]
+ 116              		.loc 1 25 98
+ 117 0022 1B02     		lsls	r3, r3, #8
+ 118              		.loc 1 25 75
+ 119 0024 1343     		orrs	r3, r2
+ 120              		.loc 1 25 112
+ 121 0026 064A     		ldr	r2, .L7
+ 122 0028 5278     		ldrb	r2, [r2, #1]
+ 123              		.loc 1 25 102
+ 124 002a 1A43     		orrs	r2, r3
+ 125              		.loc 1 25 18
+ 126 002c 7B68     		ldr	r3, [r7, #4]
+ 127 002e 5A60     		str	r2, [r3, #4]
+  26:Core/Src/app_config.c **** 	values->offset = std_offset;
+ 128              		.loc 1 26 17
+ 129 0030 7B68     		ldr	r3, [r7, #4]
+ 130 0032 0022     		movs	r2, #0
+ 131 0034 1A81     		strh	r2, [r3, #8]
+  27:Core/Src/app_config.c **** }
+ 132              		.loc 1 27 1
+ 133 0036 C046     		nop
+ 134 0038 BD46     		mov	sp, r7
+ 135 003a 02B0     		add	sp, sp, #8
+ 136              		@ sp needed
+ 137 003c 80BD     		pop	{r7, pc}
+ 138              	.L8:
+ 139 003e C046     		.align	2
+ 140              	.L7:
+ 141 0040 00000000 		.word	cfg_data
+ 142              		.cfi_endproc
+ 143              	.LFE364:
+ 145              		.section	.text.save_EEPROM,"ax",%progbits
+ 146              		.align	1
+ 147              		.global	save_EEPROM
+ 148              		.syntax unified
+ 149              		.code	16
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 4
+
+
+ 150              		.thumb_func
+ 152              	save_EEPROM:
+ 153              	.LFB365:
+  28:Core/Src/app_config.c **** 
+  29:Core/Src/app_config.c **** void save_EEPROM(calib_data *values)
+  30:Core/Src/app_config.c **** {
+ 154              		.loc 1 30 1
+ 155              		.cfi_startproc
+ 156              		@ args = 0, pretend = 0, frame = 8
+ 157              		@ frame_needed = 1, uses_anonymous_args = 0
+ 158 0000 80B5     		push	{r7, lr}
+ 159              	.LCFI5:
+ 160              		.cfi_def_cfa_offset 8
+ 161              		.cfi_offset 7, -8
+ 162              		.cfi_offset 14, -4
+ 163 0002 82B0     		sub	sp, sp, #8
+ 164              	.LCFI6:
+ 165              		.cfi_def_cfa_offset 16
+ 166 0004 00AF     		add	r7, sp, #0
+ 167              	.LCFI7:
+ 168              		.cfi_def_cfa_register 7
+ 169 0006 7860     		str	r0, [r7, #4]
+  31:Core/Src/app_config.c **** 	/* Nur die Kalibrierbytes im RAM-Cache aendern; config_save() schreibt
+  32:Core/Src/app_config.c **** 	 * den kompletten Block atomar (Ping-Pong, CRC). Bei Fehlschlag bleibt
+  33:Core/Src/app_config.c **** 	 * der alte Datensatz im Flash gueltig - kein Error_Handler noetig. */
+  34:Core/Src/app_config.c **** 	cfg_data[0] = values->calib_available;
+ 170              		.loc 1 34 22
+ 171 0008 7B68     		ldr	r3, [r7, #4]
+ 172 000a 1A78     		ldrb	r2, [r3]
+ 173              		.loc 1 34 14
+ 174 000c 0F4B     		ldr	r3, .L10
+ 175 000e 1A70     		strb	r2, [r3]
+  35:Core/Src/app_config.c **** 	cfg_data[1] = (uint8_t)(values->max_val & 0xFF);
+ 176              		.loc 1 35 32
+ 177 0010 7B68     		ldr	r3, [r7, #4]
+ 178 0012 5B68     		ldr	r3, [r3, #4]
+ 179              		.loc 1 35 16
+ 180 0014 DAB2     		uxtb	r2, r3
+ 181              		.loc 1 35 14
+ 182 0016 0D4B     		ldr	r3, .L10
+ 183 0018 5A70     		strb	r2, [r3, #1]
+  36:Core/Src/app_config.c **** 	cfg_data[2] = (uint8_t)((values->max_val >> 8) & 0xFF);
+ 184              		.loc 1 36 33
+ 185 001a 7B68     		ldr	r3, [r7, #4]
+ 186 001c 5B68     		ldr	r3, [r3, #4]
+ 187              		.loc 1 36 43
+ 188 001e 1B0A     		lsrs	r3, r3, #8
+ 189              		.loc 1 36 16
+ 190 0020 DAB2     		uxtb	r2, r3
+ 191              		.loc 1 36 14
+ 192 0022 0A4B     		ldr	r3, .L10
+ 193 0024 9A70     		strb	r2, [r3, #2]
+  37:Core/Src/app_config.c **** 	cfg_data[3] = (uint8_t)((values->max_val >> 16) & 0xFF);
+ 194              		.loc 1 37 33
+ 195 0026 7B68     		ldr	r3, [r7, #4]
+ 196 0028 5B68     		ldr	r3, [r3, #4]
+ 197              		.loc 1 37 43
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 5
+
+
+ 198 002a 1B0C     		lsrs	r3, r3, #16
+ 199              		.loc 1 37 16
+ 200 002c DAB2     		uxtb	r2, r3
+ 201              		.loc 1 37 14
+ 202 002e 074B     		ldr	r3, .L10
+ 203 0030 DA70     		strb	r2, [r3, #3]
+  38:Core/Src/app_config.c **** 	cfg_data[4] = (uint8_t)((values->max_val >> 24) & 0xFF);
+ 204              		.loc 1 38 33
+ 205 0032 7B68     		ldr	r3, [r7, #4]
+ 206 0034 5B68     		ldr	r3, [r3, #4]
+ 207              		.loc 1 38 43
+ 208 0036 1B0E     		lsrs	r3, r3, #24
+ 209              		.loc 1 38 16
+ 210 0038 DAB2     		uxtb	r2, r3
+ 211              		.loc 1 38 14
+ 212 003a 044B     		ldr	r3, .L10
+ 213 003c 1A71     		strb	r2, [r3, #4]
+  39:Core/Src/app_config.c **** 
+  40:Core/Src/app_config.c **** 	config_save();
+ 214              		.loc 1 40 2
+ 215 003e FFF7FEFF 		bl	config_save
+  41:Core/Src/app_config.c **** }
+ 216              		.loc 1 41 1
+ 217 0042 C046     		nop
+ 218 0044 BD46     		mov	sp, r7
+ 219 0046 02B0     		add	sp, sp, #8
+ 220              		@ sp needed
+ 221 0048 80BD     		pop	{r7, pc}
+ 222              	.L11:
+ 223 004a C046     		.align	2
+ 224              	.L10:
+ 225 004c 00000000 		.word	cfg_data
+ 226              		.cfi_endproc
+ 227              	.LFE365:
+ 229              		.section	.text.check_dac_EEPROM,"ax",%progbits
+ 230              		.align	1
+ 231              		.global	check_dac_EEPROM
+ 232              		.syntax unified
+ 233              		.code	16
+ 234              		.thumb_func
+ 236              	check_dac_EEPROM:
+ 237              	.LFB366:
+  42:Core/Src/app_config.c **** 
+  43:Core/Src/app_config.c **** 
+  44:Core/Src/app_config.c **** uint8_t check_dac_EEPROM(void)
+  45:Core/Src/app_config.c **** {
+ 238              		.loc 1 45 1
+ 239              		.cfi_startproc
+ 240              		@ args = 0, pretend = 0, frame = 0
+ 241              		@ frame_needed = 1, uses_anonymous_args = 0
+ 242 0000 80B5     		push	{r7, lr}
+ 243              	.LCFI8:
+ 244              		.cfi_def_cfa_offset 8
+ 245              		.cfi_offset 7, -8
+ 246              		.cfi_offset 14, -4
+ 247 0002 00AF     		add	r7, sp, #0
+ 248              	.LCFI9:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 6
+
+
+ 249              		.cfi_def_cfa_register 7
+  46:Core/Src/app_config.c **** 	return cfg_data[8];
+ 250              		.loc 1 46 17
+ 251 0004 024B     		ldr	r3, .L14
+ 252 0006 1B7A     		ldrb	r3, [r3, #8]
+  47:Core/Src/app_config.c **** }
+ 253              		.loc 1 47 1
+ 254 0008 1800     		movs	r0, r3
+ 255 000a BD46     		mov	sp, r7
+ 256              		@ sp needed
+ 257 000c 80BD     		pop	{r7, pc}
+ 258              	.L15:
+ 259 000e C046     		.align	2
+ 260              	.L14:
+ 261 0010 00000000 		.word	cfg_data
+ 262              		.cfi_endproc
+ 263              	.LFE366:
+ 265              		.section	.text.get_dac_EEPROM,"ax",%progbits
+ 266              		.align	1
+ 267              		.global	get_dac_EEPROM
+ 268              		.syntax unified
+ 269              		.code	16
+ 270              		.thumb_func
+ 272              	get_dac_EEPROM:
+ 273              	.LFB367:
+  48:Core/Src/app_config.c **** 
+  49:Core/Src/app_config.c **** void get_dac_EEPROM(dac_calib_data *values)
+  50:Core/Src/app_config.c **** {
+ 274              		.loc 1 50 1
+ 275              		.cfi_startproc
+ 276              		@ args = 0, pretend = 0, frame = 8
+ 277              		@ frame_needed = 1, uses_anonymous_args = 0
+ 278 0000 80B5     		push	{r7, lr}
+ 279              	.LCFI10:
+ 280              		.cfi_def_cfa_offset 8
+ 281              		.cfi_offset 7, -8
+ 282              		.cfi_offset 14, -4
+ 283 0002 82B0     		sub	sp, sp, #8
+ 284              	.LCFI11:
+ 285              		.cfi_def_cfa_offset 16
+ 286 0004 00AF     		add	r7, sp, #0
+ 287              	.LCFI12:
+ 288              		.cfi_def_cfa_register 7
+ 289 0006 7860     		str	r0, [r7, #4]
+  51:Core/Src/app_config.c **** 	values->calib_available = cfg_data[8];
+ 290              		.loc 1 51 36
+ 291 0008 144B     		ldr	r3, .L17
+ 292 000a 1A7A     		ldrb	r2, [r3, #8]
+ 293              		.loc 1 51 26
+ 294 000c 7B68     		ldr	r3, [r7, #4]
+ 295 000e 1A70     		strb	r2, [r3]
+  52:Core/Src/app_config.c **** 	values->dac_mx = ((uint32_t)cfg_data[12]<<24)|((uint32_t)cfg_data[11]<<16)|((uint32_t)cfg_data[10]
+ 296              		.loc 1 52 38
+ 297 0010 124B     		ldr	r3, .L17
+ 298 0012 1B7B     		ldrb	r3, [r3, #12]
+ 299              		.loc 1 52 42
+ 300 0014 1A06     		lsls	r2, r3, #24
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 7
+
+
+ 301              		.loc 1 52 67
+ 302 0016 114B     		ldr	r3, .L17
+ 303 0018 DB7A     		ldrb	r3, [r3, #11]
+ 304              		.loc 1 52 71
+ 305 001a 1B04     		lsls	r3, r3, #16
+ 306              		.loc 1 52 47
+ 307 001c 1A43     		orrs	r2, r3
+ 308              		.loc 1 52 96
+ 309 001e 0F4B     		ldr	r3, .L17
+ 310 0020 9B7A     		ldrb	r3, [r3, #10]
+ 311              		.loc 1 52 100
+ 312 0022 1B02     		lsls	r3, r3, #8
+ 313              		.loc 1 52 76
+ 314 0024 1343     		orrs	r3, r2
+ 315              		.loc 1 52 114
+ 316 0026 0D4A     		ldr	r2, .L17
+ 317 0028 527A     		ldrb	r2, [r2, #9]
+ 318              		.loc 1 52 104
+ 319 002a 1343     		orrs	r3, r2
+ 320 002c 1A00     		movs	r2, r3
+ 321              		.loc 1 52 17
+ 322 002e 7B68     		ldr	r3, [r7, #4]
+ 323 0030 5A60     		str	r2, [r3, #4]
+  53:Core/Src/app_config.c **** 	values->dac_c = ((uint32_t)cfg_data[16]<<24)|((uint32_t)cfg_data[15]<<16)|((uint32_t)cfg_data[14]<
+ 324              		.loc 1 53 37
+ 325 0032 0A4B     		ldr	r3, .L17
+ 326 0034 1B7C     		ldrb	r3, [r3, #16]
+ 327              		.loc 1 53 41
+ 328 0036 1A06     		lsls	r2, r3, #24
+ 329              		.loc 1 53 66
+ 330 0038 084B     		ldr	r3, .L17
+ 331 003a DB7B     		ldrb	r3, [r3, #15]
+ 332              		.loc 1 53 70
+ 333 003c 1B04     		lsls	r3, r3, #16
+ 334              		.loc 1 53 46
+ 335 003e 1A43     		orrs	r2, r3
+ 336              		.loc 1 53 95
+ 337 0040 064B     		ldr	r3, .L17
+ 338 0042 9B7B     		ldrb	r3, [r3, #14]
+ 339              		.loc 1 53 99
+ 340 0044 1B02     		lsls	r3, r3, #8
+ 341              		.loc 1 53 75
+ 342 0046 1343     		orrs	r3, r2
+ 343              		.loc 1 53 113
+ 344 0048 044A     		ldr	r2, .L17
+ 345 004a 527B     		ldrb	r2, [r2, #13]
+ 346              		.loc 1 53 103
+ 347 004c 1343     		orrs	r3, r2
+ 348 004e 1A00     		movs	r2, r3
+ 349              		.loc 1 53 16
+ 350 0050 7B68     		ldr	r3, [r7, #4]
+ 351 0052 9A60     		str	r2, [r3, #8]
+  54:Core/Src/app_config.c **** }
+ 352              		.loc 1 54 1
+ 353 0054 C046     		nop
+ 354 0056 BD46     		mov	sp, r7
+ 355 0058 02B0     		add	sp, sp, #8
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 8
+
+
+ 356              		@ sp needed
+ 357 005a 80BD     		pop	{r7, pc}
+ 358              	.L18:
+ 359              		.align	2
+ 360              	.L17:
+ 361 005c 00000000 		.word	cfg_data
+ 362              		.cfi_endproc
+ 363              	.LFE367:
+ 365              		.section	.text.set_param_eeprom,"ax",%progbits
+ 366              		.align	1
+ 367              		.global	set_param_eeprom
+ 368              		.syntax unified
+ 369              		.code	16
+ 370              		.thumb_func
+ 372              	set_param_eeprom:
+ 373              	.LFB368:
+  55:Core/Src/app_config.c **** 
+  56:Core/Src/app_config.c **** void set_param_eeprom(NMEA_parameter_Device *nmea_param, prod_param *values)
+  57:Core/Src/app_config.c **** {
+ 374              		.loc 1 57 1
+ 375              		.cfi_startproc
+ 376              		@ args = 0, pretend = 0, frame = 8
+ 377              		@ frame_needed = 1, uses_anonymous_args = 0
+ 378 0000 80B5     		push	{r7, lr}
+ 379              	.LCFI13:
+ 380              		.cfi_def_cfa_offset 8
+ 381              		.cfi_offset 7, -8
+ 382              		.cfi_offset 14, -4
+ 383 0002 82B0     		sub	sp, sp, #8
+ 384              	.LCFI14:
+ 385              		.cfi_def_cfa_offset 16
+ 386 0004 00AF     		add	r7, sp, #0
+ 387              	.LCFI15:
+ 388              		.cfi_def_cfa_register 7
+ 389 0006 7860     		str	r0, [r7, #4]
+ 390 0008 3960     		str	r1, [r7]
+  58:Core/Src/app_config.c **** 	cfg_data[17] = nmea_param->fluidType;
+ 391              		.loc 1 58 27
+ 392 000a 7B68     		ldr	r3, [r7, #4]
+ 393 000c 1A7B     		ldrb	r2, [r3, #12]
+ 394              		.loc 1 58 15
+ 395 000e 0B4B     		ldr	r3, .L20
+ 396 0010 5A74     		strb	r2, [r3, #17]
+  59:Core/Src/app_config.c **** 	cfg_data[18] = nmea_param->cap;
+ 397              		.loc 1 59 27
+ 398 0012 7B68     		ldr	r3, [r7, #4]
+ 399 0014 5A7B     		ldrb	r2, [r3, #13]
+ 400              		.loc 1 59 15
+ 401 0016 094B     		ldr	r3, .L20
+ 402 0018 9A74     		strb	r2, [r3, #18]
+  60:Core/Src/app_config.c **** 	memcpy(&cfg_data[19], values->lin_point, 11);
+ 403              		.loc 1 60 30
+ 404 001a 3B68     		ldr	r3, [r7]
+ 405 001c 991C     		adds	r1, r3, #2
+ 406              		.loc 1 60 2
+ 407 001e 084B     		ldr	r3, .L20+4
+ 408 0020 0B22     		movs	r2, #11
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 9
+
+
+ 409 0022 1800     		movs	r0, r3
+ 410 0024 FFF7FEFF 		bl	memcpy
+  61:Core/Src/app_config.c **** 	cfg_data[31] = nmea_param->devInstance;		/* Byte 30 (Adresse) bleibt erhalten */
+ 411              		.loc 1 61 27
+ 412 0028 7B68     		ldr	r3, [r7, #4]
+ 413 002a 1A7A     		ldrb	r2, [r3, #8]
+ 414              		.loc 1 61 15
+ 415 002c 034B     		ldr	r3, .L20
+ 416 002e DA77     		strb	r2, [r3, #31]
+  62:Core/Src/app_config.c **** 
+  63:Core/Src/app_config.c **** 	config_save();
+ 417              		.loc 1 63 2
+ 418 0030 FFF7FEFF 		bl	config_save
+  64:Core/Src/app_config.c **** }
+ 419              		.loc 1 64 1
+ 420 0034 C046     		nop
+ 421 0036 BD46     		mov	sp, r7
+ 422 0038 02B0     		add	sp, sp, #8
+ 423              		@ sp needed
+ 424 003a 80BD     		pop	{r7, pc}
+ 425              	.L21:
+ 426              		.align	2
+ 427              	.L20:
+ 428 003c 00000000 		.word	cfg_data
+ 429 0040 13000000 		.word	cfg_data+19
+ 430              		.cfi_endproc
+ 431              	.LFE368:
+ 433              		.section	.rodata
+ 434              		.align	2
+ 435              	.LC7:
+ 436 0000 000A141E 		.ascii	"\000\012\024\036(2<FPZd"
+ 436      28323C46 
+ 436      505A64
+ 437              		.section	.text.get_param_eeprom,"ax",%progbits
+ 438              		.align	1
+ 439              		.global	get_param_eeprom
+ 440              		.syntax unified
+ 441              		.code	16
+ 442              		.thumb_func
+ 444              	get_param_eeprom:
+ 445              	.LFB369:
+  65:Core/Src/app_config.c **** 
+  66:Core/Src/app_config.c **** void get_param_eeprom(NMEA_parameter_Device *nmea_param, prod_param *values)
+  67:Core/Src/app_config.c **** {
+ 446              		.loc 1 67 1
+ 447              		.cfi_startproc
+ 448              		@ args = 0, pretend = 0, frame = 24
+ 449              		@ frame_needed = 1, uses_anonymous_args = 0
+ 450 0000 90B5     		push	{r4, r7, lr}
+ 451              	.LCFI16:
+ 452              		.cfi_def_cfa_offset 12
+ 453              		.cfi_offset 4, -12
+ 454              		.cfi_offset 7, -8
+ 455              		.cfi_offset 14, -4
+ 456 0002 87B0     		sub	sp, sp, #28
+ 457              	.LCFI17:
+ 458              		.cfi_def_cfa_offset 40
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 10
+
+
+ 459 0004 00AF     		add	r7, sp, #0
+ 460              	.LCFI18:
+ 461              		.cfi_def_cfa_register 7
+ 462 0006 7860     		str	r0, [r7, #4]
+ 463 0008 3960     		str	r1, [r7]
+  68:Core/Src/app_config.c **** 	uint8_t lin_std[11] = {0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100};
+ 464              		.loc 1 68 10
+ 465 000a 0C24     		movs	r4, #12
+ 466 000c 3B19     		adds	r3, r7, r4
+ 467 000e 294A     		ldr	r2, .L28
+ 468 0010 03CA     		ldmia	r2!, {r0, r1}
+ 469 0012 03C3     		stmia	r3!, {r0, r1}
+ 470 0014 1188     		ldrh	r1, [r2]
+ 471 0016 1980     		strh	r1, [r3]
+ 472 0018 9278     		ldrb	r2, [r2, #2]
+ 473 001a 9A70     		strb	r2, [r3, #2]
+  69:Core/Src/app_config.c **** 
+  70:Core/Src/app_config.c **** 	if(cfg_data[17] == 0xFF)
+ 474              		.loc 1 70 13
+ 475 001c 264B     		ldr	r3, .L28+4
+ 476 001e 5B7C     		ldrb	r3, [r3, #17]
+ 477              		.loc 1 70 4
+ 478 0020 FF2B     		cmp	r3, #255
+ 479 0022 18D1     		bne	.L23
+  71:Core/Src/app_config.c **** 	{
+  72:Core/Src/app_config.c **** 		nmea_param->fluidType = 0x01;
+ 480              		.loc 1 72 25
+ 481 0024 7B68     		ldr	r3, [r7, #4]
+ 482 0026 0122     		movs	r2, #1
+ 483 0028 1A73     		strb	r2, [r3, #12]
+  73:Core/Src/app_config.c **** 		nmea_param->cap = 100;
+ 484              		.loc 1 73 19
+ 485 002a 7B68     		ldr	r3, [r7, #4]
+ 486 002c 6422     		movs	r2, #100
+ 487 002e 5A73     		strb	r2, [r3, #13]
+  74:Core/Src/app_config.c **** 		nmea_param->devInstance = 0;
+ 488              		.loc 1 74 27
+ 489 0030 7B68     		ldr	r3, [r7, #4]
+ 490 0032 0022     		movs	r2, #0
+ 491 0034 1A72     		strb	r2, [r3, #8]
+  75:Core/Src/app_config.c **** 		memcpy(values->lin_point, &lin_std,11);
+ 492              		.loc 1 75 16
+ 493 0036 3B68     		ldr	r3, [r7]
+ 494 0038 9A1C     		adds	r2, r3, #2
+ 495              		.loc 1 75 3
+ 496 003a 3B19     		adds	r3, r7, r4
+ 497 003c 1000     		movs	r0, r2
+ 498 003e 1900     		movs	r1, r3
+ 499 0040 0B23     		movs	r3, #11
+ 500 0042 1A00     		movs	r2, r3
+ 501 0044 FFF7FEFF 		bl	memcpy
+  76:Core/Src/app_config.c **** 		set_param_eeprom(nmea_param, values);
+ 502              		.loc 1 76 3
+ 503 0048 3A68     		ldr	r2, [r7]
+ 504 004a 7B68     		ldr	r3, [r7, #4]
+ 505 004c 1100     		movs	r1, r2
+ 506 004e 1800     		movs	r0, r3
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 11
+
+
+ 507 0050 FFF7FEFF 		bl	set_param_eeprom
+  77:Core/Src/app_config.c **** 	}
+  78:Core/Src/app_config.c **** 	else
+  79:Core/Src/app_config.c **** 	{
+  80:Core/Src/app_config.c **** 		nmea_param->fluidType = cfg_data[17];
+  81:Core/Src/app_config.c **** 		nmea_param->cap = cfg_data[18];
+  82:Core/Src/app_config.c **** 		memcpy(values->lin_point, &cfg_data[19], 11);
+  83:Core/Src/app_config.c **** 		nmea_param->devInstance = (cfg_data[31] <= 0x0F) ? cfg_data[31] : 0;
+  84:Core/Src/app_config.c **** 
+  85:Core/Src/app_config.c **** 		if (!lin_table_valid(values->lin_point))	/* defekte Tabelle -> Identitaet */
+  86:Core/Src/app_config.c **** 		{
+  87:Core/Src/app_config.c **** 			memcpy(values->lin_point, &lin_std, 11);
+  88:Core/Src/app_config.c **** 		}
+  89:Core/Src/app_config.c **** 	}
+  90:Core/Src/app_config.c **** }
+ 508              		.loc 1 90 1
+ 509 0054 29E0     		b	.L27
+ 510              	.L23:
+  80:Core/Src/app_config.c **** 		nmea_param->cap = cfg_data[18];
+ 511              		.loc 1 80 35
+ 512 0056 184B     		ldr	r3, .L28+4
+ 513 0058 5A7C     		ldrb	r2, [r3, #17]
+  80:Core/Src/app_config.c **** 		nmea_param->cap = cfg_data[18];
+ 514              		.loc 1 80 25
+ 515 005a 7B68     		ldr	r3, [r7, #4]
+ 516 005c 1A73     		strb	r2, [r3, #12]
+  81:Core/Src/app_config.c **** 		memcpy(values->lin_point, &cfg_data[19], 11);
+ 517              		.loc 1 81 29
+ 518 005e 164B     		ldr	r3, .L28+4
+ 519 0060 9A7C     		ldrb	r2, [r3, #18]
+  81:Core/Src/app_config.c **** 		memcpy(values->lin_point, &cfg_data[19], 11);
+ 520              		.loc 1 81 19
+ 521 0062 7B68     		ldr	r3, [r7, #4]
+ 522 0064 5A73     		strb	r2, [r3, #13]
+  82:Core/Src/app_config.c **** 		nmea_param->devInstance = (cfg_data[31] <= 0x0F) ? cfg_data[31] : 0;
+ 523              		.loc 1 82 16
+ 524 0066 3B68     		ldr	r3, [r7]
+ 525 0068 0233     		adds	r3, r3, #2
+  82:Core/Src/app_config.c **** 		nmea_param->devInstance = (cfg_data[31] <= 0x0F) ? cfg_data[31] : 0;
+ 526              		.loc 1 82 3
+ 527 006a 1449     		ldr	r1, .L28+8
+ 528 006c 0B22     		movs	r2, #11
+ 529 006e 1800     		movs	r0, r3
+ 530 0070 FFF7FEFF 		bl	memcpy
+  83:Core/Src/app_config.c **** 
+ 531              		.loc 1 83 38
+ 532 0074 104B     		ldr	r3, .L28+4
+ 533 0076 DB7F     		ldrb	r3, [r3, #31]
+  83:Core/Src/app_config.c **** 
+ 534              		.loc 1 83 27
+ 535 0078 0F2B     		cmp	r3, #15
+ 536 007a 02D8     		bhi	.L25
+  83:Core/Src/app_config.c **** 
+ 537              		.loc 1 83 27 is_stmt 0 discriminator 1
+ 538 007c 0E4B     		ldr	r3, .L28+4
+ 539 007e DA7F     		ldrb	r2, [r3, #31]
+ 540 0080 00E0     		b	.L26
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 12
+
+
+ 541              	.L25:
+  83:Core/Src/app_config.c **** 
+ 542              		.loc 1 83 27 discriminator 2
+ 543 0082 0022     		movs	r2, #0
+ 544              	.L26:
+  83:Core/Src/app_config.c **** 
+ 545              		.loc 1 83 27 discriminator 4
+ 546 0084 7B68     		ldr	r3, [r7, #4]
+ 547 0086 1A72     		strb	r2, [r3, #8]
+  85:Core/Src/app_config.c **** 		{
+ 548              		.loc 1 85 30 is_stmt 1
+ 549 0088 3B68     		ldr	r3, [r7]
+ 550 008a 0233     		adds	r3, r3, #2
+  85:Core/Src/app_config.c **** 		{
+ 551              		.loc 1 85 8
+ 552 008c 1800     		movs	r0, r3
+ 553 008e FFF7FEFF 		bl	lin_table_valid
+ 554 0092 031E     		subs	r3, r0, #0
+  85:Core/Src/app_config.c **** 		{
+ 555              		.loc 1 85 6 discriminator 1
+ 556 0094 09D1     		bne	.L27
+  87:Core/Src/app_config.c **** 		}
+ 557              		.loc 1 87 17
+ 558 0096 3B68     		ldr	r3, [r7]
+ 559 0098 9A1C     		adds	r2, r3, #2
+  87:Core/Src/app_config.c **** 		}
+ 560              		.loc 1 87 4
+ 561 009a 0C23     		movs	r3, #12
+ 562 009c FB18     		adds	r3, r7, r3
+ 563 009e 1000     		movs	r0, r2
+ 564 00a0 1900     		movs	r1, r3
+ 565 00a2 0B23     		movs	r3, #11
+ 566 00a4 1A00     		movs	r2, r3
+ 567 00a6 FFF7FEFF 		bl	memcpy
+ 568              	.L27:
+ 569              		.loc 1 90 1
+ 570 00aa C046     		nop
+ 571 00ac BD46     		mov	sp, r7
+ 572 00ae 07B0     		add	sp, sp, #28
+ 573              		@ sp needed
+ 574 00b0 90BD     		pop	{r4, r7, pc}
+ 575              	.L29:
+ 576 00b2 C046     		.align	2
+ 577              	.L28:
+ 578 00b4 00000000 		.word	.LC7
+ 579 00b8 00000000 		.word	cfg_data
+ 580 00bc 13000000 		.word	cfg_data+19
+ 581              		.cfi_endproc
+ 582              	.LFE369:
+ 584              		.section	.text.lin_table_valid,"ax",%progbits
+ 585              		.align	1
+ 586              		.global	lin_table_valid
+ 587              		.syntax unified
+ 588              		.code	16
+ 589              		.thumb_func
+ 591              	lin_table_valid:
+ 592              	.LFB370:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 13
+
+
+  91:Core/Src/app_config.c **** 
+  92:Core/Src/app_config.c **** /*
+  93:Core/Src/app_config.c ****  * Prueft die Stuetzstellen-Tabelle: 11 Werte in Prozent (0..100),
+  94:Core/Src/app_config.c ****  * monoton nicht fallend. lin_point[i] = Volumen-% bei Fuellhoehe i*10 %.
+  95:Core/Src/app_config.c ****  */
+  96:Core/Src/app_config.c **** uint8_t lin_table_valid(uint8_t *t)
+  97:Core/Src/app_config.c **** {
+ 593              		.loc 1 97 1
+ 594              		.cfi_startproc
+ 595              		@ args = 0, pretend = 0, frame = 16
+ 596              		@ frame_needed = 1, uses_anonymous_args = 0
+ 597 0000 80B5     		push	{r7, lr}
+ 598              	.LCFI19:
+ 599              		.cfi_def_cfa_offset 8
+ 600              		.cfi_offset 7, -8
+ 601              		.cfi_offset 14, -4
+ 602 0002 84B0     		sub	sp, sp, #16
+ 603              	.LCFI20:
+ 604              		.cfi_def_cfa_offset 24
+ 605 0004 00AF     		add	r7, sp, #0
+ 606              	.LCFI21:
+ 607              		.cfi_def_cfa_register 7
+ 608 0006 7860     		str	r0, [r7, #4]
+ 609              	.LBB2:
+  98:Core/Src/app_config.c **** 	for (uint8_t i = 0; i < 11; i++)
+ 610              		.loc 1 98 15
+ 611 0008 0F23     		movs	r3, #15
+ 612 000a FB18     		adds	r3, r7, r3
+ 613 000c 0022     		movs	r2, #0
+ 614 000e 1A70     		strb	r2, [r3]
+ 615              		.loc 1 98 2
+ 616 0010 0FE0     		b	.L31
+ 617              	.L34:
+  99:Core/Src/app_config.c **** 	{
+ 100:Core/Src/app_config.c **** 		if (t[i] > 100)
+ 618              		.loc 1 100 8
+ 619 0012 0F23     		movs	r3, #15
+ 620 0014 FB18     		adds	r3, r7, r3
+ 621 0016 1B78     		ldrb	r3, [r3]
+ 622 0018 7A68     		ldr	r2, [r7, #4]
+ 623 001a D318     		adds	r3, r2, r3
+ 624 001c 1B78     		ldrb	r3, [r3]
+ 625              		.loc 1 100 6
+ 626 001e 642B     		cmp	r3, #100
+ 627 0020 01D9     		bls	.L32
+ 101:Core/Src/app_config.c **** 		{
+ 102:Core/Src/app_config.c **** 			return 0;
+ 628              		.loc 1 102 11
+ 629 0022 0023     		movs	r3, #0
+ 630 0024 2BE0     		b	.L33
+ 631              	.L32:
+  98:Core/Src/app_config.c **** 	{
+ 632              		.loc 1 98 31 discriminator 2
+ 633 0026 0F21     		movs	r1, #15
+ 634 0028 7B18     		adds	r3, r7, r1
+ 635 002a 1A78     		ldrb	r2, [r3]
+ 636 002c 7B18     		adds	r3, r7, r1
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 14
+
+
+ 637 002e 0132     		adds	r2, r2, #1
+ 638 0030 1A70     		strb	r2, [r3]
+ 639              	.L31:
+  98:Core/Src/app_config.c **** 	{
+ 640              		.loc 1 98 24 discriminator 1
+ 641 0032 0F23     		movs	r3, #15
+ 642 0034 FB18     		adds	r3, r7, r3
+ 643 0036 1B78     		ldrb	r3, [r3]
+ 644 0038 0A2B     		cmp	r3, #10
+ 645 003a EAD9     		bls	.L34
+ 646              	.LBE2:
+ 647              	.LBB3:
+ 103:Core/Src/app_config.c **** 		}
+ 104:Core/Src/app_config.c **** 	}
+ 105:Core/Src/app_config.c **** 	for (uint8_t i = 0; i < 10; i++)
+ 648              		.loc 1 105 15
+ 649 003c 0E23     		movs	r3, #14
+ 650 003e FB18     		adds	r3, r7, r3
+ 651 0040 0022     		movs	r2, #0
+ 652 0042 1A70     		strb	r2, [r3]
+ 653              		.loc 1 105 2
+ 654 0044 15E0     		b	.L35
+ 655              	.L37:
+ 106:Core/Src/app_config.c **** 	{
+ 107:Core/Src/app_config.c **** 		if (t[i+1] < t[i])
+ 656              		.loc 1 107 8
+ 657 0046 0E21     		movs	r1, #14
+ 658 0048 7B18     		adds	r3, r7, r1
+ 659 004a 1B78     		ldrb	r3, [r3]
+ 660 004c 0133     		adds	r3, r3, #1
+ 661 004e 7A68     		ldr	r2, [r7, #4]
+ 662 0050 D318     		adds	r3, r2, r3
+ 663 0052 1A78     		ldrb	r2, [r3]
+ 664              		.loc 1 107 17
+ 665 0054 7B18     		adds	r3, r7, r1
+ 666 0056 1B78     		ldrb	r3, [r3]
+ 667 0058 7968     		ldr	r1, [r7, #4]
+ 668 005a CB18     		adds	r3, r1, r3
+ 669 005c 1B78     		ldrb	r3, [r3]
+ 670              		.loc 1 107 6
+ 671 005e 9A42     		cmp	r2, r3
+ 672 0060 01D2     		bcs	.L36
+ 108:Core/Src/app_config.c **** 		{
+ 109:Core/Src/app_config.c **** 			return 0;
+ 673              		.loc 1 109 11
+ 674 0062 0023     		movs	r3, #0
+ 675 0064 0BE0     		b	.L33
+ 676              	.L36:
+ 105:Core/Src/app_config.c **** 	{
+ 677              		.loc 1 105 31 discriminator 2
+ 678 0066 0E21     		movs	r1, #14
+ 679 0068 7B18     		adds	r3, r7, r1
+ 680 006a 1A78     		ldrb	r2, [r3]
+ 681 006c 7B18     		adds	r3, r7, r1
+ 682 006e 0132     		adds	r2, r2, #1
+ 683 0070 1A70     		strb	r2, [r3]
+ 684              	.L35:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 15
+
+
+ 105:Core/Src/app_config.c **** 	{
+ 685              		.loc 1 105 24 discriminator 1
+ 686 0072 0E23     		movs	r3, #14
+ 687 0074 FB18     		adds	r3, r7, r3
+ 688 0076 1B78     		ldrb	r3, [r3]
+ 689 0078 092B     		cmp	r3, #9
+ 690 007a E4D9     		bls	.L37
+ 691              	.LBE3:
+ 110:Core/Src/app_config.c **** 		}
+ 111:Core/Src/app_config.c **** 	}
+ 112:Core/Src/app_config.c **** 	return 1;
+ 692              		.loc 1 112 9
+ 693 007c 0123     		movs	r3, #1
+ 694              	.L33:
+ 113:Core/Src/app_config.c **** }
+ 695              		.loc 1 113 1
+ 696 007e 1800     		movs	r0, r3
+ 697 0080 BD46     		mov	sp, r7
+ 698 0082 04B0     		add	sp, sp, #16
+ 699              		@ sp needed
+ 700 0084 80BD     		pop	{r7, pc}
+ 701              		.cfi_endproc
+ 702              	.LFE370:
+ 704              		.section	.text.get_adr_eeprom,"ax",%progbits
+ 705              		.align	1
+ 706              		.global	get_adr_eeprom
+ 707              		.syntax unified
+ 708              		.code	16
+ 709              		.thumb_func
+ 711              	get_adr_eeprom:
+ 712              	.LFB371:
+ 114:Core/Src/app_config.c **** 
+ 115:Core/Src/app_config.c **** /* Config-Byte 30: zuletzt erfolgreich geclaimte NMEA2000-Quelladresse */
+ 116:Core/Src/app_config.c **** uint8_t get_adr_eeprom(void)
+ 117:Core/Src/app_config.c **** {
+ 713              		.loc 1 117 1
+ 714              		.cfi_startproc
+ 715              		@ args = 0, pretend = 0, frame = 8
+ 716              		@ frame_needed = 1, uses_anonymous_args = 0
+ 717 0000 80B5     		push	{r7, lr}
+ 718              	.LCFI22:
+ 719              		.cfi_def_cfa_offset 8
+ 720              		.cfi_offset 7, -8
+ 721              		.cfi_offset 14, -4
+ 722 0002 82B0     		sub	sp, sp, #8
+ 723              	.LCFI23:
+ 724              		.cfi_def_cfa_offset 16
+ 725 0004 00AF     		add	r7, sp, #0
+ 726              	.LCFI24:
+ 727              		.cfi_def_cfa_register 7
+ 118:Core/Src/app_config.c **** 	uint8_t adr = cfg_data[30];
+ 728              		.loc 1 118 10
+ 729 0006 FB1D     		adds	r3, r7, #7
+ 730 0008 074A     		ldr	r2, .L41
+ 731 000a 927F     		ldrb	r2, [r2, #30]
+ 732 000c 1A70     		strb	r2, [r3]
+ 119:Core/Src/app_config.c **** 
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 16
+
+
+ 120:Core/Src/app_config.c **** 	if (adr > 251)		/* 0xFF = leer, >251 = ungueltig */
+ 733              		.loc 1 120 5
+ 734 000e FB1D     		adds	r3, r7, #7
+ 735 0010 1B78     		ldrb	r3, [r3]
+ 736 0012 FB2B     		cmp	r3, #251
+ 737 0014 02D9     		bls	.L39
+ 121:Core/Src/app_config.c **** 	{
+ 122:Core/Src/app_config.c **** 		adr = 0x21;		/* Standardadresse */
+ 738              		.loc 1 122 7
+ 739 0016 FB1D     		adds	r3, r7, #7
+ 740 0018 2122     		movs	r2, #33
+ 741 001a 1A70     		strb	r2, [r3]
+ 742              	.L39:
+ 123:Core/Src/app_config.c **** 	}
+ 124:Core/Src/app_config.c **** 	return adr;
+ 743              		.loc 1 124 9
+ 744 001c FB1D     		adds	r3, r7, #7
+ 745 001e 1B78     		ldrb	r3, [r3]
+ 125:Core/Src/app_config.c **** }
+ 746              		.loc 1 125 1
+ 747 0020 1800     		movs	r0, r3
+ 748 0022 BD46     		mov	sp, r7
+ 749 0024 02B0     		add	sp, sp, #8
+ 750              		@ sp needed
+ 751 0026 80BD     		pop	{r7, pc}
+ 752              	.L42:
+ 753              		.align	2
+ 754              	.L41:
+ 755 0028 00000000 		.word	cfg_data
+ 756              		.cfi_endproc
+ 757              	.LFE371:
+ 759              		.section	.text.set_adr_eeprom,"ax",%progbits
+ 760              		.align	1
+ 761              		.global	set_adr_eeprom
+ 762              		.syntax unified
+ 763              		.code	16
+ 764              		.thumb_func
+ 766              	set_adr_eeprom:
+ 767              	.LFB372:
+ 126:Core/Src/app_config.c **** 
+ 127:Core/Src/app_config.c **** void set_adr_eeprom(uint8_t adr)
+ 128:Core/Src/app_config.c **** {
+ 768              		.loc 1 128 1
+ 769              		.cfi_startproc
+ 770              		@ args = 0, pretend = 0, frame = 8
+ 771              		@ frame_needed = 1, uses_anonymous_args = 0
+ 772 0000 80B5     		push	{r7, lr}
+ 773              	.LCFI25:
+ 774              		.cfi_def_cfa_offset 8
+ 775              		.cfi_offset 7, -8
+ 776              		.cfi_offset 14, -4
+ 777 0002 82B0     		sub	sp, sp, #8
+ 778              	.LCFI26:
+ 779              		.cfi_def_cfa_offset 16
+ 780 0004 00AF     		add	r7, sp, #0
+ 781              	.LCFI27:
+ 782              		.cfi_def_cfa_register 7
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 17
+
+
+ 783 0006 0200     		movs	r2, r0
+ 784 0008 FB1D     		adds	r3, r7, #7
+ 785 000a 1A70     		strb	r2, [r3]
+ 129:Core/Src/app_config.c **** 	if (cfg_data[30] == adr)
+ 786              		.loc 1 129 14
+ 787 000c 084B     		ldr	r3, .L47
+ 788 000e 9B7F     		ldrb	r3, [r3, #30]
+ 789              		.loc 1 129 5
+ 790 0010 FA1D     		adds	r2, r7, #7
+ 791 0012 1278     		ldrb	r2, [r2]
+ 792 0014 9A42     		cmp	r2, r3
+ 793 0016 06D0     		beq	.L46
+ 130:Core/Src/app_config.c **** 	{
+ 131:Core/Src/app_config.c **** 		return;			/* nur bei Aenderung schreiben -> minimaler Flash-Verschleiss */
+ 132:Core/Src/app_config.c **** 	}
+ 133:Core/Src/app_config.c **** 
+ 134:Core/Src/app_config.c **** 	cfg_data[30] = adr;
+ 794              		.loc 1 134 15
+ 795 0018 054B     		ldr	r3, .L47
+ 796 001a FA1D     		adds	r2, r7, #7
+ 797 001c 1278     		ldrb	r2, [r2]
+ 798 001e 9A77     		strb	r2, [r3, #30]
+ 135:Core/Src/app_config.c **** 	config_save();
+ 799              		.loc 1 135 2
+ 800 0020 FFF7FEFF 		bl	config_save
+ 801 0024 00E0     		b	.L43
+ 802              	.L46:
+ 131:Core/Src/app_config.c **** 	}
+ 803              		.loc 1 131 3
+ 804 0026 C046     		nop
+ 805              	.L43:
+ 136:Core/Src/app_config.c **** }
+ 806              		.loc 1 136 1
+ 807 0028 BD46     		mov	sp, r7
+ 808 002a 02B0     		add	sp, sp, #8
+ 809              		@ sp needed
+ 810 002c 80BD     		pop	{r7, pc}
+ 811              	.L48:
+ 812 002e C046     		.align	2
+ 813              	.L47:
+ 814 0030 00000000 		.word	cfg_data
+ 815              		.cfi_endproc
+ 816              	.LFE372:
+ 818              		.section	.text.get_name_eeprom,"ax",%progbits
+ 819              		.align	1
+ 820              		.global	get_name_eeprom
+ 821              		.syntax unified
+ 822              		.code	16
+ 823              		.thumb_func
+ 825              	get_name_eeprom:
+ 826              	.LFB373:
+ 137:Core/Src/app_config.c **** 
+ 138:Core/Src/app_config.c **** /* Sensorname aus dem Config lesen (Bytes 33..56): 0x00-terminiert,
+ 139:Core/Src/app_config.c ****  * 0xFF = nie gesetzt -> leerer String. buf braucht CFG_NAME_LEN+1 Bytes. */
+ 140:Core/Src/app_config.c **** void get_name_eeprom(char *buf)
+ 141:Core/Src/app_config.c **** {
+ 827              		.loc 1 141 1
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 18
+
+
+ 828              		.cfi_startproc
+ 829              		@ args = 0, pretend = 0, frame = 16
+ 830              		@ frame_needed = 1, uses_anonymous_args = 0
+ 831 0000 90B5     		push	{r4, r7, lr}
+ 832              	.LCFI28:
+ 833              		.cfi_def_cfa_offset 12
+ 834              		.cfi_offset 4, -12
+ 835              		.cfi_offset 7, -8
+ 836              		.cfi_offset 14, -4
+ 837 0002 85B0     		sub	sp, sp, #20
+ 838              	.LCFI29:
+ 839              		.cfi_def_cfa_offset 32
+ 840 0004 00AF     		add	r7, sp, #0
+ 841              	.LCFI30:
+ 842              		.cfi_def_cfa_register 7
+ 843 0006 7860     		str	r0, [r7, #4]
+ 142:Core/Src/app_config.c **** 	uint8_t i;
+ 143:Core/Src/app_config.c **** 	for (i = 0; i < CFG_NAME_LEN; i++)
+ 844              		.loc 1 143 9
+ 845 0008 0F23     		movs	r3, #15
+ 846 000a FB18     		adds	r3, r7, r3
+ 847 000c 0022     		movs	r2, #0
+ 848 000e 1A70     		strb	r2, [r3]
+ 849              		.loc 1 143 2
+ 850 0010 1EE0     		b	.L50
+ 851              	.L52:
+ 852              	.LBB4:
+ 144:Core/Src/app_config.c **** 	{
+ 145:Core/Src/app_config.c **** 		uint8_t c = cfg_data[CFG_NAME_OFF + i];
+ 853              		.loc 1 145 37
+ 854 0012 0F24     		movs	r4, #15
+ 855 0014 3B19     		adds	r3, r7, r4
+ 856 0016 1B78     		ldrb	r3, [r3]
+ 857 0018 2133     		adds	r3, r3, #33
+ 858 001a 1A00     		movs	r2, r3
+ 859              		.loc 1 145 11
+ 860 001c 0E20     		movs	r0, #14
+ 861 001e 3B18     		adds	r3, r7, r0
+ 862 0020 1349     		ldr	r1, .L53
+ 863 0022 8A5C     		ldrb	r2, [r1, r2]
+ 864 0024 1A70     		strb	r2, [r3]
+ 146:Core/Src/app_config.c **** 		if ((c == 0x00) || (c == 0xFF))
+ 865              		.loc 1 146 6
+ 866 0026 0100     		movs	r1, r0
+ 867 0028 7B18     		adds	r3, r7, r1
+ 868 002a 1B78     		ldrb	r3, [r3]
+ 869 002c 002B     		cmp	r3, #0
+ 870 002e 14D0     		beq	.L51
+ 871              		.loc 1 146 19 discriminator 1
+ 872 0030 7B18     		adds	r3, r7, r1
+ 873 0032 1B78     		ldrb	r3, [r3]
+ 874 0034 FF2B     		cmp	r3, #255
+ 875 0036 10D0     		beq	.L51
+ 147:Core/Src/app_config.c **** 		{
+ 148:Core/Src/app_config.c **** 			break;
+ 149:Core/Src/app_config.c **** 		}
+ 150:Core/Src/app_config.c **** 		buf[i] = (char)c;
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 19
+
+
+ 876              		.loc 1 150 6
+ 877 0038 3B19     		adds	r3, r7, r4
+ 878 003a 1B78     		ldrb	r3, [r3]
+ 879 003c 7A68     		ldr	r2, [r7, #4]
+ 880 003e D318     		adds	r3, r2, r3
+ 881              		.loc 1 150 10
+ 882 0040 7A18     		adds	r2, r7, r1
+ 883 0042 1278     		ldrb	r2, [r2]
+ 884 0044 1A70     		strb	r2, [r3]
+ 885              	.LBE4:
+ 143:Core/Src/app_config.c **** 	{
+ 886              		.loc 1 143 33 discriminator 2
+ 887 0046 3B19     		adds	r3, r7, r4
+ 888 0048 1A78     		ldrb	r2, [r3]
+ 889 004a 3B19     		adds	r3, r7, r4
+ 890 004c 0132     		adds	r2, r2, #1
+ 891 004e 1A70     		strb	r2, [r3]
+ 892              	.L50:
+ 143:Core/Src/app_config.c **** 	{
+ 893              		.loc 1 143 16 discriminator 1
+ 894 0050 0F23     		movs	r3, #15
+ 895 0052 FB18     		adds	r3, r7, r3
+ 896 0054 1B78     		ldrb	r3, [r3]
+ 897 0056 172B     		cmp	r3, #23
+ 898 0058 DBD9     		bls	.L52
+ 899              	.L51:
+ 151:Core/Src/app_config.c **** 	}
+ 152:Core/Src/app_config.c **** 	buf[i] = '\0';
+ 900              		.loc 1 152 5
+ 901 005a 0F23     		movs	r3, #15
+ 902 005c FB18     		adds	r3, r7, r3
+ 903 005e 1B78     		ldrb	r3, [r3]
+ 904 0060 7A68     		ldr	r2, [r7, #4]
+ 905 0062 D318     		adds	r3, r2, r3
+ 906              		.loc 1 152 9
+ 907 0064 0022     		movs	r2, #0
+ 908 0066 1A70     		strb	r2, [r3]
+ 153:Core/Src/app_config.c **** }
+ 909              		.loc 1 153 1
+ 910 0068 C046     		nop
+ 911 006a BD46     		mov	sp, r7
+ 912 006c 05B0     		add	sp, sp, #20
+ 913              		@ sp needed
+ 914 006e 90BD     		pop	{r4, r7, pc}
+ 915              	.L54:
+ 916              		.align	2
+ 917              	.L53:
+ 918 0070 00000000 		.word	cfg_data
+ 919              		.cfi_endproc
+ 920              	.LFE373:
+ 922              		.section	.text.set_name_eeprom,"ax",%progbits
+ 923              		.align	1
+ 924              		.global	set_name_eeprom
+ 925              		.syntax unified
+ 926              		.code	16
+ 927              		.thumb_func
+ 929              	set_name_eeprom:
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 20
+
+
+ 930              	.LFB374:
+ 154:Core/Src/app_config.c **** 
+ 155:Core/Src/app_config.c **** /* Sensorname persistent speichern (auf CFG_NAME_LEN gekuerzt). */
+ 156:Core/Src/app_config.c **** void set_name_eeprom(const char *name)
+ 157:Core/Src/app_config.c **** {
+ 931              		.loc 1 157 1
+ 932              		.cfi_startproc
+ 933              		@ args = 0, pretend = 0, frame = 16
+ 934              		@ frame_needed = 1, uses_anonymous_args = 0
+ 935 0000 80B5     		push	{r7, lr}
+ 936              	.LCFI31:
+ 937              		.cfi_def_cfa_offset 8
+ 938              		.cfi_offset 7, -8
+ 939              		.cfi_offset 14, -4
+ 940 0002 84B0     		sub	sp, sp, #16
+ 941              	.LCFI32:
+ 942              		.cfi_def_cfa_offset 24
+ 943 0004 00AF     		add	r7, sp, #0
+ 944              	.LCFI33:
+ 945              		.cfi_def_cfa_register 7
+ 946 0006 7860     		str	r0, [r7, #4]
+ 158:Core/Src/app_config.c **** 	uint8_t i;
+ 159:Core/Src/app_config.c **** 	for (i = 0; (i < CFG_NAME_LEN) && (name[i] != '\0'); i++)
+ 947              		.loc 1 159 9
+ 948 0008 0F23     		movs	r3, #15
+ 949 000a FB18     		adds	r3, r7, r3
+ 950 000c 0022     		movs	r2, #0
+ 951 000e 1A70     		strb	r2, [r3]
+ 952              		.loc 1 159 2
+ 953 0010 0FE0     		b	.L56
+ 954              	.L58:
+ 160:Core/Src/app_config.c **** 	{
+ 161:Core/Src/app_config.c **** 		cfg_data[CFG_NAME_OFF + i] = (uint8_t)name[i];
+ 955              		.loc 1 161 45
+ 956 0012 0F20     		movs	r0, #15
+ 957 0014 3B18     		adds	r3, r7, r0
+ 958 0016 1B78     		ldrb	r3, [r3]
+ 959 0018 7A68     		ldr	r2, [r7, #4]
+ 960 001a D218     		adds	r2, r2, r3
+ 961              		.loc 1 161 25
+ 962 001c 3B18     		adds	r3, r7, r0
+ 963 001e 1B78     		ldrb	r3, [r3]
+ 964 0020 2133     		adds	r3, r3, #33
+ 965              		.loc 1 161 32
+ 966 0022 1178     		ldrb	r1, [r2]
+ 967              		.loc 1 161 30
+ 968 0024 154A     		ldr	r2, .L61
+ 969 0026 D154     		strb	r1, [r2, r3]
+ 159:Core/Src/app_config.c **** 	{
+ 970              		.loc 1 159 56 discriminator 4
+ 971 0028 3B18     		adds	r3, r7, r0
+ 972 002a 1A78     		ldrb	r2, [r3]
+ 973 002c 3B18     		adds	r3, r7, r0
+ 974 002e 0132     		adds	r2, r2, #1
+ 975 0030 1A70     		strb	r2, [r3]
+ 976              	.L56:
+ 159:Core/Src/app_config.c **** 	{
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 21
+
+
+ 977              		.loc 1 159 33 discriminator 1
+ 978 0032 0F22     		movs	r2, #15
+ 979 0034 BB18     		adds	r3, r7, r2
+ 980 0036 1B78     		ldrb	r3, [r3]
+ 981 0038 172B     		cmp	r3, #23
+ 982 003a 13D8     		bhi	.L59
+ 159:Core/Src/app_config.c **** 	{
+ 983              		.loc 1 159 41 discriminator 3
+ 984 003c BB18     		adds	r3, r7, r2
+ 985 003e 1B78     		ldrb	r3, [r3]
+ 986 0040 7A68     		ldr	r2, [r7, #4]
+ 987 0042 D318     		adds	r3, r2, r3
+ 988 0044 1B78     		ldrb	r3, [r3]
+ 159:Core/Src/app_config.c **** 	{
+ 989              		.loc 1 159 33 discriminator 3
+ 990 0046 002B     		cmp	r3, #0
+ 991 0048 E3D1     		bne	.L58
+ 162:Core/Src/app_config.c **** 	}
+ 163:Core/Src/app_config.c **** 	for (; i < CFG_NAME_LEN; i++)
+ 992              		.loc 1 163 2
+ 993 004a 0BE0     		b	.L59
+ 994              	.L60:
+ 164:Core/Src/app_config.c **** 	{
+ 165:Core/Src/app_config.c **** 		cfg_data[CFG_NAME_OFF + i] = 0x00;
+ 995              		.loc 1 165 25
+ 996 004c 0F20     		movs	r0, #15
+ 997 004e 3B18     		adds	r3, r7, r0
+ 998 0050 1B78     		ldrb	r3, [r3]
+ 999 0052 2133     		adds	r3, r3, #33
+ 1000              		.loc 1 165 30
+ 1001 0054 094A     		ldr	r2, .L61
+ 1002 0056 0021     		movs	r1, #0
+ 1003 0058 D154     		strb	r1, [r2, r3]
+ 163:Core/Src/app_config.c **** 	{
+ 1004              		.loc 1 163 28 discriminator 2
+ 1005 005a 3B18     		adds	r3, r7, r0
+ 1006 005c 1A78     		ldrb	r2, [r3]
+ 1007 005e 3B18     		adds	r3, r7, r0
+ 1008 0060 0132     		adds	r2, r2, #1
+ 1009 0062 1A70     		strb	r2, [r3]
+ 1010              	.L59:
+ 163:Core/Src/app_config.c **** 	{
+ 1011              		.loc 1 163 11 discriminator 1
+ 1012 0064 0F23     		movs	r3, #15
+ 1013 0066 FB18     		adds	r3, r7, r3
+ 1014 0068 1B78     		ldrb	r3, [r3]
+ 1015 006a 172B     		cmp	r3, #23
+ 1016 006c EED9     		bls	.L60
+ 166:Core/Src/app_config.c **** 	}
+ 167:Core/Src/app_config.c **** 	config_save();
+ 1017              		.loc 1 167 2
+ 1018 006e FFF7FEFF 		bl	config_save
+ 168:Core/Src/app_config.c **** }
+ 1019              		.loc 1 168 1
+ 1020 0072 C046     		nop
+ 1021 0074 BD46     		mov	sp, r7
+ 1022 0076 04B0     		add	sp, sp, #16
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 22
+
+
+ 1023              		@ sp needed
+ 1024 0078 80BD     		pop	{r7, pc}
+ 1025              	.L62:
+ 1026 007a C046     		.align	2
+ 1027              	.L61:
+ 1028 007c 00000000 		.word	cfg_data
+ 1029              		.cfi_endproc
+ 1030              	.LFE374:
+ 1032              		.text
+ 1033              	.Letext0:
+ 1034              		.file 2 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 1035              		.file 3 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 1036              		.file 4 "Core/Inc/app_types.h"
+ 1037              		.file 5 "Core/Inc/nmea2000.h"
+ 1038              		.file 6 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_dma.h"
+ 1039              		.file 7 "Core/Inc/config_store.h"
+ 1040              		.file 8 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s 			page 23
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 app_config.c
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:19     .rodata.CHANNEL_OFFSET_TAB:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:22     .rodata.CHANNEL_OFFSET_TAB:00000000 CHANNEL_OFFSET_TAB
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:25     .text.check_EEPROM:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:31     .text.check_EEPROM:00000000 check_EEPROM
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:66     .text.check_EEPROM:00000018 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:71     .text.get_EEPROM:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:77     .text.get_EEPROM:00000000 get_EEPROM
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:141    .text.get_EEPROM:00000040 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:146    .text.save_EEPROM:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:152    .text.save_EEPROM:00000000 save_EEPROM
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:225    .text.save_EEPROM:0000004c $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:230    .text.check_dac_EEPROM:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:236    .text.check_dac_EEPROM:00000000 check_dac_EEPROM
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:261    .text.check_dac_EEPROM:00000010 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:266    .text.get_dac_EEPROM:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:272    .text.get_dac_EEPROM:00000000 get_dac_EEPROM
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:361    .text.get_dac_EEPROM:0000005c $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:366    .text.set_param_eeprom:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:372    .text.set_param_eeprom:00000000 set_param_eeprom
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:428    .text.set_param_eeprom:0000003c $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:434    .rodata:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:438    .text.get_param_eeprom:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:444    .text.get_param_eeprom:00000000 get_param_eeprom
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:591    .text.lin_table_valid:00000000 lin_table_valid
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:578    .text.get_param_eeprom:000000b4 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:585    .text.lin_table_valid:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:705    .text.get_adr_eeprom:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:711    .text.get_adr_eeprom:00000000 get_adr_eeprom
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:755    .text.get_adr_eeprom:00000028 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:760    .text.set_adr_eeprom:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:766    .text.set_adr_eeprom:00000000 set_adr_eeprom
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:814    .text.set_adr_eeprom:00000030 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:819    .text.get_name_eeprom:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:825    .text.get_name_eeprom:00000000 get_name_eeprom
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:918    .text.get_name_eeprom:00000070 $d
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:923    .text.set_name_eeprom:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:929    .text.set_name_eeprom:00000000 set_name_eeprom
+C:\Users\a_hae\AppData\Local\Temp\ccnxTVk3.s:1028   .text.set_name_eeprom:0000007c $d
+
+UNDEFINED SYMBOLS
+cfg_data
+config_save
+memcpy

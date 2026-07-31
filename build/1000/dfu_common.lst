@@ -1,0 +1,362 @@
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s 			page 1
+
+
+   1              		.cpu cortex-m0plus
+   2              		.arch armv6s-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 6
+  11              		.eabi_attribute 34, 0
+  12              		.eabi_attribute 18, 4
+  13              		.file	"dfu_common.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "Core/Src/dfu_common.c"
+  18              		.section	.bss.crc_table,"aw",%nobits
+  19              		.align	2
+  22              	crc_table:
+  23 0000 00000000 		.space	1024
+  23      00000000 
+  23      00000000 
+  23      00000000 
+  23      00000000 
+  24              		.section	.bss.crc_table_ready,"aw",%nobits
+  27              	crc_table_ready:
+  28 0000 00       		.space	1
+  29              		.section	.text.crc_table_init,"ax",%progbits
+  30              		.align	1
+  31              		.syntax unified
+  32              		.code	16
+  33              		.thumb_func
+  35              	crc_table_init:
+  36              	.LFB0:
+   1:Core/Src/dfu_common.c **** /*
+   2:Core/Src/dfu_common.c ****  * dfu_common.c
+   3:Core/Src/dfu_common.c ****  *
+   4:Core/Src/dfu_common.c ****  * Gemeinsame CRC32-Routine für das OTA-Update (App und Bootloader).
+   5:Core/Src/dfu_common.c ****  * IEEE/zlib-CRC32 – identisch zur Berechnung in der Handy-App.
+   6:Core/Src/dfu_common.c ****  *
+   7:Core/Src/dfu_common.c ****  * Tabellenbasiert (256 Einträge, einmalig zur Laufzeit erzeugt): rechnet
+   8:Core/Src/dfu_common.c ****  * ein Byte pro Schritt statt bitweise und ist damit rund 8x schneller -
+   9:Core/Src/dfu_common.c ****  * spuerbar beim Boot (app_valid rechnet die CRC ueber die ganze App) und
+  10:Core/Src/dfu_common.c ****  * bei der Update-Verifikation. Der Rueckgabewert ist bit-identisch zur
+  11:Core/Src/dfu_common.c ****  * alten bitweisen Variante (Poly 0xEDB88320, reflektiert), die Pruefsummen
+  12:Core/Src/dfu_common.c ****  * bleiben also kompatibel. Bewusst HAL-frei, damit dfu_common host-testbar
+  13:Core/Src/dfu_common.c ****  * bleibt (kein Zugriff auf die CRC-Hardware).
+  14:Core/Src/dfu_common.c ****  */
+  15:Core/Src/dfu_common.c **** 
+  16:Core/Src/dfu_common.c **** #include "dfu_common.h"
+  17:Core/Src/dfu_common.c **** 
+  18:Core/Src/dfu_common.c **** static uint32_t crc_table[256];
+  19:Core/Src/dfu_common.c **** static uint8_t  crc_table_ready = 0;
+  20:Core/Src/dfu_common.c **** 
+  21:Core/Src/dfu_common.c **** static void crc_table_init(void)
+  22:Core/Src/dfu_common.c **** {
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s 			page 2
+
+
+  37              		.loc 1 22 1
+  38              		.cfi_startproc
+  39              		@ args = 0, pretend = 0, frame = 16
+  40              		@ frame_needed = 1, uses_anonymous_args = 0
+  41 0000 80B5     		push	{r7, lr}
+  42              	.LCFI0:
+  43              		.cfi_def_cfa_offset 8
+  44              		.cfi_offset 7, -8
+  45              		.cfi_offset 14, -4
+  46 0002 84B0     		sub	sp, sp, #16
+  47              	.LCFI1:
+  48              		.cfi_def_cfa_offset 24
+  49 0004 00AF     		add	r7, sp, #0
+  50              	.LCFI2:
+  51              		.cfi_def_cfa_register 7
+  52              	.LBB2:
+  23:Core/Src/dfu_common.c **** 	for (uint32_t i = 0; i < 256; i++)
+  53              		.loc 1 23 16
+  54 0006 0023     		movs	r3, #0
+  55 0008 FB60     		str	r3, [r7, #12]
+  56              		.loc 1 23 2
+  57 000a 20E0     		b	.L2
+  58              	.L5:
+  59              	.LBB3:
+  24:Core/Src/dfu_common.c **** 	{
+  25:Core/Src/dfu_common.c **** 		uint32_t c = i;
+  60              		.loc 1 25 12
+  61 000c FB68     		ldr	r3, [r7, #12]
+  62 000e BB60     		str	r3, [r7, #8]
+  63              	.LBB4:
+  26:Core/Src/dfu_common.c **** 		for (uint8_t b = 0; b < 8; b++)
+  64              		.loc 1 26 16
+  65 0010 FB1D     		adds	r3, r7, #7
+  66 0012 0022     		movs	r2, #0
+  67 0014 1A70     		strb	r2, [r3]
+  68              		.loc 1 26 3
+  69 0016 0EE0     		b	.L3
+  70              	.L4:
+  27:Core/Src/dfu_common.c **** 		{
+  28:Core/Src/dfu_common.c **** 			c = (c & 1u) ? ((c >> 1) ^ 0xEDB88320UL) : (c >> 1);
+  71              		.loc 1 28 11
+  72 0018 BB68     		ldr	r3, [r7, #8]
+  73 001a 0122     		movs	r2, #1
+  74 001c 1340     		ands	r3, r2
+  75              		.loc 1 28 45
+  76 001e 5B42     		rsbs	r3, r3, #0
+  77 0020 104A     		ldr	r2, .L6
+  78 0022 1A40     		ands	r2, r3
+  79              		.loc 1 28 23
+  80 0024 BB68     		ldr	r3, [r7, #8]
+  81 0026 5B08     		lsrs	r3, r3, #1
+  82              		.loc 1 28 6
+  83 0028 5340     		eors	r3, r2
+  84 002a BB60     		str	r3, [r7, #8]
+  26:Core/Src/dfu_common.c **** 		for (uint8_t b = 0; b < 8; b++)
+  85              		.loc 1 26 31 discriminator 3
+  86 002c FB1D     		adds	r3, r7, #7
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s 			page 3
+
+
+  87 002e 1A78     		ldrb	r2, [r3]
+  88 0030 FB1D     		adds	r3, r7, #7
+  89 0032 0132     		adds	r2, r2, #1
+  90 0034 1A70     		strb	r2, [r3]
+  91              	.L3:
+  26:Core/Src/dfu_common.c **** 		for (uint8_t b = 0; b < 8; b++)
+  92              		.loc 1 26 25 discriminator 1
+  93 0036 FB1D     		adds	r3, r7, #7
+  94 0038 1B78     		ldrb	r3, [r3]
+  95 003a 072B     		cmp	r3, #7
+  96 003c ECD9     		bls	.L4
+  97              	.LBE4:
+  29:Core/Src/dfu_common.c **** 		}
+  30:Core/Src/dfu_common.c **** 		crc_table[i] = c;
+  98              		.loc 1 30 16
+  99 003e 0A4B     		ldr	r3, .L6+4
+ 100 0040 FA68     		ldr	r2, [r7, #12]
+ 101 0042 9200     		lsls	r2, r2, #2
+ 102 0044 B968     		ldr	r1, [r7, #8]
+ 103 0046 D150     		str	r1, [r2, r3]
+ 104              	.LBE3:
+  23:Core/Src/dfu_common.c **** 	{
+ 105              		.loc 1 23 33 discriminator 2
+ 106 0048 FB68     		ldr	r3, [r7, #12]
+ 107 004a 0133     		adds	r3, r3, #1
+ 108 004c FB60     		str	r3, [r7, #12]
+ 109              	.L2:
+  23:Core/Src/dfu_common.c **** 	{
+ 110              		.loc 1 23 25 discriminator 1
+ 111 004e FB68     		ldr	r3, [r7, #12]
+ 112 0050 FF2B     		cmp	r3, #255
+ 113 0052 DBD9     		bls	.L5
+ 114              	.LBE2:
+  31:Core/Src/dfu_common.c **** 	}
+  32:Core/Src/dfu_common.c **** 	crc_table_ready = 1;
+ 115              		.loc 1 32 18
+ 116 0054 054B     		ldr	r3, .L6+8
+ 117 0056 0122     		movs	r2, #1
+ 118 0058 1A70     		strb	r2, [r3]
+  33:Core/Src/dfu_common.c **** }
+ 119              		.loc 1 33 1
+ 120 005a C046     		nop
+ 121 005c BD46     		mov	sp, r7
+ 122 005e 04B0     		add	sp, sp, #16
+ 123              		@ sp needed
+ 124 0060 80BD     		pop	{r7, pc}
+ 125              	.L7:
+ 126 0062 C046     		.align	2
+ 127              	.L6:
+ 128 0064 2083B8ED 		.word	-306674912
+ 129 0068 00000000 		.word	crc_table
+ 130 006c 00000000 		.word	crc_table_ready
+ 131              		.cfi_endproc
+ 132              	.LFE0:
+ 134              		.section	.text.dfu_crc32_update,"ax",%progbits
+ 135              		.align	1
+ 136              		.global	dfu_crc32_update
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s 			page 4
+
+
+ 137              		.syntax unified
+ 138              		.code	16
+ 139              		.thumb_func
+ 141              	dfu_crc32_update:
+ 142              	.LFB1:
+  34:Core/Src/dfu_common.c **** 
+  35:Core/Src/dfu_common.c **** uint32_t dfu_crc32_update(uint32_t crc, const uint8_t *data, uint32_t len)
+  36:Core/Src/dfu_common.c **** {
+ 143              		.loc 1 36 1
+ 144              		.cfi_startproc
+ 145              		@ args = 0, pretend = 0, frame = 24
+ 146              		@ frame_needed = 1, uses_anonymous_args = 0
+ 147 0000 80B5     		push	{r7, lr}
+ 148              	.LCFI3:
+ 149              		.cfi_def_cfa_offset 8
+ 150              		.cfi_offset 7, -8
+ 151              		.cfi_offset 14, -4
+ 152 0002 86B0     		sub	sp, sp, #24
+ 153              	.LCFI4:
+ 154              		.cfi_def_cfa_offset 32
+ 155 0004 00AF     		add	r7, sp, #0
+ 156              	.LCFI5:
+ 157              		.cfi_def_cfa_register 7
+ 158 0006 F860     		str	r0, [r7, #12]
+ 159 0008 B960     		str	r1, [r7, #8]
+ 160 000a 7A60     		str	r2, [r7, #4]
+  37:Core/Src/dfu_common.c **** 	if (!crc_table_ready)
+ 161              		.loc 1 37 6
+ 162 000c 124B     		ldr	r3, .L13
+ 163 000e 1B78     		ldrb	r3, [r3]
+ 164              		.loc 1 37 5
+ 165 0010 002B     		cmp	r3, #0
+ 166 0012 01D1     		bne	.L9
+  38:Core/Src/dfu_common.c **** 	{
+  39:Core/Src/dfu_common.c **** 		crc_table_init();
+ 167              		.loc 1 39 3
+ 168 0014 FFF7FEFF 		bl	crc_table_init
+ 169              	.L9:
+ 170              	.LBB5:
+  40:Core/Src/dfu_common.c **** 	}
+  41:Core/Src/dfu_common.c **** 	for (uint32_t i = 0; i < len; i++)
+ 171              		.loc 1 41 16
+ 172 0018 0023     		movs	r3, #0
+ 173 001a 7B61     		str	r3, [r7, #20]
+ 174              		.loc 1 41 2
+ 175 001c 12E0     		b	.L10
+ 176              	.L11:
+  42:Core/Src/dfu_common.c **** 	{
+  43:Core/Src/dfu_common.c **** 		crc = (crc >> 8) ^ crc_table[(crc ^ data[i]) & 0xFFu];
+ 177              		.loc 1 43 14
+ 178 001e FB68     		ldr	r3, [r7, #12]
+ 179 0020 1A0A     		lsrs	r2, r3, #8
+ 180              		.loc 1 43 43
+ 181 0022 B968     		ldr	r1, [r7, #8]
+ 182 0024 7B69     		ldr	r3, [r7, #20]
+ 183 0026 CB18     		adds	r3, r1, r3
+ 184 0028 1B78     		ldrb	r3, [r3]
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s 			page 5
+
+
+ 185 002a 1900     		movs	r1, r3
+ 186              		.loc 1 43 37
+ 187 002c FB68     		ldr	r3, [r7, #12]
+ 188 002e 4B40     		eors	r3, r1
+ 189              		.loc 1 43 48
+ 190 0030 FF21     		movs	r1, #255
+ 191 0032 1940     		ands	r1, r3
+ 192              		.loc 1 43 31
+ 193 0034 094B     		ldr	r3, .L13+4
+ 194 0036 8900     		lsls	r1, r1, #2
+ 195 0038 CB58     		ldr	r3, [r1, r3]
+ 196              		.loc 1 43 7
+ 197 003a 5340     		eors	r3, r2
+ 198 003c FB60     		str	r3, [r7, #12]
+  41:Core/Src/dfu_common.c **** 	{
+ 199              		.loc 1 41 33 discriminator 3
+ 200 003e 7B69     		ldr	r3, [r7, #20]
+ 201 0040 0133     		adds	r3, r3, #1
+ 202 0042 7B61     		str	r3, [r7, #20]
+ 203              	.L10:
+  41:Core/Src/dfu_common.c **** 	{
+ 204              		.loc 1 41 25 discriminator 1
+ 205 0044 7A69     		ldr	r2, [r7, #20]
+ 206 0046 7B68     		ldr	r3, [r7, #4]
+ 207 0048 9A42     		cmp	r2, r3
+ 208 004a E8D3     		bcc	.L11
+ 209              	.LBE5:
+  44:Core/Src/dfu_common.c **** 	}
+  45:Core/Src/dfu_common.c **** 	return crc;
+ 210              		.loc 1 45 9
+ 211 004c FB68     		ldr	r3, [r7, #12]
+  46:Core/Src/dfu_common.c **** }
+ 212              		.loc 1 46 1
+ 213 004e 1800     		movs	r0, r3
+ 214 0050 BD46     		mov	sp, r7
+ 215 0052 06B0     		add	sp, sp, #24
+ 216              		@ sp needed
+ 217 0054 80BD     		pop	{r7, pc}
+ 218              	.L14:
+ 219 0056 C046     		.align	2
+ 220              	.L13:
+ 221 0058 00000000 		.word	crc_table_ready
+ 222 005c 00000000 		.word	crc_table
+ 223              		.cfi_endproc
+ 224              	.LFE1:
+ 226              		.section	.text.dfu_crc32,"ax",%progbits
+ 227              		.align	1
+ 228              		.global	dfu_crc32
+ 229              		.syntax unified
+ 230              		.code	16
+ 231              		.thumb_func
+ 233              	dfu_crc32:
+ 234              	.LFB2:
+  47:Core/Src/dfu_common.c **** 
+  48:Core/Src/dfu_common.c **** uint32_t dfu_crc32(const uint8_t *data, uint32_t len)
+  49:Core/Src/dfu_common.c **** {
+ 235              		.loc 1 49 1
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s 			page 6
+
+
+ 236              		.cfi_startproc
+ 237              		@ args = 0, pretend = 0, frame = 8
+ 238              		@ frame_needed = 1, uses_anonymous_args = 0
+ 239 0000 80B5     		push	{r7, lr}
+ 240              	.LCFI6:
+ 241              		.cfi_def_cfa_offset 8
+ 242              		.cfi_offset 7, -8
+ 243              		.cfi_offset 14, -4
+ 244 0002 82B0     		sub	sp, sp, #8
+ 245              	.LCFI7:
+ 246              		.cfi_def_cfa_offset 16
+ 247 0004 00AF     		add	r7, sp, #0
+ 248              	.LCFI8:
+ 249              		.cfi_def_cfa_register 7
+ 250 0006 7860     		str	r0, [r7, #4]
+ 251 0008 3960     		str	r1, [r7]
+  50:Core/Src/dfu_common.c **** 	return dfu_crc32_update(0xFFFFFFFFUL, data, len) ^ 0xFFFFFFFFUL;
+ 252              		.loc 1 50 9
+ 253 000a 3A68     		ldr	r2, [r7]
+ 254 000c 7968     		ldr	r1, [r7, #4]
+ 255 000e 0123     		movs	r3, #1
+ 256 0010 5B42     		rsbs	r3, r3, #0
+ 257 0012 1800     		movs	r0, r3
+ 258 0014 FFF7FEFF 		bl	dfu_crc32_update
+ 259 0018 0300     		movs	r3, r0
+ 260              		.loc 1 50 51 discriminator 1
+ 261 001a DB43     		mvns	r3, r3
+  51:Core/Src/dfu_common.c **** }
+ 262              		.loc 1 51 1
+ 263 001c 1800     		movs	r0, r3
+ 264 001e BD46     		mov	sp, r7
+ 265 0020 02B0     		add	sp, sp, #8
+ 266              		@ sp needed
+ 267 0022 80BD     		pop	{r7, pc}
+ 268              		.cfi_endproc
+ 269              	.LFE2:
+ 271              		.text
+ 272              	.Letext0:
+ 273              		.file 2 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 274              		.file 3 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s 			page 7
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 dfu_common.c
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:19     .bss.crc_table:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:22     .bss.crc_table:00000000 crc_table
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:27     .bss.crc_table_ready:00000000 crc_table_ready
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:28     .bss.crc_table_ready:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:30     .text.crc_table_init:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:35     .text.crc_table_init:00000000 crc_table_init
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:128    .text.crc_table_init:00000064 $d
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:135    .text.dfu_crc32_update:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:141    .text.dfu_crc32_update:00000000 dfu_crc32_update
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:221    .text.dfu_crc32_update:00000058 $d
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:227    .text.dfu_crc32:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccrLViQM.s:233    .text.dfu_crc32:00000000 dfu_crc32
+
+NO UNDEFINED SYMBOLS

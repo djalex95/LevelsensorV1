@@ -3,7 +3,7 @@
  *
  * BLE-Kommando-Ebene der Applikation: Status-/Kennlinien-Ausgabe an die App
  * und Verarbeitung der Textkommandos (Spezifikation in
- * PC_Tools/BLE_Protokoll.md). Aus main.c herausgezogen; Verhalten und
+ * BLE_Protokoll.md). Aus main.c herausgezogen; Verhalten und
  * Signaturen unveraendert.
  *
  * Der eigentliche Proteus-e-Treiber (UART-Frames, Reset, Namen setzen)

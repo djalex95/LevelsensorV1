@@ -1,0 +1,755 @@
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 1
+
+
+   1              		.cpu cortex-m0plus
+   2              		.arch armv6s-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 6
+  11              		.eabi_attribute 34, 0
+  12              		.eabi_attribute 18, 4
+  13              		.file	"sensor_legacy.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "Core/Src/sensor_legacy.c"
+  18              		.section	.rodata.CHANNEL_OFFSET_TAB,"a"
+  19              		.align	2
+  22              	CHANNEL_OFFSET_TAB:
+  23 0000 081C3044 		.ascii	"\010\0340DXl\200"
+  23      586C80
+  24              		.section	.text.sensor_raw_to_ubar,"ax",%progbits
+  25              		.align	1
+  26              		.syntax unified
+  27              		.code	16
+  28              		.thumb_func
+  30              	sensor_raw_to_ubar:
+  31              	.LFB363:
+  32              		.file 2 "Core/Inc/sensor_scale.h"
+   1:Core/Inc/sensor_scale.h **** /*
+   2:Core/Inc/sensor_scale.h ****  * sensor_scale.h
+   3:Core/Inc/sensor_scale.h ****  *
+   4:Core/Inc/sensor_scale.h ****  * Umrechnung Rohwert -> physikalische Groesse, getrennt vom I2C-Zugriff.
+   5:Core/Inc/sensor_scale.h ****  * Bewusst frei von HAL-Abhaengigkeiten, damit die Skalierung auf dem PC
+   6:Core/Inc/sensor_scale.h ****  * getestet werden kann (tests/test_sensor_conv.c). Die messbereichs-
+   7:Core/Inc/sensor_scale.h ****  * abhaengigen Zahlen kommen aus der Variante (sensor_cfg.h).
+   8:Core/Inc/sensor_scale.h ****  *
+   9:Core/Inc/sensor_scale.h ****  * Einheiten wie bisher:
+  10:Core/Inc/sensor_scale.h ****  *   Druck       in uBar     (1 uBar = 0,1 Pa)
+  11:Core/Inc/sensor_scale.h ****  *   Temperatur  in 0,01 Grad C
+  12:Core/Inc/sensor_scale.h ****  *
+  13:Core/Inc/sensor_scale.h ****  * Alles in Ganzzahlarithmetik - der Cortex-M0+ hat keine FPU, jede
+  14:Core/Inc/sensor_scale.h ****  * Fliesskommarechnung zoege die Soft-Float-Bibliothek in den Flash.
+  15:Core/Inc/sensor_scale.h ****  */
+  16:Core/Inc/sensor_scale.h **** #ifndef INC_SENSOR_SCALE_H_
+  17:Core/Inc/sensor_scale.h **** #define INC_SENSOR_SCALE_H_
+  18:Core/Inc/sensor_scale.h **** 
+  19:Core/Inc/sensor_scale.h **** #include <stdint.h>
+  20:Core/Inc/sensor_scale.h **** #include "sensor_cfg.h"
+  21:Core/Inc/sensor_scale.h **** 
+  22:Core/Inc/sensor_scale.h **** #if SENSOR_KIND == SENSOR_KIND_PDMS
+  23:Core/Inc/sensor_scale.h **** 
+  24:Core/Inc/sensor_scale.h **** /* --- Wuerth WSEN-PDMS -------------------------------------------------
+  25:Core/Inc/sensor_scale.h ****  *
+  26:Core/Inc/sensor_scale.h ****  * Handbuch (UM_WSEN-PDMS, rev 1.0), bidirektionale Typen (+/-1, +/-10,
+  27:Core/Inc/sensor_scale.h ****  * +/-35 kPa):
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 2
+
+
+  28:Core/Inc/sensor_scale.h ****  *
+  29:Core/Inc/sensor_scale.h ****  *   Druck [kPa]      = (P16 - OUTP_MIN) * SENP + PMIN
+  30:Core/Inc/sensor_scale.h ****  *   Temperatur [GrdC]= (T16 - OUTT_MIN) * SENT
+  31:Core/Inc/sensor_scale.h ****  *
+  32:Core/Inc/sensor_scale.h ****  * mit OUTP_MIN = 3277, OUTP_MAX = 29491, OUTT_MIN = 8192 und
+  33:Core/Inc/sensor_scale.h ****  * SENT = 4,272e-3 GrdC/digit.
+  34:Core/Inc/sensor_scale.h ****  *
+  35:Core/Inc/sensor_scale.h ****  * Wir rechnen die Druckformel um die Bereichsmitte herum, weil das
+  36:Core/Inc/sensor_scale.h ****  * Ergebnis identisch ist, aber ohne 64-Bit-Multiplikation auskommt:
+  37:Core/Inc/sensor_scale.h ****  *
+  38:Core/Inc/sensor_scale.h ****  *   Mitte  = (OUTP_MIN + OUTP_MAX) / 2 = 16384  -> 0 kPa
+  39:Core/Inc/sensor_scale.h ****  *   Halbe Spanne = (OUTP_MAX - OUTP_MIN) / 2 = 13107
+  40:Core/Inc/sensor_scale.h ****  *   Druck [uBar] = (P16 - 16384) * FS_UBAR / 13107
+  41:Core/Inc/sensor_scale.h ****  *
+  42:Core/Inc/sensor_scale.h ****  * Probe: P16 = 3277 -> -FS_UBAR, P16 = 29491 -> +FS_UBAR.
+  43:Core/Inc/sensor_scale.h ****  * Die direkte Form (P16 - 3277) * 2*FS_UBAR / 26214 wuerde beim
+  44:Core/Inc/sensor_scale.h ****  * +/-10-kPa-Typ mit 26214 * 200000 = 5,2e9 den int32 sprengen.
+  45:Core/Inc/sensor_scale.h ****  */
+  46:Core/Inc/sensor_scale.h **** #define SENSOR_OUT_MIN        3277
+  47:Core/Inc/sensor_scale.h **** #define SENSOR_OUT_MAX        29491
+  48:Core/Inc/sensor_scale.h **** #define SENSOR_OUT_MID        16384      /* Rohwert bei 0 kPa            */
+  49:Core/Inc/sensor_scale.h **** #define SENSOR_OUT_HALFSPAN   13107      /* Rohwerte je Richtung         */
+  50:Core/Inc/sensor_scale.h **** #define SENSOR_OUTT_MIN       8192       /* Rohwert bei 0 Grad C         */
+  51:Core/Inc/sensor_scale.h **** 
+  52:Core/Inc/sensor_scale.h **** /* Rohwert -> Druck in uBar. Der Rohwert wird auf den gueltigen Bereich
+  53:Core/Inc/sensor_scale.h ****  * begrenzt: das haelt die Multiplikation im int32 und liefert bei
+  54:Core/Inc/sensor_scale.h ****  * Ueberlast einen sauber gesaettigten Wert statt eines Ueberlaufs. */
+  55:Core/Inc/sensor_scale.h **** static inline int32_t sensor_raw_to_ubar(uint16_t p16)
+  56:Core/Inc/sensor_scale.h **** {
+  57:Core/Inc/sensor_scale.h **** 	int32_t p = (int32_t)p16;
+  58:Core/Inc/sensor_scale.h **** 
+  59:Core/Inc/sensor_scale.h **** 	if (p < SENSOR_OUT_MIN)
+  60:Core/Inc/sensor_scale.h **** 	{
+  61:Core/Inc/sensor_scale.h **** 		p = SENSOR_OUT_MIN;
+  62:Core/Inc/sensor_scale.h **** 	}
+  63:Core/Inc/sensor_scale.h **** 	else if (p > SENSOR_OUT_MAX)
+  64:Core/Inc/sensor_scale.h **** 	{
+  65:Core/Inc/sensor_scale.h **** 		p = SENSOR_OUT_MAX;
+  66:Core/Inc/sensor_scale.h **** 	}
+  67:Core/Inc/sensor_scale.h **** 
+  68:Core/Inc/sensor_scale.h **** 	return ((p - SENSOR_OUT_MID) * SENSOR_FS_UBAR) / SENSOR_OUT_HALFSPAN;
+  69:Core/Inc/sensor_scale.h **** }
+  70:Core/Inc/sensor_scale.h **** 
+  71:Core/Inc/sensor_scale.h **** /* 1, wenn der Rohwert ausserhalb des spezifizierten Bereichs lag (der
+  72:Core/Inc/sensor_scale.h ****  * Messwert ist dann gesaettigt und nicht mehr vertrauenswuerdig). */
+  73:Core/Inc/sensor_scale.h **** static inline uint8_t sensor_raw_saturated(uint16_t p16)
+  74:Core/Inc/sensor_scale.h **** {
+  75:Core/Inc/sensor_scale.h **** 	return (uint8_t)((p16 < SENSOR_OUT_MIN) || (p16 > SENSOR_OUT_MAX));
+  76:Core/Inc/sensor_scale.h **** }
+  77:Core/Inc/sensor_scale.h **** 
+  78:Core/Inc/sensor_scale.h **** /* Rohwert -> Temperatur in 0,01 Grad C.
+  79:Core/Inc/sensor_scale.h ****  * SENT = 4,272e-3 GrdC/digit -> in 0,01 GrdC: * 0,4272 = * 267/625
+  80:Core/Inc/sensor_scale.h ****  * (der Bruch ist exakt, 4272/10000 gekuerzt).
+  81:Core/Inc/sensor_scale.h ****  * Probe: T16 = 24576 -> 6999, also 69,99 GrdC (Datenblatt: 70 GrdC). */
+  82:Core/Inc/sensor_scale.h **** static inline int16_t sensor_raw_to_temp(uint16_t t16)
+  83:Core/Inc/sensor_scale.h **** {
+  84:Core/Inc/sensor_scale.h **** 	return (int16_t)((((int32_t)t16 - SENSOR_OUTT_MIN) * 267) / 625);
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 3
+
+
+  85:Core/Inc/sensor_scale.h **** }
+  86:Core/Inc/sensor_scale.h **** 
+  87:Core/Inc/sensor_scale.h **** #elif SENSOR_KIND == SENSOR_KIND_LEGACY
+  88:Core/Inc/sensor_scale.h **** 
+  89:Core/Inc/sensor_scale.h **** /* --- Alter 24-Bit-Drucksensor ----------------------------------------
+  90:Core/Inc/sensor_scale.h ****  *
+  91:Core/Inc/sensor_scale.h ****  * Druck: raw / k mit k = 12,8 (40-kPa-Typ) -> raw * 10 / 128.
+  92:Core/Inc/sensor_scale.h ****  *        (20-kPa-Typ waere k = 25,6 -> raw * 10 / 256.)
+  93:Core/Inc/sensor_scale.h ****  * Temperatur: raw / 256 Grad C -> in 0,01 Grad C: raw * 100 / 256
+  94:Core/Inc/sensor_scale.h ****  *        = raw * 25 / 64.
+  95:Core/Inc/sensor_scale.h ****  *
+  96:Core/Inc/sensor_scale.h ****  * Der Wertebereich von raw24 ist +/-8388608; mal 10 sind das hoechstens
+  97:Core/Inc/sensor_scale.h ****  * 8,4e7 und damit sicher im int32. Die frueher benutzte int64-Rechnung
+  98:Core/Inc/sensor_scale.h ****  * war fuer jeden moeglichen Eingabewert identisch, kostete aber einen
+  99:Core/Inc/sensor_scale.h ****  * Aufruf der 64-Bit-Divisionsroutine.
+ 100:Core/Inc/sensor_scale.h ****  */
+ 101:Core/Inc/sensor_scale.h **** static inline int32_t sensor_raw_to_ubar(int32_t raw24)
+ 102:Core/Inc/sensor_scale.h **** {
+  33              		.loc 2 102 1
+  34              		.cfi_startproc
+  35              		@ args = 0, pretend = 0, frame = 8
+  36              		@ frame_needed = 1, uses_anonymous_args = 0
+  37 0000 80B5     		push	{r7, lr}
+  38              	.LCFI0:
+  39              		.cfi_def_cfa_offset 8
+  40              		.cfi_offset 7, -8
+  41              		.cfi_offset 14, -4
+  42 0002 82B0     		sub	sp, sp, #8
+  43              	.LCFI1:
+  44              		.cfi_def_cfa_offset 16
+  45 0004 00AF     		add	r7, sp, #0
+  46              	.LCFI2:
+  47              		.cfi_def_cfa_register 7
+  48 0006 7860     		str	r0, [r7, #4]
+ 103:Core/Inc/sensor_scale.h **** 	return (raw24 * 10) / 128;
+  49              		.loc 2 103 16
+  50 0008 7A68     		ldr	r2, [r7, #4]
+  51 000a 1300     		movs	r3, r2
+  52 000c 9B00     		lsls	r3, r3, #2
+  53 000e 9B18     		adds	r3, r3, r2
+  54 0010 5B00     		lsls	r3, r3, #1
+  55              		.loc 2 103 22
+  56 0012 00D5     		bpl	.L2
+  57 0014 7F33     		adds	r3, r3, #127
+  58              	.L2:
+  59 0016 DB11     		asrs	r3, r3, #7
+ 104:Core/Inc/sensor_scale.h **** }
+  60              		.loc 2 104 1
+  61 0018 1800     		movs	r0, r3
+  62 001a BD46     		mov	sp, r7
+  63 001c 02B0     		add	sp, sp, #8
+  64              		@ sp needed
+  65 001e 80BD     		pop	{r7, pc}
+  66              		.cfi_endproc
+  67              	.LFE363:
+  69              		.section	.text.sensor_raw_to_temp,"ax",%progbits
+  70              		.align	1
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 4
+
+
+  71              		.syntax unified
+  72              		.code	16
+  73              		.thumb_func
+  75              	sensor_raw_to_temp:
+  76              	.LFB365:
+ 105:Core/Inc/sensor_scale.h **** 
+ 106:Core/Inc/sensor_scale.h **** static inline uint8_t sensor_raw_saturated(int32_t raw24)
+ 107:Core/Inc/sensor_scale.h **** {
+ 108:Core/Inc/sensor_scale.h **** 	(void)raw24;
+ 109:Core/Inc/sensor_scale.h **** 	return 0;	/* der alte Sensor meldet keine Bereichsueberschreitung */
+ 110:Core/Inc/sensor_scale.h **** }
+ 111:Core/Inc/sensor_scale.h **** 
+ 112:Core/Inc/sensor_scale.h **** static inline int16_t sensor_raw_to_temp(int32_t t16)
+ 113:Core/Inc/sensor_scale.h **** {
+  77              		.loc 2 113 1
+  78              		.cfi_startproc
+  79              		@ args = 0, pretend = 0, frame = 8
+  80              		@ frame_needed = 1, uses_anonymous_args = 0
+  81 0000 80B5     		push	{r7, lr}
+  82              	.LCFI3:
+  83              		.cfi_def_cfa_offset 8
+  84              		.cfi_offset 7, -8
+  85              		.cfi_offset 14, -4
+  86 0002 82B0     		sub	sp, sp, #8
+  87              	.LCFI4:
+  88              		.cfi_def_cfa_offset 16
+  89 0004 00AF     		add	r7, sp, #0
+  90              	.LCFI5:
+  91              		.cfi_def_cfa_register 7
+  92 0006 7860     		str	r0, [r7, #4]
+ 114:Core/Inc/sensor_scale.h **** 	return (int16_t)((t16 * 25) / 64);
+  93              		.loc 2 114 24
+  94 0008 7A68     		ldr	r2, [r7, #4]
+  95 000a 1300     		movs	r3, r2
+  96 000c 9B00     		lsls	r3, r3, #2
+  97 000e 9B18     		adds	r3, r3, r2
+  98 0010 9A00     		lsls	r2, r3, #2
+  99 0012 9B18     		adds	r3, r3, r2
+ 100              		.loc 2 114 30
+ 101 0014 002B     		cmp	r3, #0
+ 102 0016 00DA     		bge	.L5
+ 103 0018 3F33     		adds	r3, r3, #63
+ 104              	.L5:
+ 105 001a 9B11     		asrs	r3, r3, #6
+ 106              		.loc 2 114 9
+ 107 001c 1BB2     		sxth	r3, r3
+ 115:Core/Inc/sensor_scale.h **** }
+ 108              		.loc 2 115 1
+ 109 001e 1800     		movs	r0, r3
+ 110 0020 BD46     		mov	sp, r7
+ 111 0022 02B0     		add	sp, sp, #8
+ 112              		@ sp needed
+ 113 0024 80BD     		pop	{r7, pc}
+ 114              		.cfi_endproc
+ 115              	.LFE365:
+ 117              		.section	.text.init_Sensor,"ax",%progbits
+ 118              		.align	1
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 5
+
+
+ 119              		.global	init_Sensor
+ 120              		.syntax unified
+ 121              		.code	16
+ 122              		.thumb_func
+ 124              	init_Sensor:
+ 125              	.LFB366:
+   1:Core/Src/sensor_legacy.c **** /*
+   2:Core/Src/sensor_legacy.c ****  * sensor_legacy.c
+   3:Core/Src/sensor_legacy.c ****  *
+   4:Core/Src/sensor_legacy.c ****  * Einlesen des alten 24-Bit-Drucksensors (I2C 0x6D, Messung per
+   5:Core/Src/sensor_legacy.c ****  * Kommando angestossen). Inhaltlich unveraendert aus sensor.c
+   6:Core/Src/sensor_legacy.c ****  * uebernommen; die Adresse kommt jetzt aus der Variante
+   7:Core/Src/sensor_legacy.c ****  * (sensor_cfg.h), die Umrechnung aus sensor_scale.h.
+   8:Core/Src/sensor_legacy.c ****  *
+   9:Core/Src/sensor_legacy.c ****  * Wird nur bei HW_VARIANT=1000 gebaut: das Makefile bindet nur den
+  10:Core/Src/sensor_legacy.c ****  * passenden Treiber ein, und zusaetzlich ist der gesamte Inhalt in eine
+  11:Core/Src/sensor_legacy.c ****  * Variantenabfrage gefasst. Letzteres ist fuer die CubeIDE noetig, die
+  12:Core/Src/sensor_legacy.c ****  * ohne Weiteres jede Datei in Core/Src uebersetzt - bei der falschen
+  13:Core/Src/sensor_legacy.c ****  * Variante bleibt hier einfach eine leere Uebersetzungseinheit uebrig.
+  14:Core/Src/sensor_legacy.c ****  */
+  15:Core/Src/sensor_legacy.c **** #include "main.h"
+  16:Core/Src/sensor_legacy.c **** #include "sensor.h"
+  17:Core/Src/sensor_legacy.c **** #include "sensor_scale.h"
+  18:Core/Src/sensor_legacy.c **** 
+  19:Core/Src/sensor_legacy.c **** #if SENSOR_KIND == SENSOR_KIND_LEGACY
+  20:Core/Src/sensor_legacy.c **** 
+  21:Core/Src/sensor_legacy.c **** /* CubeMX-Handles und App-Zustand - definiert in main.c. */
+  22:Core/Src/sensor_legacy.c **** extern I2C_HandleTypeDef hi2c1;
+  23:Core/Src/sensor_legacy.c **** extern volatile uint8_t error_mode;
+  24:Core/Src/sensor_legacy.c **** extern calib_data EEPROM_values;
+  25:Core/Src/sensor_legacy.c **** 
+  26:Core/Src/sensor_legacy.c **** #define SENSOR_ADDR8    (SENSOR_I2C_ADDR7 << 1)
+  27:Core/Src/sensor_legacy.c **** 
+  28:Core/Src/sensor_legacy.c **** void init_Sensor(void)
+  29:Core/Src/sensor_legacy.c **** {
+ 126              		.loc 1 29 1
+ 127              		.cfi_startproc
+ 128              		@ args = 0, pretend = 0, frame = 8
+ 129              		@ frame_needed = 1, uses_anonymous_args = 0
+ 130 0000 80B5     		push	{r7, lr}
+ 131              	.LCFI6:
+ 132              		.cfi_def_cfa_offset 8
+ 133              		.cfi_offset 7, -8
+ 134              		.cfi_offset 14, -4
+ 135 0002 84B0     		sub	sp, sp, #16
+ 136              	.LCFI7:
+ 137              		.cfi_def_cfa_offset 24
+ 138 0004 02AF     		add	r7, sp, #8
+ 139              	.LCFI8:
+ 140              		.cfi_def_cfa 7, 16
+  30:Core/Src/sensor_legacy.c **** 	uint8_t tx_arr[2];
+  31:Core/Src/sensor_legacy.c **** 	tx_arr[0] = 0x30;
+ 141              		.loc 1 31 12
+ 142 0006 3B1D     		adds	r3, r7, #4
+ 143 0008 3022     		movs	r2, #48
+ 144 000a 1A70     		strb	r2, [r3]
+  32:Core/Src/sensor_legacy.c **** 	tx_arr[1] = 0x0A;
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 6
+
+
+ 145              		.loc 1 32 12
+ 146 000c 3B1D     		adds	r3, r7, #4
+ 147 000e 0A22     		movs	r2, #10
+ 148 0010 5A70     		strb	r2, [r3, #1]
+  33:Core/Src/sensor_legacy.c **** 	/* Fix: vorher 'while(cmd_reg % 0x08)' mit cmd_reg=0 -> Schleife lief nie.
+  34:Core/Src/sensor_legacy.c **** 	 * Jetzt: warten bis Busy-Bit (0x08 in Reg 0x30) geloescht ist,
+  35:Core/Src/sensor_legacy.c **** 	 * mit Versuchslimit statt Endlosschleife bei fehlendem Sensor. */
+  36:Core/Src/sensor_legacy.c **** 	uint8_t cmd_reg = 0x08;
+ 149              		.loc 1 36 10
+ 150 0012 FB1C     		adds	r3, r7, #3
+ 151 0014 0822     		movs	r2, #8
+ 152 0016 1A70     		strb	r2, [r3]
+  37:Core/Src/sensor_legacy.c **** 	uint8_t retries = 0;
+ 153              		.loc 1 37 10
+ 154 0018 FB1D     		adds	r3, r7, #7
+ 155 001a 0022     		movs	r2, #0
+ 156 001c 1A70     		strb	r2, [r3]
+  38:Core/Src/sensor_legacy.c **** 
+  39:Core/Src/sensor_legacy.c **** 	HAL_I2C_Master_Transmit(&hi2c1, SENSOR_ADDR8, tx_arr, 2, 25);
+ 157              		.loc 1 39 2
+ 158 001e 3A1D     		adds	r2, r7, #4
+ 159 0020 1448     		ldr	r0, .L12
+ 160 0022 1923     		movs	r3, #25
+ 161 0024 0093     		str	r3, [sp]
+ 162 0026 0223     		movs	r3, #2
+ 163 0028 DA21     		movs	r1, #218
+ 164 002a FFF7FEFF 		bl	HAL_I2C_Master_Transmit
+  40:Core/Src/sensor_legacy.c **** 
+  41:Core/Src/sensor_legacy.c **** 	while ((cmd_reg & 0x08) && (retries++ < 100))
+ 165              		.loc 1 41 8
+ 166 002e 0FE0     		b	.L8
+ 167              	.L10:
+  42:Core/Src/sensor_legacy.c **** 	{
+  43:Core/Src/sensor_legacy.c **** 		HAL_I2C_Master_Transmit(&hi2c1, SENSOR_ADDR8, tx_arr, 1, 25);
+ 168              		.loc 1 43 3
+ 169 0030 3A1D     		adds	r2, r7, #4
+ 170 0032 1048     		ldr	r0, .L12
+ 171 0034 1923     		movs	r3, #25
+ 172 0036 0093     		str	r3, [sp]
+ 173 0038 0123     		movs	r3, #1
+ 174 003a DA21     		movs	r1, #218
+ 175 003c FFF7FEFF 		bl	HAL_I2C_Master_Transmit
+  44:Core/Src/sensor_legacy.c **** 
+  45:Core/Src/sensor_legacy.c **** 		HAL_I2C_Master_Receive(&hi2c1, SENSOR_ADDR8, &cmd_reg, 1, 25);
+ 176              		.loc 1 45 3
+ 177 0040 FA1C     		adds	r2, r7, #3
+ 178 0042 0C48     		ldr	r0, .L12
+ 179 0044 1923     		movs	r3, #25
+ 180 0046 0093     		str	r3, [sp]
+ 181 0048 0123     		movs	r3, #1
+ 182 004a DA21     		movs	r1, #218
+ 183 004c FFF7FEFF 		bl	HAL_I2C_Master_Receive
+ 184              	.L8:
+  41:Core/Src/sensor_legacy.c **** 	{
+ 185              		.loc 1 41 18
+ 186 0050 FB1C     		adds	r3, r7, #3
+ 187 0052 1B78     		ldrb	r3, [r3]
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 7
+
+
+ 188 0054 1A00     		movs	r2, r3
+ 189 0056 0823     		movs	r3, #8
+ 190 0058 1340     		ands	r3, r2
+  41:Core/Src/sensor_legacy.c **** 	{
+ 191              		.loc 1 41 26
+ 192 005a 06D0     		beq	.L11
+  41:Core/Src/sensor_legacy.c **** 	{
+ 193              		.loc 1 41 37 discriminator 1
+ 194 005c FB1D     		adds	r3, r7, #7
+ 195 005e 1B78     		ldrb	r3, [r3]
+ 196 0060 FA1D     		adds	r2, r7, #7
+ 197 0062 591C     		adds	r1, r3, #1
+ 198 0064 1170     		strb	r1, [r2]
+  41:Core/Src/sensor_legacy.c **** 	{
+ 199              		.loc 1 41 26 discriminator 1
+ 200 0066 632B     		cmp	r3, #99
+ 201 0068 E2D9     		bls	.L10
+ 202              	.L11:
+  46:Core/Src/sensor_legacy.c **** 	}
+  47:Core/Src/sensor_legacy.c **** 
+  48:Core/Src/sensor_legacy.c **** }
+ 203              		.loc 1 48 1
+ 204 006a C046     		nop
+ 205 006c BD46     		mov	sp, r7
+ 206 006e 02B0     		add	sp, sp, #8
+ 207              		@ sp needed
+ 208 0070 80BD     		pop	{r7, pc}
+ 209              	.L13:
+ 210 0072 C046     		.align	2
+ 211              	.L12:
+ 212 0074 00000000 		.word	hi2c1
+ 213              		.cfi_endproc
+ 214              	.LFE366:
+ 216              		.section	.text.get_value,"ax",%progbits
+ 217              		.align	1
+ 218              		.global	get_value
+ 219              		.syntax unified
+ 220              		.code	16
+ 221              		.thumb_func
+ 223              	get_value:
+ 224              	.LFB367:
+  49:Core/Src/sensor_legacy.c **** 
+  50:Core/Src/sensor_legacy.c **** sensor_mess get_value(void)
+  51:Core/Src/sensor_legacy.c **** {
+ 225              		.loc 1 51 1
+ 226              		.cfi_startproc
+ 227              		@ args = 0, pretend = 0, frame = 40
+ 228              		@ frame_needed = 1, uses_anonymous_args = 0
+ 229 0000 90B5     		push	{r4, r7, lr}
+ 230              	.LCFI9:
+ 231              		.cfi_def_cfa_offset 12
+ 232              		.cfi_offset 4, -12
+ 233              		.cfi_offset 7, -8
+ 234              		.cfi_offset 14, -4
+ 235 0002 8DB0     		sub	sp, sp, #52
+ 236              	.LCFI10:
+ 237              		.cfi_def_cfa_offset 64
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 8
+
+
+ 238 0004 02AF     		add	r7, sp, #8
+ 239              	.LCFI11:
+ 240              		.cfi_def_cfa 7, 56
+ 241 0006 7860     		str	r0, [r7, #4]
+  52:Core/Src/sensor_legacy.c **** 	static sensor_mess last_good = {0, 0};	/* letzter gueltiger Messwert */
+  53:Core/Src/sensor_legacy.c **** 	sensor_mess mess_data;
+  54:Core/Src/sensor_legacy.c **** 	uint8_t rxBuffer[5] = {0};
+ 242              		.loc 1 54 10
+ 243 0008 0C23     		movs	r3, #12
+ 244 000a FB18     		adds	r3, r7, r3
+ 245 000c 1800     		movs	r0, r3
+ 246 000e 0523     		movs	r3, #5
+ 247 0010 1A00     		movs	r2, r3
+ 248 0012 0021     		movs	r1, #0
+ 249 0014 FFF7FEFF 		bl	memset
+  55:Core/Src/sensor_legacy.c **** 	uint8_t start_Reg = 0x06;
+ 250              		.loc 1 55 10
+ 251 0018 0B21     		movs	r1, #11
+ 252 001a 7B18     		adds	r3, r7, r1
+ 253 001c 0622     		movs	r2, #6
+ 254 001e 1A70     		strb	r2, [r3]
+  56:Core/Src/sensor_legacy.c **** 	uint8_t tx_arr[2];
+  57:Core/Src/sensor_legacy.c **** 	tx_arr[0] = 0x30;
+ 255              		.loc 1 57 12
+ 256 0020 0820     		movs	r0, #8
+ 257 0022 3B18     		adds	r3, r7, r0
+ 258 0024 3022     		movs	r2, #48
+ 259 0026 1A70     		strb	r2, [r3]
+  58:Core/Src/sensor_legacy.c **** 	tx_arr[1] = 0x0A;
+ 260              		.loc 1 58 12
+ 261 0028 3B18     		adds	r3, r7, r0
+ 262 002a 0A22     		movs	r2, #10
+ 263 002c 5A70     		strb	r2, [r3, #1]
+  59:Core/Src/sensor_legacy.c **** 	int32_t raw24, t16;
+  60:Core/Src/sensor_legacy.c **** 	uint8_t i2c_ok = 1;
+ 264              		.loc 1 60 10
+ 265 002e 1F24     		movs	r4, #31
+ 266 0030 3B19     		adds	r3, r7, r4
+ 267 0032 0122     		movs	r2, #1
+ 268 0034 1A70     		strb	r2, [r3]
+  61:Core/Src/sensor_legacy.c **** 
+  62:Core/Src/sensor_legacy.c **** 	/* Fix: Timeout 25 ms statt 2500 ms - blockiert die Hauptschleife
+  63:Core/Src/sensor_legacy.c **** 	 * bei Sensorausfall nicht mehr sekundenlang. */
+  64:Core/Src/sensor_legacy.c **** 	if(HAL_I2C_Master_Transmit(&hi2c1, SENSOR_ADDR8, &start_Reg, 1, 25)!= HAL_OK)
+ 269              		.loc 1 64 5
+ 270 0036 7A18     		adds	r2, r7, r1
+ 271 0038 4548     		ldr	r0, .L22
+ 272 003a 1923     		movs	r3, #25
+ 273 003c 0093     		str	r3, [sp]
+ 274 003e 0123     		movs	r3, #1
+ 275 0040 DA21     		movs	r1, #218
+ 276 0042 FFF7FEFF 		bl	HAL_I2C_Master_Transmit
+ 277 0046 031E     		subs	r3, r0, #0
+ 278              		.loc 1 64 4 discriminator 1
+ 279 0048 0AD0     		beq	.L15
+  65:Core/Src/sensor_legacy.c **** 	{
+  66:Core/Src/sensor_legacy.c **** 		error_mode |= ERROR_I2C;
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 9
+
+
+ 280              		.loc 1 66 14
+ 281 004a 424B     		ldr	r3, .L22+4
+ 282 004c 1B78     		ldrb	r3, [r3]
+ 283 004e DBB2     		uxtb	r3, r3
+ 284 0050 0222     		movs	r2, #2
+ 285 0052 1343     		orrs	r3, r2
+ 286 0054 DAB2     		uxtb	r2, r3
+ 287 0056 3F4B     		ldr	r3, .L22+4
+ 288 0058 1A70     		strb	r2, [r3]
+  67:Core/Src/sensor_legacy.c **** 		i2c_ok = 0;
+ 289              		.loc 1 67 10
+ 290 005a 3B19     		adds	r3, r7, r4
+ 291 005c 0022     		movs	r2, #0
+ 292 005e 1A70     		strb	r2, [r3]
+ 293              	.L15:
+  68:Core/Src/sensor_legacy.c **** 	}
+  69:Core/Src/sensor_legacy.c **** 
+  70:Core/Src/sensor_legacy.c **** 	if(i2c_ok && (HAL_I2C_Master_Receive(&hi2c1, SENSOR_ADDR8, rxBuffer, 5, 25) != HAL_OK))
+ 294              		.loc 1 70 4
+ 295 0060 1F24     		movs	r4, #31
+ 296 0062 3B19     		adds	r3, r7, r4
+ 297 0064 1B78     		ldrb	r3, [r3]
+ 298 0066 002B     		cmp	r3, #0
+ 299 0068 15D0     		beq	.L16
+ 300              		.loc 1 70 16 discriminator 1
+ 301 006a 0C23     		movs	r3, #12
+ 302 006c FA18     		adds	r2, r7, r3
+ 303 006e 3848     		ldr	r0, .L22
+ 304 0070 1923     		movs	r3, #25
+ 305 0072 0093     		str	r3, [sp]
+ 306 0074 0523     		movs	r3, #5
+ 307 0076 DA21     		movs	r1, #218
+ 308 0078 FFF7FEFF 		bl	HAL_I2C_Master_Receive
+ 309 007c 031E     		subs	r3, r0, #0
+ 310              		.loc 1 70 12 discriminator 1
+ 311 007e 0AD0     		beq	.L16
+  71:Core/Src/sensor_legacy.c **** 	{
+  72:Core/Src/sensor_legacy.c **** 		error_mode |= ERROR_I2C;
+ 312              		.loc 1 72 14
+ 313 0080 344B     		ldr	r3, .L22+4
+ 314 0082 1B78     		ldrb	r3, [r3]
+ 315 0084 DBB2     		uxtb	r3, r3
+ 316 0086 0222     		movs	r2, #2
+ 317 0088 1343     		orrs	r3, r2
+ 318 008a DAB2     		uxtb	r2, r3
+ 319 008c 314B     		ldr	r3, .L22+4
+ 320 008e 1A70     		strb	r2, [r3]
+  73:Core/Src/sensor_legacy.c **** 		i2c_ok = 0;
+ 321              		.loc 1 73 10
+ 322 0090 3B19     		adds	r3, r7, r4
+ 323 0092 0022     		movs	r2, #0
+ 324 0094 1A70     		strb	r2, [r3]
+ 325              	.L16:
+  74:Core/Src/sensor_legacy.c **** 	}
+  75:Core/Src/sensor_legacy.c **** 
+  76:Core/Src/sensor_legacy.c **** 	/* naechste Messung anstossen (auch nach Fehler versuchen) */
+  77:Core/Src/sensor_legacy.c **** 	HAL_I2C_Master_Transmit(&hi2c1, SENSOR_ADDR8, tx_arr, 2, 25);
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 10
+
+
+ 326              		.loc 1 77 2
+ 327 0096 0823     		movs	r3, #8
+ 328 0098 FA18     		adds	r2, r7, r3
+ 329 009a 2D48     		ldr	r0, .L22
+ 330 009c 1923     		movs	r3, #25
+ 331 009e 0093     		str	r3, [sp]
+ 332 00a0 0223     		movs	r3, #2
+ 333 00a2 DA21     		movs	r1, #218
+ 334 00a4 FFF7FEFF 		bl	HAL_I2C_Master_Transmit
+  78:Core/Src/sensor_legacy.c **** 
+  79:Core/Src/sensor_legacy.c **** 	if(i2c_ok == 0)
+ 335              		.loc 1 79 4
+ 336 00a8 1F23     		movs	r3, #31
+ 337 00aa FB18     		adds	r3, r7, r3
+ 338 00ac 1B78     		ldrb	r3, [r3]
+ 339 00ae 002B     		cmp	r3, #0
+ 340 00b0 04D1     		bne	.L17
+  80:Core/Src/sensor_legacy.c **** 	{
+  81:Core/Src/sensor_legacy.c **** 		/* Fix: bei I2C-Fehler keinen uninitialisierten Puffer auswerten,
+  82:Core/Src/sensor_legacy.c **** 		 * sondern letzten gueltigen Wert zurueckgeben. */
+  83:Core/Src/sensor_legacy.c **** 		return last_good;
+ 341              		.loc 1 83 10
+ 342 00b2 7B68     		ldr	r3, [r7, #4]
+ 343 00b4 284A     		ldr	r2, .L22+8
+ 344 00b6 03CA     		ldmia	r2!, {r0, r1}
+ 345 00b8 03C3     		stmia	r3!, {r0, r1}
+ 346 00ba 44E0     		b	.L21
+ 347              	.L17:
+  84:Core/Src/sensor_legacy.c **** 	}
+  85:Core/Src/sensor_legacy.c **** 
+  86:Core/Src/sensor_legacy.c **** 	raw24 = ((int32_t)rxBuffer[0] << 16) | ((int32_t)rxBuffer[1] << 8) | rxBuffer[2];
+ 348              		.loc 1 86 28
+ 349 00bc 0C21     		movs	r1, #12
+ 350 00be 7B18     		adds	r3, r7, r1
+ 351 00c0 1B78     		ldrb	r3, [r3]
+ 352              		.loc 1 86 32
+ 353 00c2 1A04     		lsls	r2, r3, #16
+ 354              		.loc 1 86 59
+ 355 00c4 7B18     		adds	r3, r7, r1
+ 356 00c6 5B78     		ldrb	r3, [r3, #1]
+ 357              		.loc 1 86 63
+ 358 00c8 1B02     		lsls	r3, r3, #8
+ 359              		.loc 1 86 39
+ 360 00ca 1343     		orrs	r3, r2
+ 361              		.loc 1 86 79
+ 362 00cc 7A18     		adds	r2, r7, r1
+ 363 00ce 9278     		ldrb	r2, [r2, #2]
+ 364              		.loc 1 86 8
+ 365 00d0 1343     		orrs	r3, r2
+ 366 00d2 7B62     		str	r3, [r7, #36]
+  87:Core/Src/sensor_legacy.c **** 	if (rxBuffer[0] & 0x80)
+ 367              		.loc 1 87 14
+ 368 00d4 7B18     		adds	r3, r7, r1
+ 369 00d6 1B78     		ldrb	r3, [r3]
+ 370              		.loc 1 87 6
+ 371 00d8 5BB2     		sxtb	r3, r3
+ 372              		.loc 1 87 5
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 11
+
+
+ 373 00da 002B     		cmp	r3, #0
+ 374 00dc 05DA     		bge	.L19
+  88:Core/Src/sensor_legacy.c **** 	{
+  89:Core/Src/sensor_legacy.c **** 		raw24 -= 16777216;	/* 24-bit-Zweierkomplement */
+ 375              		.loc 1 89 9
+ 376 00de 7B6A     		ldr	r3, [r7, #36]
+ 377 00e0 FF22     		movs	r2, #255
+ 378 00e2 1206     		lsls	r2, r2, #24
+ 379 00e4 9446     		mov	ip, r2
+ 380 00e6 6344     		add	r3, r3, ip
+ 381 00e8 7B62     		str	r3, [r7, #36]
+ 382              	.L19:
+  90:Core/Src/sensor_legacy.c **** 	}
+  91:Core/Src/sensor_legacy.c **** 	t16 = ((int32_t)rxBuffer[3] << 8) | rxBuffer[4];
+ 383              		.loc 1 91 26
+ 384 00ea 0C21     		movs	r1, #12
+ 385 00ec 7B18     		adds	r3, r7, r1
+ 386 00ee DB78     		ldrb	r3, [r3, #3]
+ 387              		.loc 1 91 30
+ 388 00f0 1B02     		lsls	r3, r3, #8
+ 389              		.loc 1 91 46
+ 390 00f2 7A18     		adds	r2, r7, r1
+ 391 00f4 1279     		ldrb	r2, [r2, #4]
+ 392              		.loc 1 91 6
+ 393 00f6 1343     		orrs	r3, r2
+ 394 00f8 3B62     		str	r3, [r7, #32]
+  92:Core/Src/sensor_legacy.c **** 	if (rxBuffer[3] & 0x80)
+ 395              		.loc 1 92 14
+ 396 00fa 7B18     		adds	r3, r7, r1
+ 397 00fc DB78     		ldrb	r3, [r3, #3]
+ 398              		.loc 1 92 6
+ 399 00fe 5BB2     		sxtb	r3, r3
+ 400              		.loc 1 92 5
+ 401 0100 002B     		cmp	r3, #0
+ 402 0102 04DA     		bge	.L20
+  93:Core/Src/sensor_legacy.c **** 	{
+  94:Core/Src/sensor_legacy.c **** 		t16 -= 65536;		/* 16-bit-Zweierkomplement */
+ 403              		.loc 1 94 7
+ 404 0104 3B6A     		ldr	r3, [r7, #32]
+ 405 0106 154A     		ldr	r2, .L22+12
+ 406 0108 9446     		mov	ip, r2
+ 407 010a 6344     		add	r3, r3, ip
+ 408 010c 3B62     		str	r3, [r7, #32]
+ 409              	.L20:
+  95:Core/Src/sensor_legacy.c **** 	}
+  96:Core/Src/sensor_legacy.c **** 
+  97:Core/Src/sensor_legacy.c **** 	mess_data.pressure = sensor_raw_to_ubar(raw24) - EEPROM_values.offset;
+ 410              		.loc 1 97 23
+ 411 010e 7B6A     		ldr	r3, [r7, #36]
+ 412 0110 1800     		movs	r0, r3
+ 413 0112 FFF7FEFF 		bl	sensor_raw_to_ubar
+ 414 0116 0200     		movs	r2, r0
+ 415              		.loc 1 97 64 discriminator 1
+ 416 0118 114B     		ldr	r3, .L22+16
+ 417 011a 0821     		movs	r1, #8
+ 418 011c 5B5E     		ldrsh	r3, [r3, r1]
+ 419              		.loc 1 97 49 discriminator 1
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 12
+
+
+ 420 011e D21A     		subs	r2, r2, r3
+ 421              		.loc 1 97 21 discriminator 1
+ 422 0120 1424     		movs	r4, #20
+ 423 0122 3B19     		adds	r3, r7, r4
+ 424 0124 1A60     		str	r2, [r3]
+  98:Core/Src/sensor_legacy.c **** 	mess_data.temp = sensor_raw_to_temp(t16);
+ 425              		.loc 1 98 19
+ 426 0126 3B6A     		ldr	r3, [r7, #32]
+ 427 0128 1800     		movs	r0, r3
+ 428 012a FFF7FEFF 		bl	sensor_raw_to_temp
+ 429 012e 0300     		movs	r3, r0
+ 430 0130 1A00     		movs	r2, r3
+ 431              		.loc 1 98 17 discriminator 1
+ 432 0132 3B19     		adds	r3, r7, r4
+ 433 0134 9A80     		strh	r2, [r3, #4]
+  99:Core/Src/sensor_legacy.c **** 
+ 100:Core/Src/sensor_legacy.c **** 	last_good = mess_data;
+ 434              		.loc 1 100 12
+ 435 0136 084B     		ldr	r3, .L22+8
+ 436 0138 3A19     		adds	r2, r7, r4
+ 437 013a 03CA     		ldmia	r2!, {r0, r1}
+ 438 013c 03C3     		stmia	r3!, {r0, r1}
+ 101:Core/Src/sensor_legacy.c **** 
+ 102:Core/Src/sensor_legacy.c **** 	return mess_data;
+ 439              		.loc 1 102 9
+ 440 013e 7B68     		ldr	r3, [r7, #4]
+ 441 0140 3A19     		adds	r2, r7, r4
+ 442 0142 03CA     		ldmia	r2!, {r0, r1}
+ 443 0144 03C3     		stmia	r3!, {r0, r1}
+ 444              	.L21:
+ 103:Core/Src/sensor_legacy.c **** }
+ 445              		.loc 1 103 1
+ 446 0146 7868     		ldr	r0, [r7, #4]
+ 447 0148 BD46     		mov	sp, r7
+ 448 014a 0BB0     		add	sp, sp, #44
+ 449              		@ sp needed
+ 450 014c 90BD     		pop	{r4, r7, pc}
+ 451              	.L23:
+ 452 014e C046     		.align	2
+ 453              	.L22:
+ 454 0150 00000000 		.word	hi2c1
+ 455 0154 00000000 		.word	error_mode
+ 456 0158 00000000 		.word	last_good.0
+ 457 015c 0000FFFF 		.word	-65536
+ 458 0160 00000000 		.word	EEPROM_values
+ 459              		.cfi_endproc
+ 460              	.LFE367:
+ 462              		.section	.bss.last_good.0,"aw",%nobits
+ 463              		.align	2
+ 466              	last_good.0:
+ 467 0000 00000000 		.space	8
+ 467      00000000 
+ 468              		.text
+ 469              	.Letext0:
+ 470              		.file 3 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 471              		.file 4 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 472              		.file 5 "Drivers/CMSIS/Device/ST/STM32G0xx/Include/stm32g0b1xx.h"
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 13
+
+
+ 473              		.file 6 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_def.h"
+ 474              		.file 7 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_dma.h"
+ 475              		.file 8 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_i2c.h"
+ 476              		.file 9 "Core/Inc/app_types.h"
+ 477              		.file 10 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_dma.h"
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s 			page 14
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 sensor_legacy.c
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:19     .rodata.CHANNEL_OFFSET_TAB:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:22     .rodata.CHANNEL_OFFSET_TAB:00000000 CHANNEL_OFFSET_TAB
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:25     .text.sensor_raw_to_ubar:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:30     .text.sensor_raw_to_ubar:00000000 sensor_raw_to_ubar
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:70     .text.sensor_raw_to_temp:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:75     .text.sensor_raw_to_temp:00000000 sensor_raw_to_temp
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:118    .text.init_Sensor:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:124    .text.init_Sensor:00000000 init_Sensor
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:212    .text.init_Sensor:00000074 $d
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:217    .text.get_value:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:223    .text.get_value:00000000 get_value
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:454    .text.get_value:00000150 $d
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:466    .bss.last_good.0:00000000 last_good.0
+C:\Users\a_hae\AppData\Local\Temp\cc4mSm3y.s:463    .bss.last_good.0:00000000 $d
+
+UNDEFINED SYMBOLS
+HAL_I2C_Master_Transmit
+HAL_I2C_Master_Receive
+hi2c1
+memset
+error_mode
+EEPROM_values

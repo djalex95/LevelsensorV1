@@ -1,0 +1,168 @@
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s 			page 1
+
+
+   1              		.cpu cortex-m0plus
+   2              		.arch armv6s-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 6
+  11              		.eabi_attribute 34, 0
+  12              		.eabi_attribute 18, 4
+  13              		.file	"board_pins.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "Core/Src/board_pins.c"
+  18              		.section	.rodata.CHANNEL_OFFSET_TAB,"a"
+  19              		.align	2
+  22              	CHANNEL_OFFSET_TAB:
+  23 0000 081C3044 		.ascii	"\010\0340DXl\200"
+  23      586C80
+  24              		.section	.text.board_fdcan_pins_init,"ax",%progbits
+  25              		.align	1
+  26              		.global	board_fdcan_pins_init
+  27              		.syntax unified
+  28              		.code	16
+  29              		.thumb_func
+  31              	board_fdcan_pins_init:
+  32              	.LFB363:
+   1:Core/Src/board_pins.c **** /*
+   2:Core/Src/board_pins.c ****  * board_pins.c - Beschreibung und Begruendung siehe board_pins.h
+   3:Core/Src/board_pins.c ****  */
+   4:Core/Src/board_pins.c **** 
+   5:Core/Src/board_pins.c **** #include "board_pins.h"
+   6:Core/Src/board_pins.c **** #include "main.h"
+   7:Core/Src/board_pins.c **** #include "sensor_cfg.h"		/* liefert HW_VARIANT und prueft es gegen den Include-Pfad */
+   8:Core/Src/board_pins.c **** 
+   9:Core/Src/board_pins.c **** #if HW_VARIANT == 1000
+  10:Core/Src/board_pins.c **** 
+  11:Core/Src/board_pins.c **** /* ---------------- Platine V1 (STM32G0B1KBU6N) ---------------- */
+  12:Core/Src/board_pins.c **** 
+  13:Core/Src/board_pins.c **** void board_fdcan_pins_init(void)
+  14:Core/Src/board_pins.c **** {
+  15:Core/Src/board_pins.c **** 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+  16:Core/Src/board_pins.c **** 
+  17:Core/Src/board_pins.c **** 	/* Erst die von CubeMX gesetzten V2-Pins wieder loesen. Ohne das waeren
+  18:Core/Src/board_pins.c **** 	 * PA11 und PD0 gleichzeitig auf FDCAN1_RX gemuxt. PA11 haengt auf der
+  19:Core/Src/board_pins.c **** 	 * V1-Platine an keinem Netz (die Loetbruecken zu den CAN-Leitungen sind
+  20:Core/Src/board_pins.c **** 	 * offen), der Eingang wuerde also frei floaten und den Empfang stoeren. */
+  21:Core/Src/board_pins.c **** 	HAL_GPIO_DeInit(GPIOA, GPIO_PIN_11 | GPIO_PIN_12);
+  22:Core/Src/board_pins.c **** 
+  23:Core/Src/board_pins.c **** 	__HAL_RCC_GPIOD_CLK_ENABLE();
+  24:Core/Src/board_pins.c **** 
+  25:Core/Src/board_pins.c **** 	/* PD0 -> FDCAN1_RX, PD1 -> FDCAN1_TX; gleiche Alternate Function wie
+  26:Core/Src/board_pins.c **** 	 * auf PA11/PA12, es aendern sich nur Port und Pinmaske. */
+  27:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s 			page 2
+
+
+  28:Core/Src/board_pins.c **** 	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  29:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pull = GPIO_NOPULL;
+  30:Core/Src/board_pins.c **** 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  31:Core/Src/board_pins.c **** 	GPIO_InitStruct.Alternate = GPIO_AF3_FDCAN1;
+  32:Core/Src/board_pins.c **** 	HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  33:Core/Src/board_pins.c **** }
+  34:Core/Src/board_pins.c **** 
+  35:Core/Src/board_pins.c **** void board_gpio_fixup(void)
+  36:Core/Src/board_pins.c **** {
+  37:Core/Src/board_pins.c **** 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+  38:Core/Src/board_pins.c **** 
+  39:Core/Src/board_pins.c **** 	__HAL_RCC_GPIOD_CLK_ENABLE();
+  40:Core/Src/board_pins.c **** 
+  41:Core/Src/board_pins.c **** 	/* CAN_STBY liegt auf PD2 statt auf PB4, mit demselben Startpegel wie in
+  42:Core/Src/board_pins.c **** 	 * der generierten Init: LOW = Transceiver aktiv. Der Pin wird im Betrieb
+  43:Core/Src/board_pins.c **** 	 * nirgends umgeschaltet, deshalb genuegt diese einmalige Konfiguration
+  44:Core/Src/board_pins.c **** 	 * und es braucht keine Makro-Indirektion im uebrigen Code. */
+  45:Core/Src/board_pins.c **** 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
+  46:Core/Src/board_pins.c **** 
+  47:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pin = GPIO_PIN_2;
+  48:Core/Src/board_pins.c **** 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  49:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pull = GPIO_NOPULL;
+  50:Core/Src/board_pins.c **** 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  51:Core/Src/board_pins.c **** 	HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  52:Core/Src/board_pins.c **** }
+  53:Core/Src/board_pins.c **** 
+  54:Core/Src/board_pins.c **** #else
+  55:Core/Src/board_pins.c **** 
+  56:Core/Src/board_pins.c **** /* ------------- Platine V2 (STM32G0B1KBU6, 1001/1003) -------------
+  57:Core/Src/board_pins.c ****  * Die generierte Init passt bereits, hier ist nichts nachzuziehen. */
+  58:Core/Src/board_pins.c **** 
+  59:Core/Src/board_pins.c **** void board_fdcan_pins_init(void)
+  60:Core/Src/board_pins.c **** {
+  33              		.loc 1 60 1
+  34              		.cfi_startproc
+  35              		@ args = 0, pretend = 0, frame = 0
+  36              		@ frame_needed = 1, uses_anonymous_args = 0
+  37 0000 80B5     		push	{r7, lr}
+  38              	.LCFI0:
+  39              		.cfi_def_cfa_offset 8
+  40              		.cfi_offset 7, -8
+  41              		.cfi_offset 14, -4
+  42 0002 00AF     		add	r7, sp, #0
+  43              	.LCFI1:
+  44              		.cfi_def_cfa_register 7
+  61:Core/Src/board_pins.c **** }
+  45              		.loc 1 61 1
+  46 0004 C046     		nop
+  47 0006 BD46     		mov	sp, r7
+  48              		@ sp needed
+  49 0008 80BD     		pop	{r7, pc}
+  50              		.cfi_endproc
+  51              	.LFE363:
+  53              		.section	.text.board_gpio_fixup,"ax",%progbits
+  54              		.align	1
+  55              		.global	board_gpio_fixup
+  56              		.syntax unified
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s 			page 3
+
+
+  57              		.code	16
+  58              		.thumb_func
+  60              	board_gpio_fixup:
+  61              	.LFB364:
+  62:Core/Src/board_pins.c **** 
+  63:Core/Src/board_pins.c **** void board_gpio_fixup(void)
+  64:Core/Src/board_pins.c **** {
+  62              		.loc 1 64 1
+  63              		.cfi_startproc
+  64              		@ args = 0, pretend = 0, frame = 0
+  65              		@ frame_needed = 1, uses_anonymous_args = 0
+  66 0000 80B5     		push	{r7, lr}
+  67              	.LCFI2:
+  68              		.cfi_def_cfa_offset 8
+  69              		.cfi_offset 7, -8
+  70              		.cfi_offset 14, -4
+  71 0002 00AF     		add	r7, sp, #0
+  72              	.LCFI3:
+  73              		.cfi_def_cfa_register 7
+  65:Core/Src/board_pins.c **** }
+  74              		.loc 1 65 1
+  75 0004 C046     		nop
+  76 0006 BD46     		mov	sp, r7
+  77              		@ sp needed
+  78 0008 80BD     		pop	{r7, pc}
+  79              		.cfi_endproc
+  80              	.LFE364:
+  82              		.text
+  83              	.Letext0:
+  84              		.file 2 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+  85              		.file 3 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+  86              		.file 4 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_dma.h"
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s 			page 4
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 board_pins.c
+C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s:19     .rodata.CHANNEL_OFFSET_TAB:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s:22     .rodata.CHANNEL_OFFSET_TAB:00000000 CHANNEL_OFFSET_TAB
+C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s:25     .text.board_fdcan_pins_init:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s:31     .text.board_fdcan_pins_init:00000000 board_fdcan_pins_init
+C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s:54     .text.board_gpio_fixup:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\cctUpc68.s:60     .text.board_gpio_fixup:00000000 board_gpio_fixup
+
+NO UNDEFINED SYMBOLS

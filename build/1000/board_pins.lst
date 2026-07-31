@@ -1,0 +1,293 @@
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s 			page 1
+
+
+   1              		.cpu cortex-m0plus
+   2              		.arch armv6s-m
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 6
+  11              		.eabi_attribute 34, 0
+  12              		.eabi_attribute 18, 4
+  13              		.file	"board_pins.c"
+  14              		.text
+  15              	.Ltext0:
+  16              		.cfi_sections	.debug_frame
+  17              		.file 1 "Core/Src/board_pins.c"
+  18              		.section	.rodata.CHANNEL_OFFSET_TAB,"a"
+  19              		.align	2
+  22              	CHANNEL_OFFSET_TAB:
+  23 0000 081C3044 		.ascii	"\010\0340DXl\200"
+  23      586C80
+  24              		.section	.text.board_fdcan_pins_init,"ax",%progbits
+  25              		.align	1
+  26              		.global	board_fdcan_pins_init
+  27              		.syntax unified
+  28              		.code	16
+  29              		.thumb_func
+  31              	board_fdcan_pins_init:
+  32              	.LFB363:
+   1:Core/Src/board_pins.c **** /*
+   2:Core/Src/board_pins.c ****  * board_pins.c - Beschreibung und Begruendung siehe board_pins.h
+   3:Core/Src/board_pins.c ****  */
+   4:Core/Src/board_pins.c **** 
+   5:Core/Src/board_pins.c **** #include "board_pins.h"
+   6:Core/Src/board_pins.c **** #include "main.h"
+   7:Core/Src/board_pins.c **** #include "sensor_cfg.h"		/* liefert HW_VARIANT und prueft es gegen den Include-Pfad */
+   8:Core/Src/board_pins.c **** 
+   9:Core/Src/board_pins.c **** #if HW_VARIANT == 1000
+  10:Core/Src/board_pins.c **** 
+  11:Core/Src/board_pins.c **** /* ---------------- Platine V1 (STM32G0B1KBU6N) ---------------- */
+  12:Core/Src/board_pins.c **** 
+  13:Core/Src/board_pins.c **** void board_fdcan_pins_init(void)
+  14:Core/Src/board_pins.c **** {
+  33              		.loc 1 14 1
+  34              		.cfi_startproc
+  35              		@ args = 0, pretend = 0, frame = 24
+  36              		@ frame_needed = 1, uses_anonymous_args = 0
+  37 0000 80B5     		push	{r7, lr}
+  38              	.LCFI0:
+  39              		.cfi_def_cfa_offset 8
+  40              		.cfi_offset 7, -8
+  41              		.cfi_offset 14, -4
+  42 0002 86B0     		sub	sp, sp, #24
+  43              	.LCFI1:
+  44              		.cfi_def_cfa_offset 32
+  45 0004 00AF     		add	r7, sp, #0
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s 			page 2
+
+
+  46              	.LCFI2:
+  47              		.cfi_def_cfa_register 7
+  15:Core/Src/board_pins.c **** 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+  48              		.loc 1 15 19
+  49 0006 3B1D     		adds	r3, r7, #4
+  50 0008 1800     		movs	r0, r3
+  51 000a 1423     		movs	r3, #20
+  52 000c 1A00     		movs	r2, r3
+  53 000e 0021     		movs	r1, #0
+  54 0010 FFF7FEFF 		bl	memset
+  16:Core/Src/board_pins.c **** 
+  17:Core/Src/board_pins.c **** 	/* Erst die von CubeMX gesetzten V2-Pins wieder loesen. Ohne das waeren
+  18:Core/Src/board_pins.c **** 	 * PA11 und PD0 gleichzeitig auf FDCAN1_RX gemuxt. PA11 haengt auf der
+  19:Core/Src/board_pins.c **** 	 * V1-Platine an keinem Netz (die Loetbruecken zu den CAN-Leitungen sind
+  20:Core/Src/board_pins.c **** 	 * offen), der Eingang wuerde also frei floaten und den Empfang stoeren. */
+  21:Core/Src/board_pins.c **** 	HAL_GPIO_DeInit(GPIOA, GPIO_PIN_11 | GPIO_PIN_12);
+  55              		.loc 1 21 2
+  56 0014 C023     		movs	r3, #192
+  57 0016 5A01     		lsls	r2, r3, #5
+  58 0018 A023     		movs	r3, #160
+  59 001a DB05     		lsls	r3, r3, #23
+  60 001c 1100     		movs	r1, r2
+  61 001e 1800     		movs	r0, r3
+  62 0020 FFF7FEFF 		bl	HAL_GPIO_DeInit
+  63              	.LBB2:
+  22:Core/Src/board_pins.c **** 
+  23:Core/Src/board_pins.c **** 	__HAL_RCC_GPIOD_CLK_ENABLE();
+  64              		.loc 1 23 2
+  65 0024 124B     		ldr	r3, .L2
+  66 0026 5A6B     		ldr	r2, [r3, #52]
+  67 0028 114B     		ldr	r3, .L2
+  68 002a 0821     		movs	r1, #8
+  69 002c 0A43     		orrs	r2, r1
+  70 002e 5A63     		str	r2, [r3, #52]
+  71 0030 0F4B     		ldr	r3, .L2
+  72 0032 5B6B     		ldr	r3, [r3, #52]
+  73 0034 0822     		movs	r2, #8
+  74 0036 1340     		ands	r3, r2
+  75 0038 3B60     		str	r3, [r7]
+  76 003a 3B68     		ldr	r3, [r7]
+  77              	.LBE2:
+  24:Core/Src/board_pins.c **** 
+  25:Core/Src/board_pins.c **** 	/* PD0 -> FDCAN1_RX, PD1 -> FDCAN1_TX; gleiche Alternate Function wie
+  26:Core/Src/board_pins.c **** 	 * auf PA11/PA12, es aendern sich nur Port und Pinmaske. */
+  27:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+  78              		.loc 1 27 22
+  79 003c 3B1D     		adds	r3, r7, #4
+  80 003e 0322     		movs	r2, #3
+  81 0040 1A60     		str	r2, [r3]
+  28:Core/Src/board_pins.c **** 	GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  82              		.loc 1 28 23
+  83 0042 3B1D     		adds	r3, r7, #4
+  84 0044 0222     		movs	r2, #2
+  85 0046 5A60     		str	r2, [r3, #4]
+  29:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pull = GPIO_NOPULL;
+  86              		.loc 1 29 23
+  87 0048 3B1D     		adds	r3, r7, #4
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s 			page 3
+
+
+  88 004a 0022     		movs	r2, #0
+  89 004c 9A60     		str	r2, [r3, #8]
+  30:Core/Src/board_pins.c **** 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  90              		.loc 1 30 24
+  91 004e 3B1D     		adds	r3, r7, #4
+  92 0050 0022     		movs	r2, #0
+  93 0052 DA60     		str	r2, [r3, #12]
+  31:Core/Src/board_pins.c **** 	GPIO_InitStruct.Alternate = GPIO_AF3_FDCAN1;
+  94              		.loc 1 31 28
+  95 0054 3B1D     		adds	r3, r7, #4
+  96 0056 0322     		movs	r2, #3
+  97 0058 1A61     		str	r2, [r3, #16]
+  32:Core/Src/board_pins.c **** 	HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  98              		.loc 1 32 2
+  99 005a 3B1D     		adds	r3, r7, #4
+ 100 005c 054A     		ldr	r2, .L2+4
+ 101 005e 1900     		movs	r1, r3
+ 102 0060 1000     		movs	r0, r2
+ 103 0062 FFF7FEFF 		bl	HAL_GPIO_Init
+  33:Core/Src/board_pins.c **** }
+ 104              		.loc 1 33 1
+ 105 0066 C046     		nop
+ 106 0068 BD46     		mov	sp, r7
+ 107 006a 06B0     		add	sp, sp, #24
+ 108              		@ sp needed
+ 109 006c 80BD     		pop	{r7, pc}
+ 110              	.L3:
+ 111 006e C046     		.align	2
+ 112              	.L2:
+ 113 0070 00100240 		.word	1073876992
+ 114 0074 000C0050 		.word	1342180352
+ 115              		.cfi_endproc
+ 116              	.LFE363:
+ 118              		.section	.text.board_gpio_fixup,"ax",%progbits
+ 119              		.align	1
+ 120              		.global	board_gpio_fixup
+ 121              		.syntax unified
+ 122              		.code	16
+ 123              		.thumb_func
+ 125              	board_gpio_fixup:
+ 126              	.LFB364:
+  34:Core/Src/board_pins.c **** 
+  35:Core/Src/board_pins.c **** void board_gpio_fixup(void)
+  36:Core/Src/board_pins.c **** {
+ 127              		.loc 1 36 1
+ 128              		.cfi_startproc
+ 129              		@ args = 0, pretend = 0, frame = 24
+ 130              		@ frame_needed = 1, uses_anonymous_args = 0
+ 131 0000 80B5     		push	{r7, lr}
+ 132              	.LCFI3:
+ 133              		.cfi_def_cfa_offset 8
+ 134              		.cfi_offset 7, -8
+ 135              		.cfi_offset 14, -4
+ 136 0002 86B0     		sub	sp, sp, #24
+ 137              	.LCFI4:
+ 138              		.cfi_def_cfa_offset 32
+ 139 0004 00AF     		add	r7, sp, #0
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s 			page 4
+
+
+ 140              	.LCFI5:
+ 141              		.cfi_def_cfa_register 7
+  37:Core/Src/board_pins.c **** 	GPIO_InitTypeDef GPIO_InitStruct = {0};
+ 142              		.loc 1 37 19
+ 143 0006 3B1D     		adds	r3, r7, #4
+ 144 0008 1800     		movs	r0, r3
+ 145 000a 1423     		movs	r3, #20
+ 146 000c 1A00     		movs	r2, r3
+ 147 000e 0021     		movs	r1, #0
+ 148 0010 FFF7FEFF 		bl	memset
+ 149              	.LBB3:
+  38:Core/Src/board_pins.c **** 
+  39:Core/Src/board_pins.c **** 	__HAL_RCC_GPIOD_CLK_ENABLE();
+ 150              		.loc 1 39 2
+ 151 0014 134B     		ldr	r3, .L5
+ 152 0016 5A6B     		ldr	r2, [r3, #52]
+ 153 0018 124B     		ldr	r3, .L5
+ 154 001a 0821     		movs	r1, #8
+ 155 001c 0A43     		orrs	r2, r1
+ 156 001e 5A63     		str	r2, [r3, #52]
+ 157 0020 104B     		ldr	r3, .L5
+ 158 0022 5B6B     		ldr	r3, [r3, #52]
+ 159 0024 0822     		movs	r2, #8
+ 160 0026 1340     		ands	r3, r2
+ 161 0028 3B60     		str	r3, [r7]
+ 162 002a 3B68     		ldr	r3, [r7]
+ 163              	.LBE3:
+  40:Core/Src/board_pins.c **** 
+  41:Core/Src/board_pins.c **** 	/* CAN_STBY liegt auf PD2 statt auf PB4, mit demselben Startpegel wie in
+  42:Core/Src/board_pins.c **** 	 * der generierten Init: LOW = Transceiver aktiv. Der Pin wird im Betrieb
+  43:Core/Src/board_pins.c **** 	 * nirgends umgeschaltet, deshalb genuegt diese einmalige Konfiguration
+  44:Core/Src/board_pins.c **** 	 * und es braucht keine Makro-Indirektion im uebrigen Code. */
+  45:Core/Src/board_pins.c **** 	HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
+ 164              		.loc 1 45 2
+ 165 002c 0E4B     		ldr	r3, .L5+4
+ 166 002e 0022     		movs	r2, #0
+ 167 0030 0421     		movs	r1, #4
+ 168 0032 1800     		movs	r0, r3
+ 169 0034 FFF7FEFF 		bl	HAL_GPIO_WritePin
+  46:Core/Src/board_pins.c **** 
+  47:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pin = GPIO_PIN_2;
+ 170              		.loc 1 47 22
+ 171 0038 3B1D     		adds	r3, r7, #4
+ 172 003a 0422     		movs	r2, #4
+ 173 003c 1A60     		str	r2, [r3]
+  48:Core/Src/board_pins.c **** 	GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+ 174              		.loc 1 48 23
+ 175 003e 3B1D     		adds	r3, r7, #4
+ 176 0040 0122     		movs	r2, #1
+ 177 0042 5A60     		str	r2, [r3, #4]
+  49:Core/Src/board_pins.c **** 	GPIO_InitStruct.Pull = GPIO_NOPULL;
+ 178              		.loc 1 49 23
+ 179 0044 3B1D     		adds	r3, r7, #4
+ 180 0046 0022     		movs	r2, #0
+ 181 0048 9A60     		str	r2, [r3, #8]
+  50:Core/Src/board_pins.c **** 	GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+ 182              		.loc 1 50 24
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s 			page 5
+
+
+ 183 004a 3B1D     		adds	r3, r7, #4
+ 184 004c 0022     		movs	r2, #0
+ 185 004e DA60     		str	r2, [r3, #12]
+  51:Core/Src/board_pins.c **** 	HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+ 186              		.loc 1 51 2
+ 187 0050 3B1D     		adds	r3, r7, #4
+ 188 0052 054A     		ldr	r2, .L5+4
+ 189 0054 1900     		movs	r1, r3
+ 190 0056 1000     		movs	r0, r2
+ 191 0058 FFF7FEFF 		bl	HAL_GPIO_Init
+  52:Core/Src/board_pins.c **** }
+ 192              		.loc 1 52 1
+ 193 005c C046     		nop
+ 194 005e BD46     		mov	sp, r7
+ 195 0060 06B0     		add	sp, sp, #24
+ 196              		@ sp needed
+ 197 0062 80BD     		pop	{r7, pc}
+ 198              	.L6:
+ 199              		.align	2
+ 200              	.L5:
+ 201 0064 00100240 		.word	1073876992
+ 202 0068 000C0050 		.word	1342180352
+ 203              		.cfi_endproc
+ 204              	.LFE364:
+ 206              		.text
+ 207              	.Letext0:
+ 208              		.file 2 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 209              		.file 3 "C:\\ST\\STM32CubeIDE_2.2.0\\STM32CubeIDE\\plugins\\com.st.stm32cube.ide.mcu.externaltools
+ 210              		.file 4 "Drivers/CMSIS/Device/ST/STM32G0xx/Include/stm32g0b1xx.h"
+ 211              		.file 5 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_hal_gpio.h"
+ 212              		.file 6 "Drivers/STM32G0xx_HAL_Driver/Inc/stm32g0xx_ll_dma.h"
+ARM GAS  C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s 			page 6
+
+
+DEFINED SYMBOLS
+                            *ABS*:00000000 board_pins.c
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:19     .rodata.CHANNEL_OFFSET_TAB:00000000 $d
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:22     .rodata.CHANNEL_OFFSET_TAB:00000000 CHANNEL_OFFSET_TAB
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:25     .text.board_fdcan_pins_init:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:31     .text.board_fdcan_pins_init:00000000 board_fdcan_pins_init
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:113    .text.board_fdcan_pins_init:00000070 $d
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:119    .text.board_gpio_fixup:00000000 $t
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:125    .text.board_gpio_fixup:00000000 board_gpio_fixup
+C:\Users\a_hae\AppData\Local\Temp\ccKvC5Hh.s:201    .text.board_gpio_fixup:00000064 $d
+
+UNDEFINED SYMBOLS
+memset
+HAL_GPIO_DeInit
+HAL_GPIO_Init
+HAL_GPIO_WritePin
