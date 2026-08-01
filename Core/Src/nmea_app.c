@@ -7,6 +7,7 @@
 #include "main.h"
 #include "nmea_app.h"
 #include "ble_app.h"
+#include "ble.h"
 #include "app_types.h"
 #include "app_config.h"
 #include "config_store.h"
@@ -21,6 +22,8 @@
 #define PROP_CMD_CALIB   0x03	/* aktuellen Druck als 100 % (max_val) kalibrieren */
 #define PROP_CMD_RESET   0x04	/* Kalibrierung auf Werkswert zuruecksetzen */
 #define PROP_CMD_FRESET  0x05	/* Werksreset: kompletten Config loeschen + Neustart */
+#define PROP_CMD_BLEDIAG 0x06	/* BLE-Diagnose: Zustand + Ereignisprotokoll */
+#define PROP_BLEDIAG_VER 0x01	/* Aufbau der Antwort 0x86 */
 
 /* CubeMX-Handle und App-Zustand - definiert in main.c.
  * (gf_buf/gf_len/gf_src kommen aus nmea2000.h.) */
@@ -266,6 +269,51 @@ void handle_prop_config(void)
 		reply[2] = 0x84;
 		reply[3] = 0;
 		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, reply, 4);
+	}
+	else if (gf_buf[2] == PROP_CMD_BLEDIAG)
+	{
+		/* Diagnose des BLE-Zweigs ueber den CAN-Bus. Absichtlich hier und
+		 * nicht ueber BLE: gebraucht wird sie genau dann, wenn ueber BLE
+		 * nichts mehr geht. Geliefert werden das Zustandsbild der
+		 * Provisionierung, die aus dem Modul zurueckgelesenen Werte und das
+		 * Ereignisprotokoll der letzten Modul- und Sensor-Kommandos. */
+		uint8_t dg[128];
+		uint8_t n = ble_log_cnt;
+		uint8_t start = (uint8_t)((ble_log_cnt < BLE_LOG_N)
+								  ? 0 : ble_log_wr);
+		uint16_t now = (uint16_t)(HAL_GetTick() / 100U);
+		uint8_t len;
+
+		dg[0] = PROP_HDR_0;
+		dg[1] = PROP_HDR_1;
+		dg[2] = 0x86;
+		dg[3] = PROP_BLEDIAG_VER;
+		dg[4] = ble_diag.reset_cause;
+		dg[5] = ble_diag.sync_step;
+		dg[6] = ble_diag.secprov_sub;
+		dg[7] = ble_diag.secprov_att;
+		dg[8] = ble_diag.marker;
+		dg[9] = ble_diag.heal_cnt;
+		dg[10] = ble_diag.fail_cnt;
+		dg[11] = ble_diag.rb_flags;
+		dg[12] = ble_diag.secflags;
+		memcpy(&dg[13], ble_diag.passkey, BLE_PIN_LEN);
+		memcpy(&dg[19], ble_diag.modfw, 3);
+		dg[22] = (uint8_t)(now & 0xFF);
+		dg[23] = (uint8_t)(now >> 8);
+		dg[24] = n;
+
+		len = 25;
+		for (uint8_t i = 0; i < n; i++)
+		{
+			uint8_t k = (uint8_t)((start + i) % BLE_LOG_N);
+			dg[len++] = (uint8_t)(ble_log[k].t & 0xFF);
+			dg[len++] = (uint8_t)(ble_log[k].t >> 8);
+			dg[len++] = ble_log[k].ev;
+			dg[len++] = ble_log[k].p;
+		}
+
+		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, dg, len);
 	}
 	else if (gf_buf[2] == PROP_CMD_FRESET)
 	{

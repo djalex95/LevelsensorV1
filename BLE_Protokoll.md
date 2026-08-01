@@ -168,12 +168,26 @@ BLE-Modul zeigt davon max. 20.
 einmalig nach Update/Werksreset als bestätigte Schritt-Kette: Modul neu
 starten → SecFlags schreiben → Modul-Neustart abwarten → Passkey schreiben →
 Neustart abwarten → Bonds löschen → Neustart. Der Neustart am Anfang ist kein
-Schönheitsfehler, sondern der Grund, warum die Kette überhaupt durchläuft:
-solange das Modul bootet, kann sich kein Telefon verbinden, und `CMD_SET_REQ`
-braucht den getrennten Zustand. Ohne ihn lief die Kette gegen den
-Verbindungsversuch des Telefons an, verlor das Rennen und gab nach drei
-Anläufen bis zum nächsten Sensorstart auf – das Modul behielt dann alte PIN
-und alte Bonds. (Der frühere PIN-Anlauf scheiterte nicht am Modul –
+Schönheitsfehler: solange das Modul bootet, kann sich kein Telefon verbinden,
+und `CMD_SET_REQ` braucht den getrennten Zustand.
+
+Zwei Eigenschaften der Kette sind dabei entscheidend. **Erstens** fasst sie das
+Modul nie an, solange eine Verbindung besteht – auch nicht für den einleitenden
+Neustart. Jedes `CMD_SET_REQ` und jeder Reset startet den Proteus-e neu, und
+zwar ohne Trennungsmeldung: das Telefon sieht den Sensor mitten im Pairing
+verschwinden (`LINK_SUPERVISION_TIMEOUT`) und die Kopplung kommt nie zustande.
+Die Kette wartet deshalb ab; ihr Fenster sind die ersten Sekunden nach dem
+Einschalten. Bleibt eine Verbindung 30 s lang bestehen, ohne dass der
+Datenkanal aufgeht oder gekoppelt wird, trennt die Firmware sie einmal sauber
+per `CMD_DISCONNECT_REQ` – ein normales Verbindungsende, kein Reset.
+**Zweitens** wartet sie auf den Modul-Neustart nicht nur passiv: nach zwei
+Sekunden fragt sie zusätzlich aktiv mit `CMD_GETSTATE_REQ` nach. Die Antwort
+`CMD_GETSTATE_CNF` ist dieselbe Meldung, die das Modul nach einem Neustart von
+sich aus schickt. Ginge die spontane Meldung verloren, liefe sonst jeder
+Schritt in den Timeout, die Kette gäbe auf, und PIN und Bonds blieben
+ungeschrieben – bei gesetzten SecFlags heißt das: das Telefon fragt nach der
+PIN, aber das Modul prüft gegen eine andere. (Der frühere PIN-Anlauf
+scheiterte nicht am Modul –
 Bonds liegen persistent im Modul-Flash –, sondern an zwei Firmware-Fehlern:
 die PIN wurde anfangs bei jedem Boot neu geschrieben samt Bond-Löschung, und
 die Provisionierung wartete die Selbst-Neustarts des Moduls nach `CMD_SET_REQ`
@@ -191,7 +205,11 @@ Modul neu – danach koppelt das Gerät frisch. Kam dagegen eine
 Sicherheitsmeldung, war die Kopplung in Ordnung und es wird nichts gelöscht;
 sonst würde jeder App-seitige Abbruch einen frisch angelegten Bond wieder
 zerstören. Pro Sensorstart sind höchstens drei Heilungen möglich, nach jeder
-erfolgreichen Verbindung startet die Zählung neu.
+erfolgreichen Verbindung startet die Zählung neu. Der Neustart am Ende der
+Heilung entfällt, wenn sich in der Zwischenzeit wieder ein Gerät verbunden hat
+– er würde es mitten im neuen Pairing hinauswerfen und damit genau den Fehler
+erzeugen, den die Heilung beheben soll. Wirksam ist ohnehin das Löschen der
+Bonds.
 
 Auf App-Seite gehört dazu die Geduld beim Pairing: Das Einschalten der
 Notifications (Descriptor 2902) ist der Schreibzugriff, der die PIN-Abfrage
@@ -238,3 +256,47 @@ Sensor gespeichert (überstehen einen Neustart und Stromausfall).
 - Vor `LIN …` sicherstellen, dass die MTU groß genug ist (die Zeile kann
   ~40 Zeichen lang sein).
 ```
+
+## 6. Diagnose über NMEA2000, wenn die Kopplung scheitert
+
+Scheitert die Kopplung, fehlt genau der Weg, über den man sonst nachsieht:
+der BLE-Datenkanal geht ja gerade nicht auf. Deshalb liegt die Diagnose des
+BLE-Zweigs auf dem CAN-Bus, nicht auf BLE. Das PC-Programm
+`LevelSense-NMEA2000` schickt dazu das proprietäre Kommando `0x06` auf
+PGN 126720; der Sensor antwortet mit `0x86`.
+
+Die Antwort enthält drei Dinge:
+
+**Zustand der Provisionierung** – Schritt und Teilschritt der Kette, Zahl der
+Anläufe, ob der Marker im Konfigurationsspeicher gesetzt ist, wie oft die
+Bond-Heilung schon gegriffen hat und wie viele Verbindungen in Folge ohne
+Kanal und ohne Pairing endeten.
+
+**Was tatsächlich im Funkmodul steht** – `RF_SecFlags`, die statische Passkey
+und die Firmware-Version des Moduls, einmalig nach dem Start zurückgelesen.
+Erst diese drei Werte beantworten die Frage, ob das Modul überhaupt im
+erwarteten Modus steht (`0x0B`) und ob die dort hinterlegte PIN die des
+Sensors ist. Vorher war das geraten.
+
+**Ein Protokoll der letzten 24 Ereignisse** zwischen STM32 und Funkmodul, je
+mit Zeitstempel in Zehntelsekunden seit dem Start. Aufgezeichnet wird jedes
+Kommando in beide Richtungen; nur der Nutzdatenverkehr bleibt draußen, weil
+er den kleinen Puffer in Sekunden überschreiben würde.
+
+Das Protokoll beantwortet die eine Frage, an der die Fehlersuche bisher
+hängen blieb – warum der Sensor mitten im Koppeln verstummt:
+
+- Steht dort `DISCONNECT_IND`, hat das **Modul die Verbindung beendet**, und
+  das Byte dahinter nennt den Grund.
+- Steht dort `GETSTATE_CNF`, ist das **Modul neu gestartet**. Dann verrät der
+  Eintrag davor, ob der STM32 etwas geschickt hat (`SET_REQ`, `RESET_REQ`)
+  oder ob das Modul von sich aus neu gestartet ist.
+- Steht dort `STM32 gestartet`, hat sich der **STM32 neu gestartet**. Er zieht
+  dabei über `MX_GPIO_Init` die Resetleitung des Moduls – von außen sieht das
+  genauso aus wie ein Modul-Neustart. Der mitgelieferte Neustartgrund aus
+  `RCC->CSR` sagt dann, ob Watchdog, Spannungseinbruch oder ein
+  Software-Reset dahinter steckt.
+- Steht dort **gar nichts** in dem Moment, hat weder der STM32 etwas gesendet
+  noch das Modul etwas gemeldet. Dann liegt es an der Funkstrecke oder am
+  Modul selbst, und die Suche gehört auf die Modul-Firmware und die
+  Sicherheitseinstellungen gelenkt.

@@ -231,6 +231,13 @@ static uint8_t bond_heal_cnt = 0;	/* Heilungen dieses Boots */
 #define BOND_HEAL_MAX 3				/* mehr als das ist keine Bond-Frage mehr */
 static uint32_t bond_heal_t0 = 0;
 
+/* Einmaliges Ruecklesen der Modul-Einstellungen fuer die Diagnose:
+ * 0/1 = RF_SecFlags, 2/3 = RF_StaticPasskey, 4/5 = Modul-Firmware,
+ * 6 = fertig (gerade Schritte fragen, ungerade warten auf die Antwort). */
+static uint8_t  ble_rb_step = 0;
+static uint32_t ble_rb_next = 0;
+static uint32_t ble_rb_t0 = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -261,6 +268,15 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+
+  /* Grund des letzten Neustarts sichern, bevor ihn irgendetwas loeschen
+   * kann. RCC->CSR Bit 31..24 haelt fest, wer zugeschlagen hat: Option-Byte-
+   * Ladung, Reset-Pin, Spannungseinbruch (BOR/PWR), Software-Reset,
+   * IWDG, WWDG, Low-Power. Der Wert geht in die NMEA2000-Diagnose - nur so
+   * ist von aussen zu erkennen, ob der STM32 sich waehrend eines
+   * Kopplungsversuchs selbst neu gestartet hat und warum. */
+  ble_diag.reset_cause = (uint8_t)(RCC->CSR >> 24);
+  __HAL_RCC_CLEAR_RESET_FLAGS();
 
   /* USER CODE END SysInit */
 
@@ -654,23 +670,115 @@ int main(void)
 		}
 		ble_prev_conn = ble_connected;
 
-		if ((bond_heal_step == 1)
-				&& ((ble_delbonds_cnf != 0) || ((time_el - bond_heal_t0) > 800)))
+		/* Zustandsbild fuer die NMEA2000-Diagnose nachfuehren. Kostet nichts
+		 * und ist im Fehlerfall die einzige Moeglichkeit, an diese Werte zu
+		 * kommen - ueber BLE geht dann ja gerade nichts. */
+		ble_diag.sync_step   = ble_sync_step;
+		ble_diag.secprov_sub = secprov_sub;
+		ble_diag.secprov_att = secprov_att;
+		ble_diag.marker      = cfg_data[CFG_SECPROV_OFF];
+		ble_diag.heal_cnt    = bond_heal_cnt;
+		ble_diag.fail_cnt    = ble_fail_cnt;
+
+		/* --- Einmalig zuruecklesen, was tatsaechlich im Modul steht ---
+		 * Sicherheitsmodus, statische Passkey und Modul-Firmware. Ohne diese
+		 * drei Werte ist jede Aussage ueber eine gescheiterte Kopplung
+		 * geraten: erst sie zeigen, ob das Modul ueberhaupt im Passkey-
+		 * Bonding-Modus steht, ob die dort hinterlegte PIN die des Sensors
+		 * ist und welche Modul-Firmware ueberhaupt laeuft. Nur im getrennten
+		 * Zustand - CMD_GET_REQ ist zwar harmlos, aber waehrend einer
+		 * Verbindung wird am Modul grundsaetzlich nichts angefasst. */
+		if ((ble_sync_step >= 2) && (ble_rb_step < 6) && (ble_connected == 0)
+				&& (bonds_req == 0) && (time_el >= ble_rb_next))
 		{
-			bond_heal_step = 0;
-			BLE_ResetModule();	/* frisch starten, Handy koppelt danach neu */
-			if (cfg_data[CFG_SECPROV_OFF] != CFG_SECPROV_MAGIC)
+			static const uint8_t rb_idx[3] = { CFG_IDX_SECFLAGS,
+											   CFG_IDX_STATICPASSKEY, 0x01 };
+			uint8_t slot = (uint8_t)(ble_rb_step >> 1);
+
+			if ((ble_rb_step & 1U) == 0U)		/* Abfrage schicken */
 			{
-				/* Provisionierung ist noch offen (z. B. Kette abgebrochen):
-				 * direkt einen frischen Anlauf starten - das Modul bootet
-				 * gerade, die Kette hat freie Bahn. */
-				ble_sync_step = 1;
-				secprov_sub = 0;
-				secprov_wait = 0;
-				secprov_att = 0;
-				secprov_ints = 0;
-				secprov_rounds = 0;
-				ble_sync_next = time_el + 1500;
+				if (BLE_RequestSetting(rb_idx[slot]))
+				{
+					ble_rb_step++;
+					ble_rb_t0 = time_el;
+					ble_rb_next = time_el + 20;
+				}
+				else
+				{
+					ble_rb_step = 6;	/* UART tot -> gar nicht erst weiter */
+				}
+			}
+			else								/* auf die Antwort warten */
+			{
+				if (ble_get_ready && (ble_get_index == rb_idx[slot]))
+				{
+					if (slot == 0)
+					{
+						ble_diag.secflags = ble_get_value[0];
+						ble_diag.rb_flags |= 0x01;
+					}
+					else if (slot == 1)
+					{
+						uint16_t n = (ble_get_len > BLE_PIN_LEN)
+									 ? (uint16_t)BLE_PIN_LEN : ble_get_len;
+						memcpy(ble_diag.passkey, ble_get_value, n);
+						ble_diag.rb_flags |= 0x02;
+					}
+					else if (ble_get_len >= 3)
+					{
+						/* 3 Bytes: Patch, Minor, Major - wie in der
+						 * BONDS-Diagnose ueber BLE */
+						ble_diag.modfw[0] = ble_get_value[2];
+						ble_diag.modfw[1] = ble_get_value[1];
+						ble_diag.modfw[2] = ble_get_value[0];
+						ble_diag.rb_flags |= 0x04;
+					}
+					ble_get_ready = 0;
+					ble_rb_step++;
+					ble_rb_next = time_el + 100;
+				}
+				else if ((time_el - ble_rb_t0) > 1000)
+				{
+					/* Keine Antwort - der naechste Wert ist trotzdem einen
+					 * Versuch wert; das fehlende rb_flags-Bit sagt aus, dass
+					 * dieser Wert unbekannt ist. */
+					ble_rb_step++;
+					ble_rb_next = time_el + 100;
+				}
+				else
+				{
+					ble_rb_next = time_el + 20;
+				}
+			}
+		}
+
+		if (bond_heal_step == 1)
+		{
+			if (ble_connected)
+			{
+				/* Inzwischen haengt wieder ein Handy dran. Der Reset wuerde es
+				 * mitten im neuen Pairing rauswerfen - also genau den Fehler
+				 * erzeugen, den die Heilung beheben soll. Die Bonds sind
+				 * bereits geloescht, das ist der wirksame Teil. */
+				bond_heal_step = 0;
+			}
+			else if ((ble_delbonds_cnf != 0) || ((time_el - bond_heal_t0) > 800))
+			{
+				bond_heal_step = 0;
+				BLE_ResetModule();	/* frisch starten, Handy koppelt danach neu */
+				if (cfg_data[CFG_SECPROV_OFF] != CFG_SECPROV_MAGIC)
+				{
+					/* Provisionierung ist noch offen (z. B. Kette abgebrochen):
+					 * direkt einen frischen Anlauf starten - das Modul bootet
+					 * gerade, die Kette hat freie Bahn. */
+					ble_sync_step = 1;
+					secprov_sub = 0;
+					secprov_wait = 0;
+					secprov_att = 0;
+					secprov_ints = 0;
+					secprov_rounds = 0;
+					ble_sync_next = time_el + 1500;
+				}
 			}
 		}
 
@@ -826,38 +934,42 @@ int main(void)
 				}
 				else if (secprov_wait == 0)	/* naechstes Kommando der Kette senden */
 				{
-					if (ble_connected && (secprov_sub != 0))
+					if (ble_connected)
 					{
-						/* CMD_SET_REQ braucht den getrennten Zustand. Nur das
-						 * SENDEN stoert eine Verbindung - Fortschritt behalten
-						 * (secprov_sub bleibt!) und nach dem Trennen SCHNELL
-						 * weitermachen, sonst gewinnt der Auto-Reconnect des
-						 * Handys jedes Rennen und die Kette wirft das Modul
-						 * endlos per Reset aus der Luft. Eigener Zaehler:
-						 * ble_sync_tries wird an anderen Stellen genullt.
-						 * Schritt 0 (Reset) braucht die Bedingung nicht - der
-						 * Reset beendet eine Verbindung ohnehin. */
-						BLE_Disconnect();
-						if (++secprov_ints > 30)
+						/* Solange ein Handy verbunden ist, wird am Modul
+						 * NICHTS geaendert - auch nicht der Reset aus
+						 * Schritt 0. Jedes CMD_SET_REQ und jeder Reset laesst
+						 * den Proteus-e neu starten, und zwar ohne
+						 * Trennungsmeldung: das Handy sieht den Sensor mitten
+						 * im Pairing verschwinden (LINK_SUPERVISION_TIMEOUT),
+						 * die Kopplung kommt nie zustande und die naechsten
+						 * Versuche laufen genauso. Die Kette wartet deshalb
+						 * einfach ab; ihr eigentliches Fenster sind ohnehin
+						 * die ersten Sekunden nach dem Einschalten, bevor
+						 * sich ein Handy verbinden kann. Eigener Zaehler,
+						 * weil ble_sync_tries an anderen Stellen genullt
+						 * wird. */
+						ble_sync_next = time_el + 200;
+						if (++secprov_ints > 150)	/* ~30 s ununterbrochen */
 						{
-							/* Diese Runde verloren. Nicht endgueltig aufgeben:
-							 * bis zu 2 weitere Anlaeufe mit Abstand (mehr
-							 * nicht - jede Runde schreibt Modul-Flash). */
 							secprov_ints = 0;
-							secprov_sub = 0;
-							secprov_wait = 0;
-							if (++secprov_rounds >= 3)
+							if (!ble_chan_seen && !ble_sec_seen)
 							{
-								ble_sync_step = 2;	/* bis zum naechsten Boot */
+								/* Diese Verbindung bringt nichts: weder geht
+								 * der Datenkanal auf noch wird gekoppelt.
+								 * Einmal sauber trennen (CMD_DISCONNECT_REQ,
+								 * kein Reset) - das Handy sieht ein normales
+								 * Verbindungsende, und die Kette kommt dran. */
+								BLE_Disconnect();
 							}
-							else
+							else if (++secprov_rounds >= 3)
 							{
-								ble_sync_next = time_el + 8000;
+								/* Es wird gekoppelt oder gearbeitet, nur sehr
+								 * lange. Dann hat die Provisionierung Zeit bis
+								 * zum naechsten Boot - Vorrang hat die
+								 * laufende Verbindung. */
+								ble_sync_step = 2;
 							}
-						}
-						else
-						{
-							ble_sync_next = time_el + 150;
 						}
 					}
 					else
@@ -871,10 +983,10 @@ int main(void)
 							/* Das Modul ZUERST neu starten. Solange es bootet,
 							 * kann sich kein Handy verbinden, und gleich nach
 							 * der Boot-Meldung hat die Kette freie Bahn fuer
-							 * das erste CMD_SET_REQ. Ohne diesen Schritt lief
-							 * die Kette gegen den Verbindungsversuch des
-							 * Handys an, verlor das Rennen und gab auf - das
-							 * Modul behielt dann alte PIN und alte Bonds. */
+							 * das erste CMD_SET_REQ. Laeuft nur im getrennten
+							 * Zustand (siehe oben) - sonst wuerde ausgerechnet
+							 * dieser Schritt die Verbindung abwuergen, die er
+							 * absichern soll. */
 							sent = BLE_ResetModule();
 							break;
 						case 1:
@@ -956,6 +1068,20 @@ int main(void)
 					}
 					else
 					{
+						/* Weiter pollen - und nach der Bootzeit zusaetzlich
+						 * aktiv nachfragen. CMD_GETSTATE_CNF ist dieselbe
+						 * Meldung, die das Modul nach einem Neustart von sich
+						 * aus schickt; kommt sie als Antwort auf unsere
+						 * Abfrage, ist das Modul genauso sicher wieder da.
+						 * Ohne das haengt die ganze Kette daran, dass die
+						 * spontane Boot-Meldung auch wirklich ankommt - geht
+						 * sie verloren, laeuft jeder Schritt in den Timeout,
+						 * die Kette gibt auf, und PIN und Bonds bleiben
+						 * ungeschrieben. */
+						if ((ble_boot_seen == 0) && (ble_sync_tries >= 20))
+						{
+							BLE_RequestState();
+						}
 						ble_sync_next = time_el + 100;	/* weiter pollen */
 					}
 				}

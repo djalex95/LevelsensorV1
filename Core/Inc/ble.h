@@ -143,6 +143,65 @@ uint8_t BLE_DeleteBonds(void);                   /* CMD_DELETEBONDS_REQ      */
 uint8_t BLE_ResetModule(void);                   /* CMD_RESET_REQ            */
 uint8_t BLE_RequestBonds(void);                  /* CMD_GETBONDS_REQ         */
 
+/* Fragt den Modulzustand ab (CMD_GETSTATE_REQ). Die Antwort CMD_GETSTATE_CNF
+ * ist dieselbe Meldung, die das Modul nach einem Neustart von sich aus
+ * schickt, und setzt ble_boot_seen. Damit haengt die Provisionierungs-Kette
+ * nicht daran, dass die spontane Boot-Meldung tatsaechlich ankommt: sobald
+ * das Modul wieder antwortet, ist es wieder da. */
+uint8_t BLE_RequestState(void);                  /* CMD_GETSTATE_REQ         */
+
+/* --- Diagnose ---------------------------------------------------------
+ *
+ * Solange die Kopplung scheitert, ist der Datenkanal ueber BLE genau das,
+ * was fehlt - Fehlersuche ueber BLE geht also nicht. Deshalb schreibt der
+ * Treiber jedes Ereignis in einen kleinen Ringpuffer, der ueber NMEA2000
+ * ausgelesen wird (PROP_CMD_BLEDIAG). Damit laesst sich im Nachhinein
+ * unterscheiden, ob das Modul neu gestartet ist (CMD_GETSTATE_CNF), ob es
+ * die Verbindung selbst beendet hat (CMD_DISCONNECT_IND samt Grund) und ob
+ * der STM32 in diesem Moment ueberhaupt etwas gesendet hat. */
+#define BLE_LOG_N               24
+
+typedef struct
+{
+	uint16_t t;		/* Zeit in 1/10 s seit STM32-Start (rollt nach ~109 min) */
+	uint8_t  ev;	/* Modul -> STM32: Kommandobyte (immer >= 0x41, denn
+					 *                 CNF = base|0x40, IND = base|0x80,
+					 *                 RSP = base|0xC0)
+					 * STM32 -> Modul: 0x20 | Kommando (Kommandos sind <= 0x11,
+					 *                 kollidiert also nicht mit den Antworten -
+					 *                 0x80 waere mit CMD_DISCONNECT_IND
+					 *                 zusammengefallen, ausgerechnet dem
+					 *                 wichtigsten Ereignis)
+					 * 0xFE          : STM32 gestartet (BLE_Init) */
+	uint8_t  p;		/* erstes Nutzbyte (Status/Grund) bzw. Settings-Index */
+} ble_log_entry;
+
+extern volatile ble_log_entry ble_log[BLE_LOG_N];
+extern volatile uint8_t ble_log_wr;	/* naechster Schreibindex */
+extern volatile uint8_t ble_log_cnt;	/* gefuellte Eintraege (max. BLE_LOG_N) */
+
+#define BLE_LOG_EV_MCUBOOT      0xFE
+
+void BLE_LogAdd(uint8_t ev, uint8_t p);
+
+/* Zustandsbild fuer die NMEA2000-Diagnose. Wird in main.c gepflegt. */
+typedef struct
+{
+	uint8_t reset_cause;	/* RCC->CSR >> 24 beim Start (Grund des Neustarts) */
+	uint8_t sync_step;		/* ble_sync_step   */
+	uint8_t secprov_sub;	/* secprov_sub     */
+	uint8_t secprov_att;	/* secprov_att     */
+	uint8_t marker;			/* cfg_data[CFG_SECPROV_OFF] */
+	uint8_t heal_cnt;		/* bond_heal_cnt   */
+	uint8_t fail_cnt;		/* ble_fail_cnt    */
+	uint8_t rb_flags;		/* 1 = SecFlags, 2 = Passkey, 4 = Modul-FW gelesen */
+	uint8_t secflags;		/* zurueckgelesener RF_SecFlags-Wert */
+	uint8_t passkey[BLE_PIN_LEN];	/* zurueckgelesener RF_StaticPasskey */
+	uint8_t modfw[3];		/* Modul-Firmware: Major, Minor, Patch */
+} ble_diag_t;
+
+extern ble_diag_t ble_diag;
+
 /* Aktive Verbindung modulseitig trennen (CMD_DISCONNECT_REQ). */
 void BLE_Disconnect(void);
 

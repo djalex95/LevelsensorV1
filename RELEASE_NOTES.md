@@ -13,17 +13,34 @@ Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
   alte Kopplung selbst, damit das Telefon beim naechsten Verbinden neu
   nach der PIN fragt.
 - Die einmalige Provisionierung (Sicherheitsmodus, PIN, Bonds loeschen)
-  startet jetzt damit, das Funkmodul neu zu starten. Waehrend es bootet,
-  kann sich kein Telefon verbinden, und die Kette bekommt ihr erstes
-  Kommando sicher los. Vorher lief sie gegen den Verbindungsversuch des
-  Telefons an, verlor das Rennen und gab auf - das Modul behielt dann
-  alte PIN und alte Bindungen, und die Kopplung landete in einer
-  Sackgasse.
+  startet damit, das Funkmodul neu zu starten. Waehrend es bootet, kann
+  sich kein Telefon verbinden, und die Kette bekommt ihr erstes Kommando
+  sicher los.
+- Die Kette fasst das Funkmodul nicht mehr an, solange ein Telefon
+  verbunden ist. Jede Aenderung und jeder Reset startet das Modul neu,
+  und zwar ohne Trennungsmeldung - das Telefon sah den Sensor dadurch
+  mitten im Koppeln verschwinden, und die PIN-Abfrage lief ins Leere.
+  Jetzt wartet die Kette, bis die Verbindung zu Ende ist.
+- Auf den Neustart des Moduls wartet die Kette nicht mehr nur passiv:
+  nach zwei Sekunden fragt sie aktiv nach. Blieb die Startmeldung des
+  Moduls aus, lief vorher jeder Schritt in den Timeout und die Kette gab
+  auf - PIN und Bindungen blieben ungeschrieben, das Telefon fragte nach
+  der PIN und das Modul pruefte gegen eine andere.
 - Sollten Telefon und Sensor unterschiedlicher Meinung darueber sein, ob
   eine Kopplung besteht, loest sich das von allein: nach drei
   Verbindungen, in denen weder ein Kanal noch ein Pairing zustande kam,
   loescht die Firmware ihre Bindungen einmalig (hoechstens dreimal je
   Start). Details in `BLE_Protokoll.md`.
+- Neu: eine BLE-Diagnose ueber den CAN-Bus (proprietaeres Kommando 0x06 auf
+  PGN 126720, Schaltflaeche im PC-Programm `LevelSense-NMEA2000`). Sie
+  meldet den Zustand der Provisionierung, die aus dem Funkmodul
+  zurueckgelesenen Sicherheitseinstellungen samt Modul-Firmware und ein
+  Protokoll der letzten 24 Ereignisse zwischen STM32 und Funkmodul. Damit
+  laesst sich eine gescheiterte Kopplung ueberhaupt erst zuordnen: Modul
+  hat getrennt, Modul ist neu gestartet, STM32 ist neu gestartet (mit
+  Grund aus `RCC->CSR`) oder keiner von beiden hat etwas getan. Der Weg
+  ueber den Bus ist bewusst gewaehlt - er funktioniert genau dann, wenn
+  ueber BLE nichts mehr geht.
 
 ### Unterdruck jenseits des Messbereichs
 - Der DSP des WSEN-PDMS rechnet bei Unterdruck unterhalb des

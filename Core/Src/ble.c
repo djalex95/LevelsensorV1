@@ -43,6 +43,12 @@ volatile uint8_t ble_bonds_count = 0;
 volatile uint8_t ble_bonds_status = 0xFF;
 volatile uint8_t ble_sec_state = 0xFF;
 
+/* --- Diagnose: Ereignis-Ringpuffer und Zustandsbild (siehe ble.h) --- */
+volatile ble_log_entry ble_log[BLE_LOG_N];
+volatile uint8_t ble_log_wr = 0;
+volatile uint8_t ble_log_cnt = 0;
+ble_diag_t ble_diag;
+
 /* --- Frame-Parser-Zustand --- */
 typedef enum { ST_STX = 0, ST_CMD, ST_LEN_L, ST_LEN_H, ST_PAYLOAD, ST_CS } parse_state;
 static parse_state pstate = ST_STX;
@@ -64,9 +70,42 @@ static uint8_t xor_cs(const uint8_t *d, uint16_t len)
 	return cs;
 }
 
+/*
+ * Ein Ereignis protokollieren. Wird sowohl aus der ISR (empfangene Frames)
+ * als auch aus der Hauptschleife (gesendete Kommandos) aufgerufen - deshalb
+ * kurz die Interrupts sperren und PRIMASK sauber wiederherstellen, damit ein
+ * Aufruf aus bereits gesperrtem Kontext nichts kaputt macht.
+ */
+void BLE_LogAdd(uint8_t ev, uint8_t p)
+{
+	uint32_t pm = __get_PRIMASK();
+	__disable_irq();
+
+	ble_log[ble_log_wr].t  = (uint16_t)(HAL_GetTick() / 100U);
+	ble_log[ble_log_wr].ev = ev;
+	ble_log[ble_log_wr].p  = p;
+	ble_log_wr = (uint8_t)((ble_log_wr + 1U) % BLE_LOG_N);
+	if (ble_log_cnt < BLE_LOG_N)
+	{
+		ble_log_cnt++;
+	}
+
+	__set_PRIMASK(pm);
+}
+
 /* Ein vollständig empfangenes, geprüftes Frame verarbeiten (ISR-Kontext). */
 static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
 {
+	/* Nutzdatenverkehr nicht mitschreiben - er wuerde den kleinen Ringpuffer
+	 * in Sekunden ueberschreiben und sagt ueber eine gescheiterte Kopplung
+	 * nichts aus. Alles andere kommt hinein, insbesondere CMD_DISCONNECT_IND
+	 * (mit Grund) und CMD_GETSTATE_CNF (= das Modul ist neu gestartet). */
+	if ((cmd != CMD_DATA_IND) && (cmd != CMD_DATA_CNF)
+			&& (cmd != CMD_TXCOMPLETE_RSP))
+	{
+		BLE_LogAdd(cmd, (len >= 1) ? payload[0] : 0);
+	}
+
 	switch (cmd)
 	{
 	case CMD_CONNECT_IND:
@@ -290,6 +329,7 @@ static void ble_send_set(uint8_t idx, const uint8_t *data, uint16_t n)
 	frame[5 + n] = xor_cs(frame, 5 + n);
 
 	HAL_UART_Transmit(ble_uart, frame, 6 + n, 200);
+	BLE_LogAdd((uint8_t)(0x20U | CMD_SET_REQ), idx);
 }
 
 /* Sendet ein Kommando ohne Payload (z. B. RESET, DISCONNECT, DELETEBONDS). */
@@ -303,6 +343,7 @@ static void ble_send_cmd0(uint8_t cmd)
 	frame[3] = 0;
 	frame[4] = xor_cs(frame, 4);
 	HAL_UART_Transmit(ble_uart, frame, 5, 100);
+	BLE_LogAdd((uint8_t)(0x20U | cmd), 0);
 }
 
 /* CMD_SET_REQ zum Umbenennen; das Modul startet danach selbst neu. */
@@ -356,6 +397,7 @@ uint8_t BLE_RequestSetting(uint8_t idx)
 	frame[4] = idx;
 	frame[5] = xor_cs(frame, 5);
 
+	BLE_LogAdd((uint8_t)(0x20U | CMD_GET_REQ), idx);
 	return (HAL_UART_Transmit(ble_uart, frame, 6, 100) == HAL_OK) ? 1 : 0;
 }
 
@@ -427,6 +469,21 @@ uint8_t BLE_RequestBonds(void)
 	return 1;
 }
 
+/* Zustandsabfrage. Wird von der Provisionierungs-Kette benutzt, um einen
+ * erwarteten Modul-Neustart selbst festzustellen: waehrend das Modul bootet
+ * antwortet es nicht, danach schickt es CMD_GETSTATE_CNF - und das ist
+ * dieselbe Meldung wie die spontane Boot-Meldung, setzt also ble_boot_seen.
+ * Erst nach der Bootzeit fragen, sonst antwortet noch die alte Instanz. */
+uint8_t BLE_RequestState(void)
+{
+	if (ble_uart == NULL)
+	{
+		return 0;
+	}
+	ble_send_cmd0(CMD_GETSTATE_REQ);
+	return 1;
+}
+
 void BLE_Disconnect(void)
 {
 	if (ble_uart != NULL)
@@ -443,6 +500,11 @@ void BLE_ApplyPendingName(void)
 
 void BLE_Init(UART_HandleTypeDef *huart)
 {
+	/* Erster Eintrag nach jedem STM32-Start. Steht er mitten im Protokoll,
+	 * hat sich der STM32 neu gestartet - und hat dabei ueber MX_GPIO_Init
+	 * auch die Resetleitung des Moduls gezogen. */
+	BLE_LogAdd(BLE_LOG_EV_MCUBOOT, 0);
+
 	ble_uart = huart;
 	pstate = ST_STX;
 	ble_connected = 0;
