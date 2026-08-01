@@ -42,10 +42,15 @@ static void check_i32(const char *what, int32_t got, int32_t want)
 /* Referenzrechnung in 64 Bit, direkt nach der Datenblattformel
  *   Druck = (P16 - OUTP_MIN) * SENP + PMIN
  * mit SENP = 2*FS / (OUTP_MAX - OUTP_MIN) und PMIN = -FS.
+ * Rohwerte ab 49152 gehoeren zum negativen Ast (der DSP rechnet bei
+ * Unterdruck unter null weiter, das Registerfeld ist vorzeichenlos)
+ * und werden vorher zurueckgefaltet.
  * Muss mit der int32-Mittelpunktsform aus sensor_scale.h uebereinstimmen. */
 static int32_t ref_ubar(uint16_t p16)
 {
 	int64_t p = (int64_t)p16;
+
+	if (p >= (int64_t)SENSOR_OUT_MID + 32768) { p -= 65536; }
 
 	if (p < SENSOR_OUT_MIN)      { p = SENSOR_OUT_MIN; }
 	else if (p > SENSOR_OUT_MAX) { p = SENSOR_OUT_MAX; }
@@ -68,13 +73,27 @@ static void test_pressure(void)
 	/* Unterhalb/oberhalb des Bereichs wird begrenzt, nicht extrapoliert. */
 	check_i32("Rohwert 0 wird begrenzt",
 	          sensor_raw_to_ubar(0), -SENSOR_FS_UBAR);
-	check_i32("Rohwert 65535 wird begrenzt",
-	          sensor_raw_to_ubar(65535), SENSOR_FS_UBAR);
+	check_i32("Rohwert 32767 wird begrenzt",
+	          sensor_raw_to_ubar(32767), SENSOR_FS_UBAR);
+
+	/* Starker Unterdruck: der DSP rechnet unter null weiter, im
+	 * vorzeichenlosen Registerfeld erscheinen sehr grosse Zahlen. Die
+	 * duerfen nicht als voller Ueberdruck durchgehen. */
+	check_i32("Rohwert 65535 ist Unterdruck",
+	          sensor_raw_to_ubar(65535), -SENSOR_FS_UBAR);
+	check_i32("Rohwert 60000 ist Unterdruck",
+	          sensor_raw_to_ubar(60000), -SENSOR_FS_UBAR);
+	check_i32("Umschlagpunkt 49152 ist Unterdruck",
+	          sensor_raw_to_ubar(49152), -SENSOR_FS_UBAR);
+	check_i32("49151 ist noch Ueberdruck",
+	          sensor_raw_to_ubar(49151), SENSOR_FS_UBAR);
 
 	check_i32("Saettigung bei 3276 gemeldet",
 	          sensor_raw_saturated(SENSOR_OUT_MIN - 1), 1);
 	check_i32("Saettigung bei 29492 gemeldet",
 	          sensor_raw_saturated(SENSOR_OUT_MAX + 1), 1);
+	check_i32("Saettigung bei 65535 gemeldet",
+	          sensor_raw_saturated(65535), 1);
 	check_i32("keine Saettigung im Bereich",
 	          sensor_raw_saturated(16384), 0);
 
@@ -83,20 +102,24 @@ static void test_pressure(void)
 	          sensor_raw_to_ubar(16384 + 6553) + sensor_raw_to_ubar(16384 - 6553), 0);
 
 	/* Monotonie und Uebereinstimmung mit der 64-Bit-Referenz ueber den
-	 * gesamten Rohwertebereich. Das faengt einen Ueberlauf der int32-
-	 * Multiplikation zuverlaessig ab: er wuerde als Sprung auffallen. */
+	 * gesamten Rohwertebereich. Durchlaufen wird nach dem Abstand zur
+	 * Bereichsmitte, weil die Kennlinie darueber monoton ist und nicht
+	 * ueber dem vorzeichenlosen Rohwert (der bei Unterdruck umlaeuft).
+	 * Das faengt einen Ueberlauf der int32-Multiplikation zuverlaessig
+	 * ab: er wuerde als Sprung auffallen. */
 	{
-		int32_t prev = sensor_raw_to_ubar(0);
+		int32_t prev = sensor_raw_to_ubar((uint16_t)(SENSOR_OUT_MID - 32768));
 		int      mono_ok = 1;
 		int      ref_ok = 1;
-		int32_t  p;
+		int32_t  d;
 
-		for (p = 0; p <= 65535; p++)
+		for (d = -32768; d <= 32767; d++)
 		{
-			int32_t v = sensor_raw_to_ubar((uint16_t)p);
+			uint16_t raw = (uint16_t)(SENSOR_OUT_MID + d);
+			int32_t  v   = sensor_raw_to_ubar(raw);
 
-			if (v < prev)          { mono_ok = 0; }
-			if (v != ref_ubar((uint16_t)p)) { ref_ok = 0; }
+			if (v < prev)            { mono_ok = 0; }
+			if (v != ref_ubar(raw))  { ref_ok = 0; }
 			prev = v;
 		}
 		check_i32("monoton steigend ueber alle 65536 Rohwerte", mono_ok, 1);

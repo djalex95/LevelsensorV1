@@ -1,3 +1,38 @@
+## Firmware 2.0.0
+
+Die BLE-Verbindung ist ab Werk mit einer PIN geschuetzt, und der
+Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
+
+### BLE-PIN
+- Das Funkmodul verlangt bei der Kopplung eine PIN. Werksseitig ist das
+  die Modul-Standard-PIN 123123.
+- Die PIN laesst sich per App aendern (`PIN`-Kommando, sechsstellig). Sie
+  liegt im Konfigurationsspeicher und ueberlebt einen Neustart; der
+  Werksreset stellt 123123 wieder her.
+- Nach einer PIN-Aenderung und nach dem Werksreset entfernt die App die
+  alte Kopplung selbst, damit das Telefon beim naechsten Verbinden neu
+  nach der PIN fragt.
+- Sollten Telefon und Sensor unterschiedlicher Meinung darueber sein, ob
+  eine Kopplung besteht, loest sich das von allein: nach drei
+  Verbindungen, in denen weder ein Kanal noch ein Pairing zustande kam,
+  loescht die Firmware ihre Bindungen einmalig (hoechstens dreimal je
+  Start). Details in `BLE_Protokoll.md`.
+
+### Unterdruck jenseits des Messbereichs
+- Der DSP des WSEN-PDMS rechnet bei Unterdruck unterhalb des
+  Nennbereichs unter null weiter, das Registerfeld ist aber
+  vorzeichenlos: aus einem kleinen negativen Rohwert wird eine sehr
+  grosse Zahl. Die Begrenzung in `sensor_scale.h` hat die als
+  Ueberschreitung nach oben gelesen - der Sensor sprang von vollem
+  Unterdruck auf vollen Ueberdruck (Variante 1003 bei etwa -12,5 mbar,
+  Variante 1001 bei etwa -125 mbar).
+- Gerechnet wird jetzt mit dem vorzeichenbehafteten Abstand zur
+  Bereichsmitte. Der Umlauf wird damit erkannt, und der Wert bleibt an
+  der Untergrenze stehen, wo er hingehoert. Richtig bleibt das bis zum
+  rund 2,5-fachen Vollausschlag in beide Richtungen.
+- Die Host-Tests pruefen den Umschlagpunkt und laufen die Kennlinie
+  ueber alle 65536 Rohwerte auf Monotonie ab.
+
 ## Firmware 1.2.11
 
 Die Hardware-Kennung steht jetzt im OTP des Controllers, und die Platine V1

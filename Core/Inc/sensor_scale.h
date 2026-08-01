@@ -49,30 +49,58 @@
 #define SENSOR_OUT_HALFSPAN   13107      /* Rohwerte je Richtung         */
 #define SENSOR_OUTT_MIN       8192       /* Rohwert bei 0 Grad C         */
 
-/* Rohwert -> Druck in uBar. Der Rohwert wird auf den gueltigen Bereich
- * begrenzt: das haelt die Multiplikation im int32 und liefert bei
- * Ueberlast einen sauber gesaettigten Wert statt eines Ueberlaufs. */
+/* Abstand des Rohwerts zur Bereichsmitte, vorzeichenbehaftet.
+ *
+ * Bei Unterdruck jenseits des Nennbereichs rechnet der DSP unter null
+ * weiter, das Registerfeld ist aber vorzeichenlos: aus -1 wird 65535.
+ * Wuerde man den Rohwert direkt begrenzen, landete so ein Wert an der
+ * Obergrenze und der Sensor meldete ploetzlich vollen Ueberdruck.
+ *
+ * Die Subtraktion wird deshalb modulo 65536 gerechnet und das Ergebnis
+ * als vorzeichenbehaftete 16-Bit-Zahl gelesen. Damit stimmt der Abstand
+ * fuer alles zwischen -32768 und +32767 digits, also bis etwa dem
+ * 2,5-fachen Vollausschlag in beide Richtungen - weiter kommt kein
+ * realer Druck an diesem Sensor, und ausserhalb davon ist ohnehin nur
+ * noch die Richtung interessant.
+ *
+ * Die Fallunterscheidung statt eines Casts nach int16_t: die Umwandlung
+ * eines zu grossen vorzeichenlosen Werts in einen vorzeichenbehafteten
+ * Typ ist in C nicht festgelegt. Der Compiler macht daraus ohnehin
+ * dieselben ein bis zwei Befehle. */
+static inline int32_t sensor_raw_delta(uint16_t p16)
+{
+	uint16_t u = (uint16_t)(p16 - (uint16_t)SENSOR_OUT_MID);
+
+	return (u >= 32768u) ? ((int32_t)u - 65536) : (int32_t)u;
+}
+
+/* Rohwert -> Druck in uBar. Der Abstand zur Mitte wird auf die halbe
+ * Nennspanne begrenzt: das haelt die Multiplikation im int32 und
+ * liefert bei Ueberlast einen sauber gesaettigten Wert statt eines
+ * Ueberlaufs - in der Richtung, aus der die Ueberlast kam. */
 static inline int32_t sensor_raw_to_ubar(uint16_t p16)
 {
-	int32_t p = (int32_t)p16;
+	int32_t d = sensor_raw_delta(p16);
 
-	if (p < SENSOR_OUT_MIN)
+	if (d < -SENSOR_OUT_HALFSPAN)
 	{
-		p = SENSOR_OUT_MIN;
+		d = -SENSOR_OUT_HALFSPAN;
 	}
-	else if (p > SENSOR_OUT_MAX)
+	else if (d > SENSOR_OUT_HALFSPAN)
 	{
-		p = SENSOR_OUT_MAX;
+		d = SENSOR_OUT_HALFSPAN;
 	}
 
-	return ((p - SENSOR_OUT_MID) * SENSOR_FS_UBAR) / SENSOR_OUT_HALFSPAN;
+	return (d * SENSOR_FS_UBAR) / SENSOR_OUT_HALFSPAN;
 }
 
 /* 1, wenn der Rohwert ausserhalb des spezifizierten Bereichs lag (der
  * Messwert ist dann gesaettigt und nicht mehr vertrauenswuerdig). */
 static inline uint8_t sensor_raw_saturated(uint16_t p16)
 {
-	return (uint8_t)((p16 < SENSOR_OUT_MIN) || (p16 > SENSOR_OUT_MAX));
+	int32_t d = sensor_raw_delta(p16);
+
+	return (uint8_t)((d < -SENSOR_OUT_HALFSPAN) || (d > SENSOR_OUT_HALFSPAN));
 }
 
 /* Rohwert -> Temperatur in 0,01 Grad C.
