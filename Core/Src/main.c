@@ -202,7 +202,8 @@ static uint8_t  ble_sync_tries = 0;
 /* Provisionierungs-Kette (Schritt 1 des Boot-Abgleichs): der Proteus-e
  * startet nach jedem CMD_SET_REQ selbst neu, deshalb wird jedes Kommando
  * einzeln bestaetigt und der Modul-Neustart abgewartet (ble_boot_seen). */
-static uint8_t  secprov_sub = 0;	/* 0 SecFlags, 1 Passkey, 2 DeleteBonds, 3 Reset */
+static uint8_t  secprov_sub = 0;	/* 0 Reset, 1 SecFlags, 2 Passkey,
+									   3 DeleteBonds, 4 Reset             */
 static uint8_t  secprov_wait = 0;	/* 1 = auf CNF/Neustart des Schritts warten */
 static uint8_t  secprov_att = 0;	/* Sendeversuche des aktuellen Schritts */
 static uint8_t  secprov_ints = 0;	/* Verbindungs-Unterbrechungen dieser Kette */
@@ -825,7 +826,7 @@ int main(void)
 				}
 				else if (secprov_wait == 0)	/* naechstes Kommando der Kette senden */
 				{
-					if (ble_connected)
+					if (ble_connected && (secprov_sub != 0))
 					{
 						/* CMD_SET_REQ braucht den getrennten Zustand. Nur das
 						 * SENDEN stoert eine Verbindung - Fortschritt behalten
@@ -833,9 +834,11 @@ int main(void)
 						 * weitermachen, sonst gewinnt der Auto-Reconnect des
 						 * Handys jedes Rennen und die Kette wirft das Modul
 						 * endlos per Reset aus der Luft. Eigener Zaehler:
-						 * ble_sync_tries wird an anderen Stellen genullt. */
+						 * ble_sync_tries wird an anderen Stellen genullt.
+						 * Schritt 0 (Reset) braucht die Bedingung nicht - der
+						 * Reset beendet eine Verbindung ohnehin. */
 						BLE_Disconnect();
-						if (++secprov_ints > 10)
+						if (++secprov_ints > 30)
 						{
 							/* Diese Runde verloren. Nicht endgueltig aufgeben:
 							 * bis zu 2 weitere Anlaeufe mit Abstand (mehr
@@ -849,7 +852,7 @@ int main(void)
 							}
 							else
 							{
-								ble_sync_next = time_el + 15000;
+								ble_sync_next = time_el + 8000;
 							}
 						}
 						else
@@ -865,13 +868,23 @@ int main(void)
 						switch (secprov_sub)
 						{
 						case 0:
-							sent = BLE_SetSecFlags(BLE_SECFLAGS_TARGET);
+							/* Das Modul ZUERST neu starten. Solange es bootet,
+							 * kann sich kein Handy verbinden, und gleich nach
+							 * der Boot-Meldung hat die Kette freie Bahn fuer
+							 * das erste CMD_SET_REQ. Ohne diesen Schritt lief
+							 * die Kette gegen den Verbindungsversuch des
+							 * Handys an, verlor das Rennen und gab auf - das
+							 * Modul behielt dann alte PIN und alte Bonds. */
+							sent = BLE_ResetModule();
 							break;
 						case 1:
+							sent = BLE_SetSecFlags(BLE_SECFLAGS_TARGET);
+							break;
+						case 2:
 							get_pin_eeprom(pin);
 							sent = BLE_SetPasskey(pin);
 							break;
-						case 2:
+						case 3:
 							sent = BLE_DeleteBonds();
 							break;
 						default:
@@ -890,14 +903,14 @@ int main(void)
 				{
 					uint8_t done = 0, fail = 0;
 
-					if (secprov_sub == 2)		/* DeleteBonds: nur CNF, kein Neustart */
+					if (secprov_sub == 3)		/* DeleteBonds: nur CNF, kein Neustart */
 					{
 						done = (ble_delbonds_cnf == 1);
 						fail = (ble_delbonds_cnf == 2);
 					}
-					else if (secprov_sub == 3)	/* Reset: auf die Boot-Meldung warten */
+					else if ((secprov_sub == 0) || (secprov_sub >= 4))
 					{
-						done = ble_boot_seen;
+						done = ble_boot_seen;	/* Reset: Boot-Meldung abwarten */
 					}
 					else						/* SET: erst CNF, dann Modul-Neustart */
 					{
@@ -910,7 +923,7 @@ int main(void)
 						secprov_wait = 0;
 						secprov_att = 0;
 						ble_sync_tries = 0;
-						if (secprov_sub >= 3)	/* Kette komplett -> Marker setzen */
+						if (secprov_sub >= 4)	/* Kette komplett -> Marker setzen */
 						{
 							cfg_data[CFG_SECPROV_OFF] = CFG_SECPROV_MAGIC;
 							config_save();
@@ -918,13 +931,18 @@ int main(void)
 						}
 						else
 						{
+							/* Ohne Verzoegerung weiter: das naechste Kommando
+							 * soll noch in das Zeitfenster fallen, in dem das
+							 * gerade neu gestartete Modul noch keine
+							 * Verbindung angenommen hat. */
 							secprov_sub++;
-							ble_sync_next = time_el + 150;
+							ble_sync_next = time_el + 20;
 						}
 					}
-					else if (fail || (++ble_sync_tries >= 15))
+					else if (fail || (++ble_sync_tries >= 30))
 					{
-						/* Schritt fehlgeschlagen bzw. 1,5 s ohne Antwort:
+						/* Schritt fehlgeschlagen bzw. 3 s ohne Antwort (der
+						 * Proteus-e braucht nach einem Reset gut 1,5 s):
 						 * denselben Schritt neu senden, nach 3 Versuchen
 						 * diesen Boot aufgeben (Marker bleibt leer). */
 						secprov_wait = 0;

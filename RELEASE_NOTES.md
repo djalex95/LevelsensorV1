@@ -12,6 +12,13 @@ Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
 - Nach einer PIN-Aenderung und nach dem Werksreset entfernt die App die
   alte Kopplung selbst, damit das Telefon beim naechsten Verbinden neu
   nach der PIN fragt.
+- Die einmalige Provisionierung (Sicherheitsmodus, PIN, Bonds loeschen)
+  startet jetzt damit, das Funkmodul neu zu starten. Waehrend es bootet,
+  kann sich kein Telefon verbinden, und die Kette bekommt ihr erstes
+  Kommando sicher los. Vorher lief sie gegen den Verbindungsversuch des
+  Telefons an, verlor das Rennen und gab auf - das Modul behielt dann
+  alte PIN und alte Bindungen, und die Kopplung landete in einer
+  Sackgasse.
 - Sollten Telefon und Sensor unterschiedlicher Meinung darueber sein, ob
   eine Kopplung besteht, loest sich das von allein: nach drei
   Verbindungen, in denen weder ein Kanal noch ein Pairing zustande kam,

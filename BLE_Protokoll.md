@@ -165,9 +165,15 @@ BLE-Modul zeigt davon max. 20.
 
 **Sicherheit:** Ab Firmware 2.0.0 läuft die Schnittstelle mit
 `RF_SecFlags = 0x0B` (Static Passkey + Bonding). Die Provisionierung passiert
-einmalig nach Update/Werksreset als bestätigte Schritt-Kette: SecFlags
-schreiben → Modul-Neustart abwarten → Passkey schreiben → Neustart abwarten →
-Bonds löschen → Neustart. (Der frühere PIN-Anlauf scheiterte nicht am Modul –
+einmalig nach Update/Werksreset als bestätigte Schritt-Kette: Modul neu
+starten → SecFlags schreiben → Modul-Neustart abwarten → Passkey schreiben →
+Neustart abwarten → Bonds löschen → Neustart. Der Neustart am Anfang ist kein
+Schönheitsfehler, sondern der Grund, warum die Kette überhaupt durchläuft:
+solange das Modul bootet, kann sich kein Telefon verbinden, und `CMD_SET_REQ`
+braucht den getrennten Zustand. Ohne ihn lief die Kette gegen den
+Verbindungsversuch des Telefons an, verlor das Rennen und gab nach drei
+Anläufen bis zum nächsten Sensorstart auf – das Modul behielt dann alte PIN
+und alte Bonds. (Der frühere PIN-Anlauf scheiterte nicht am Modul –
 Bonds liegen persistent im Modul-Flash –, sondern an zwei Firmware-Fehlern:
 die PIN wurde anfangs bei jedem Boot neu geschrieben samt Bond-Löschung, und
 die Provisionierung wartete die Selbst-Neustarts des Moduls nach `CMD_SET_REQ`
