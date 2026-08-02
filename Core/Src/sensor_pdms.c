@@ -10,7 +10,9 @@
  * alle 2,4 ms und legt das Ergebnis in DSP_P/DSP_T ab. Es gibt also
  * keine Trigger-Sequenz, wir lesen einfach den aktuellen Stand.
  *
- * Quelle: UM_WSEN-PDMS_25131308xxx05 (rev 1.0).
+ * Quelle: Handbuch UM_WSEN-PDMS_25131308xxx05, Version 1.0,
+ * November 2025. Die Fundstellen zu den Rohwerten stehen in
+ * sensor_scale.h.
  */
 #include "main.h"
 #include "sensor.h"
@@ -51,17 +53,27 @@ static sensor_range_t press_range = { 0 };
 #define PDMS_TIMEOUT_MS         25
 
 /*
- * Byte-Reihenfolge: das Handbuch widerspricht sich - an einer Stelle
- * heisst es, das niederwertige Byte komme zuerst, an anderer, innerhalb
- * eines 16-Bit-Worts werde MSB zuerst uebertragen.
+ * Byte-Reihenfolge: das Handbuch widerspricht sich.
  *
- * Am Aufbau geklaert (V2-Board, Juli 2026): der Sensor sendet das
- * NIEDERWERTIGE Byte zuerst. Mit MSB-first gelesen zeigte die Firmware
- * 210,19 Grad C (t16 = 0xE032) bei tatsaechlich 20,64 Grad C
- * (t16 = 0x32E0), und der Druck stand stabil auf plus Vollausschlag
- * (L = 99,9 % bei beiden offenen Ports), weil das echte High-Byte
- * konstant 0x40 ist und der vertauschte Wert damit ueber
- * SENSOR_OUT_MAX klemmt.
+ * Abschnitt 4.3.7 (Read/Write operation, Seite 23): "The read/write data
+ * is transferred MSB first - low byte before the high byte." Der Satz
+ * meint zwei verschiedene Ebenen - die Bits gehen MSB zuerst, die Bytes
+ * niederwertiges zuerst - und liest sich beim ersten Mal wie ein
+ * Widerspruch in sich.
+ *
+ * Abschnitt 8.5 und 8.6 sagen das Gegenteil: dort soll das zuerst
+ * uebertragene Byte das hoeherwertige sein. Dieselben Abschnitte
+ * behaupten ausserdem, ab 0x2E kaeme zuerst der Druck und dann die
+ * Temperatur - Abschnitt 8.2 sagt es umgekehrt. Uns beruehrt das nicht,
+ * weil wir beide Register einzeln adressieren.
+ *
+ * Am Aufbau geklaert (V2-Board, Juli 2026), zugunsten von Abschnitt
+ * 4.3.7: der Sensor sendet das NIEDERWERTIGE Byte zuerst. Mit MSB-first
+ * gelesen zeigte die Firmware 210,19 Grad C (t16 = 0xE032) bei
+ * tatsaechlich 20,64 Grad C (t16 = 0x32E0), und der Druck stand stabil
+ * auf plus Vollausschlag (L = 99,9 % bei beiden offenen Ports), weil
+ * das echte High-Byte konstant 0x40 ist und der vertauschte Wert damit
+ * ueber SENSOR_OUT_MAX klemmt.
  *
  * Erkennungsmerkmal, falls das je wieder auftritt: die Temperatur
  * schwankt um rund 25 Grad C, sobald sich die echte Temperatur um

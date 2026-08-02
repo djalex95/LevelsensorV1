@@ -23,36 +23,60 @@
 
 /* --- Wuerth WSEN-PDMS -------------------------------------------------
  *
- * Handbuch (UM_WSEN-PDMS, rev 1.0), bidirektionale Typen (+/-1, +/-10,
- * +/-35 kPa):
+ * Handbuch: UM_WSEN-PDMS_25131308xxx05, Version 1.0 (November 2025).
+ * Fundstellen, die hier eingerechnet sind:
+ *
+ *   Abschnitt 8.3, Tabelle 21   Digitalausgang Druck, bidirektionale
+ *                               Typen: OUTOFF 16384, FSS 26214,
+ *                               OUTP_MIN 3277, OUTP_MAX 29491 digits.
+ *                               Beide bestueckten Typen stehen dort:
+ *                               2513130810105 (+/-1 kPa, Variante 1003)
+ *                               und ...0205 (+/-10 kPa, Variante 1001).
+ *                               Tabelle 22 und 23 gelten fuer die
+ *                               unidirektionalen Typen mit anderem
+ *                               Nullpunkt - nicht verwechseln.
+ *   Abschnitt 8.4, Tabelle 24   Digitalausgang Temperatur, fuer alle
+ *                               Typen: OUTT_MIN 8192, OUTT_MAX 24576.
+ *   Tabelle 11                  SENT = 4,272e-3 GrdC/digit.
+ *   Abschnitt 10, Tabelle 28    SENP je Bestellnummer: 7,63e-5 kPa/digit
+ *                               (+/-1 kPa) und 7,63e-4 (+/-10 kPa).
+ *   Abschnitt 8.5 / 8.6         die Formeln selbst:
  *
  *   Druck [kPa]      = (P16 - OUTP_MIN) * SENP + PMIN
  *   Temperatur [GrdC]= (T16 - OUTT_MIN) * SENT
  *
- * mit OUTP_MIN = 3277, OUTP_MAX = 29491, OUTT_MIN = 8192 und
- * SENT = 4,272e-3 GrdC/digit.
+ * Wichtig ist der Nullpunkt: bei den bidirektionalen Typen liegt 0 kPa
+ * nicht beim Rohwert 0, sondern bei OUTOFF = 16384 - Nennbereich also
+ * 3277..29491 statt 0..32768. Das Handbuch nennt diesen Wert in
+ * Tabelle 21 ausdruecklich; er ist zugleich die Mitte von OUTP_MIN und
+ * OUTP_MAX.
  *
- * Wir rechnen die Druckformel um die Bereichsmitte herum, weil das
- * Ergebnis identisch ist, aber ohne 64-Bit-Multiplikation auskommt:
+ * Wir rechnen die Druckformel um diese Mitte herum, weil das Ergebnis
+ * identisch ist, aber ohne 64-Bit-Multiplikation auskommt:
  *
- *   Mitte  = (OUTP_MIN + OUTP_MAX) / 2 = 16384  -> 0 kPa
- *   Halbe Spanne = (OUTP_MAX - OUTP_MIN) / 2 = 13107
+ *   Mitte  = OUTOFF = (OUTP_MIN + OUTP_MAX) / 2 = 16384  -> 0 kPa
+ *   Halbe Spanne = FSS / 2 = (OUTP_MAX - OUTP_MIN) / 2 = 13107
  *   Druck [uBar] = (P16 - 16384) * FS_UBAR / 13107
  *
  * Probe: P16 = 3277 -> -FS_UBAR, P16 = 29491 -> +FS_UBAR.
+ * Zweite Probe gegen Tabelle 28: 13107 digits * 7,63e-5 kPa/digit
+ * = 1,0001 kPa, also der Vollausschlag des +/-1-kPa-Typs.
  * Die direkte Form (P16 - 3277) * 2*FS_UBAR / 26214 wuerde beim
  * +/-10-kPa-Typ mit 26214 * 200000 = 5,2e9 den int32 sprengen.
  */
 #define SENSOR_OUT_MIN        3277
 #define SENSOR_OUT_MAX        29491
-#define SENSOR_OUT_MID        16384      /* Rohwert bei 0 kPa            */
-#define SENSOR_OUT_HALFSPAN   13107      /* Rohwerte je Richtung         */
-#define SENSOR_OUTT_MIN       8192       /* Rohwert bei 0 Grad C         */
+#define SENSOR_OUT_MID        16384      /* OUTOFF, Rohwert bei 0 kPa    */
+#define SENSOR_OUT_HALFSPAN   13107      /* FSS/2, Rohwerte je Richtung  */
+#define SENSOR_OUTT_MIN       8192       /* OUTT_MIN, Rohwert bei 0 Grd C*/
 
 /* Abstand des Rohwerts zur Bereichsmitte, vorzeichenbehaftet.
  *
  * Bei Unterdruck jenseits des Nennbereichs rechnet der DSP unter null
  * weiter, das Registerfeld ist aber vorzeichenlos: aus -1 wird 65535.
+ * Im Handbuch steht dazu nichts - es beschreibt nur den Nennbereich und
+ * sagt weder, dass der Wert begrenzt wird, noch, dass er weiterlaeuft.
+ * Am Aufbau gemessen laeuft er weiter.
  * Wuerde man den Rohwert direkt begrenzen, landete so ein Wert an der
  * Obergrenze und der Sensor meldete ploetzlich vollen Ueberdruck.
  *
