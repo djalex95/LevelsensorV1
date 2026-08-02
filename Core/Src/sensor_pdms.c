@@ -78,6 +78,14 @@ static sensor_range_t press_range = { 0 };
  * Erkennungsmerkmal, falls das je wieder auftritt: die Temperatur
  * schwankt um rund 25 Grad C, sobald sich die echte Temperatur um
  * 0,1 Grad C aendert - das vertauschte Byte wirkt mit Faktor 256.
+ *
+ * Nachtraeglich bestaetigt durch Wuerths eigenen Treiber (Sensors SDK
+ * 2.7, WSEN_PDMS_25131308XXX05.c, in Zephyr als hal_wurthelektronik):
+ * dort steht "*rawPressure = (readbuffer8[3] << 8) | readbuffer8[2]",
+ * das zuerst empfangene Byte ist also auch bei Wuerth das
+ * niederwertige. Derselbe Code liest ab 0x2E zuerst die Temperatur,
+ * dann den Druck, dann STATUS_SYNC - wie in Abschnitt 8.2 und entgegen
+ * 8.5/8.6.
  */
 #define SENSOR_PDMS_MSB_FIRST   0
 

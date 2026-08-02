@@ -77,6 +77,17 @@
  * Im Handbuch steht dazu nichts - es beschreibt nur den Nennbereich und
  * sagt weder, dass der Wert begrenzt wird, noch, dass er weiterlaeuft.
  * Am Aufbau gemessen laeuft er weiter.
+ *
+ * Wuerths eigener Treiber (Sensors SDK 2.7, in Zephyr als Modul
+ * hal_wurthelektronik) faengt das ebenfalls nicht ab, und zwar
+ * schlechter als unser alter Stand: er rechnet (rawPressure - 3277)
+ * vorzeichenlos, ohne jede Begrenzung. P_MAX_TYP_VAL_PDMS ist dort zwar
+ * definiert, wird aber nirgends benutzt. Sobald das Register unter 0
+ * durchlaeuft - auf der +/-1-kPa-Variante schon bei rund -12,5 mBar,
+ * also 2,5 mBar jenseits des Nennbereichs - springt die Anzeige von
+ * -12,5 mBar auf +37,5 mBar. Unser alter Stand hielt bis -25 mBar
+ * durch. Der Umlauf ist also kein Sonderfall unserer Rechnung, sondern
+ * steckt im Sensor; abfangen muss ihn der Anwender.
  * Wuerde man den Rohwert direkt begrenzen, landete so ein Wert an der
  * Obergrenze und der Sensor meldete ploetzlich vollen Ueberdruck.
  *
