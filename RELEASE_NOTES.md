@@ -16,6 +16,10 @@ Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
   startet damit, das Funkmodul neu zu starten. Waehrend es bootet, kann
   sich kein Telefon verbinden, und die Kette bekommt ihr erstes Kommando
   sicher los.
+- Die Bond-Selbstheilung zaehlt einen Fehlversuch jetzt daran, dass keine
+  Verschluesselung zustande kam. Vorher galt schon ein offener Datenkanal
+  als Erfolg - den oeffnet das Modul aber vor dem Pairing, womit die
+  Heilung nie ansprang.
 - Nutzdaten gehen erst ueber eine verschluesselte Verbindung raus. Der
   Datenkanal geht schon auf, waehrend die Kopplung noch laeuft; der
   Statustext lief bisher genau dort hinein und liess das Funkmodul mit

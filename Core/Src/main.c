@@ -635,18 +635,19 @@ int main(void)
 		}
 		if (ble_prev_conn && !ble_connected)	/* Verbindung ist zu Ende */
 		{
-			if (ble_chan_seen || ble_sec_seen)
+			if (ble_sec_seen)
 			{
-				/* Kanal ging auf ODER das Pairing lief sauber durch. In
-				 * beiden Faellen sind die Bonds in Ordnung - bricht die
+				/* Die Verbindung war verschluesselt, das Pairing lief also
+				 * sauber durch und die Bonds sind in Ordnung. Bricht die
 				 * Verbindung danach ab, liegt es an der App und die Bonds
 				 * duerfen auf keinen Fall geloescht werden (sonst kippt
-				 * die Kopplung staendig hin und her). */
+				 * die Kopplung staendig hin und her).
+				 * Frueher zaehlte auch ein offener Datenkanal als Erfolg.
+				 * Das Modul oeffnet den Kanal aber schon vor dem Pairing -
+				 * die Bedingung war damit praktisch immer erfuellt und die
+				 * Selbstheilung konnte nie anspringen. */
 				ble_fail_cnt = 0;
-				if (ble_chan_seen)
-				{
-					bond_heal_cnt = 0;	/* alles gut -> Heilung wieder frei */
-				}
+				bond_heal_cnt = 0;	/* alles gut -> Heilung wieder frei */
 			}
 			else if (ble_fail_cnt < 255)
 			{
