@@ -33,10 +33,17 @@ sensor_mess get_value(void);
  *   sensor_raw_p    Rohwert des Drucks, wie aus dem Sensor gelesen
  *                   (PDMS: P16 als 0..65535; alt: raw24 vorzeichenbehaftet)
  *   sensor_raw_t    Rohwert der Temperatur
- *   sensor_delta    Abstand zur Bereichsmitte, vorzeichenbehaftet und
- *                   UNBEGRENZT (beim alten Sensor gleich sensor_raw_p)
- *   sensor_ubar_raw Druck in uBar VOR Abzug des Offsets
- *   sensor_sat      1 = Rohwert lag ausserhalb des Nennbereichs
+ *   sensor_delta    Abstand zur Bereichsmitte, vorzeichenbehaftet,
+ *                   UNBEGRENZT und ohne Bereichsueberwachung - dieser
+ *                   Wert laeuft bei starkem Unterdruck absichtlich um,
+ *                   damit im Protokoll zu sehen ist, wo das passiert
+ *                   (beim alten Sensor gleich sensor_raw_p)
+ *   sensor_ubar_raw Druck in uBar VOR Abzug des Offsets, mit
+ *                   Bereichsueberwachung, also der Wert, mit dem die
+ *                   Firmware tatsaechlich weiterrechnet
+ *   sensor_sat      0 = im Nennbereich, 1 = darueber, 2 = darunter;
+ *                   die Richtung wird beim Verlassen des Bereichs
+ *                   festgehalten und erst beim Zurueckkommen geloescht
  */
 extern volatile int32_t sensor_raw_p;
 extern volatile int32_t sensor_raw_t;

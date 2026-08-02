@@ -28,6 +28,12 @@ extern calib_data EEPROM_values;
 
 #define SENSOR_ADDR8            (SENSOR_I2C_ADDR7 << 1)
 
+/* Gemerkte Richtung, wenn der Druck den Nennbereich verlaesst. Ohne sie
+ * schlaegt starker Unterdruck ab -32768 digits in vollen Ueberdruck um -
+ * siehe sensor_range_delta() in sensor_scale.h. Genau ein Sensor, also
+ * genau ein Zustand. */
+static sensor_range_t press_range = { 0 };
+
 /* Registeradressen laut Handbuch. */
 #define PDMS_REG_CMD            0x22
 #define PDMS_REG_DSP_T          0x2E    /* Temperatur, 16 Bit */
@@ -91,6 +97,8 @@ void init_Sensor(void)
 	uint16_t status = 0;
 	uint8_t retries = 0;
 
+	sensor_range_init(&press_range);
+
 	/* Kein Startkommando noetig - der Sensor misst nach dem Anlegen der
 	 * Versorgung selbstaendig weiter. Wir pruefen nur, ob er antwortet,
 	 * und warten kurz auf den ersten gueltigen Messwert (2,4 ms Zyklus,
@@ -143,14 +151,16 @@ sensor_mess get_value(void)
 	}
 
 	/* Zwischenwerte fuer die Diagnose mitschreiben (Kommando 0x07).
-	 * sensor_delta ist bewusst der UNBEGRENZTE Abstand zur Mitte - nur
-	 * daran ist zu erkennen, wie weit der Sensor bei Unterdruck schon
-	 * unter den Nennbereich gefallen ist. */
+	 * sensor_delta ist bewusst der ROHE, unbegrenzte Abstand zur Mitte
+	 * ohne Bereichsueberwachung - nur daran ist im Protokoll zu sehen,
+	 * wann das Register umlaeuft. Gerechnet wird mit dem ueberwachten
+	 * Wert, der die Richtung beibehaelt. */
 	sensor_raw_p = (int32_t)p16;
 	sensor_raw_t = (int32_t)t16;
 	sensor_delta = sensor_raw_delta(p16);
-	sensor_ubar_raw = sensor_raw_to_ubar(p16);
-	sensor_sat = sensor_raw_saturated(p16);
+	sensor_ubar_raw = sensor_range_to_ubar(&press_range, p16);
+	sensor_sat = (press_range.dir == 0) ? 0u
+	           : ((press_range.dir < 0) ? 2u : 1u);
 
 	mess_data.pressure = sensor_ubar_raw - EEPROM_values.offset;
 	mess_data.temp = sensor_raw_to_temp(t16);

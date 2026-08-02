@@ -26,7 +26,10 @@
 #define PROP_CMD_BLEDIAG 0x06	/* BLE-Diagnose: Zustand + Ereignisprotokoll */
 #define PROP_BLEDIAG_VER 0x01	/* Aufbau der Antwort 0x86 */
 #define PROP_CMD_SENSRAW 0x07	/* Rohwerte der Druckmessung, Stufe fuer Stufe */
-#define PROP_SENSRAW_VER 0x01	/* Aufbau der Antwort 0x87 */
+#define PROP_SENSRAW_VER 0x02	/* Aufbau der Antwort 0x87.
+								 * 0x02: Byte 20 meldet nicht mehr nur
+								 * ja/nein, sondern die Richtung der
+								 * Bereichsueberschreitung. */
 
 /* CubeMX-Handle und App-Zustand - definiert in main.c.
  * (gf_buf/gf_len/gf_src kommen aus nmea2000.h.) */

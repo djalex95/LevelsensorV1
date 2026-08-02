@@ -61,10 +61,24 @@ Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
   Variante 1001 bei etwa -125 mbar).
 - Gerechnet wird jetzt mit dem vorzeichenbehafteten Abstand zur
   Bereichsmitte. Der Umlauf wird damit erkannt, und der Wert bleibt an
-  der Untergrenze stehen, wo er hingehoert. Richtig bleibt das bis zum
+  der Untergrenze stehen, wo er hingehoert. Richtig ist das bis zum
   rund 2,5-fachen Vollausschlag in beide Richtungen.
-- Die Host-Tests pruefen den Umschlagpunkt und laufen die Kennlinie
-  ueber alle 65536 Rohwerte auf Monotonie ab.
+- Darueber hinaus reicht ein einzelner Messwert nicht mehr aus: bei
+  Rohwert 49152 laeuft das Register von -32768 auf +32767 digits um, und
+  beide Richtungen sehen dann gleich aus. Am Aufbau gemessen ist das
+  Variante 1003 bei etwa -25 mbar; die Firmware meldete ab dort wieder
+  vollen Ueberdruck und 99,5 % Fuellhoehe.
+- Die Firmware merkt sich deshalb, durch welche Grenze der Messwert den
+  Nennbereich verlassen hat, und bleibt an dieser Grenze stehen, bis er
+  zurueckkommt. Ausserhalb des Bereichs ist der Betrag ohnehin ohne
+  Aussage - gebraucht wird nur die Richtung, und die kann sich nicht
+  aendern, ohne dass der Sensor den Nennbereich durchlaufen haette.
+  Einzige Luecke: startet die Firmware, waehrend der Druck schon jenseits
+  des Umlaufs liegt, fehlt die Vorgeschichte. Das gibt sich, sobald der
+  Druck einmal im Nennbereich war.
+- Die Host-Tests pruefen den Umschlagpunkt, laufen die Kennlinie ueber
+  alle 65536 Rohwerte auf Monotonie ab und fahren die am Aufbau
+  gemessene Messreihe durch den Umlauf hindurch nach.
 - Neu: eine Rohwert-Diagnose ueber den CAN-Bus (proprietaeres Kommando
   0x07 auf PGN 126720, Schaltflaeche im PC-Programm
   `LevelSense-NMEA2000`). Sie liefert die ganze Rechenkette einer Messung
@@ -72,7 +86,8 @@ Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
   Offset, gefilterten Druck, Temperatur und Prozent vor und nach der
   Linearisierung. Ueber die App ist das nicht zu sehen: die zeigt nur das
   Ende der Kette, und das steht bei Unterlast auf dem begrenzten Wert.
-  Damit war nicht zu sagen, an welcher Stelle ein Wert umschlaegt.
+  Damit war nicht zu sagen, an welcher Stelle ein Wert umschlaegt. Genau
+  damit ist der Umschlagpunkt oben dann gefunden worden.
 
 ## Firmware 1.2.11
 

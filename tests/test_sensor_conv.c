@@ -19,6 +19,7 @@
  */
 #include <stdio.h>
 #include <stdint.h>
+#include <stddef.h>
 #include <string.h>
 
 #include "sensor_scale.h"
@@ -132,6 +133,83 @@ static void test_pressure(void)
 	          1);
 }
 
+/* Bereichsueberwachung: der Rohwert des PDMS laeuft bei p16 = 49152 um.
+ * Ab dort ist aus einem einzelnen Messwert nicht mehr zu erkennen, ob
+ * starker Unter- oder starker Ueberdruck anliegt - sensor_range_delta()
+ * behaelt deshalb die Richtung bei, mit der der Nennbereich verlassen
+ * wurde. */
+static void test_range_tracking(void)
+{
+	sensor_range_t st;
+	size_t i;
+
+	/* Am Aufbau gemessene Folge bei fallendem Druck (Variante 1003,
+	 * Protokoll vom August 2026). Ab 48626 zeigt der rohe Abstand zur
+	 * Mitte +32242 digits statt -33294 - ohne Gedaechtnis meldete die
+	 * Firmware hier 99,50 % Fuellhoehe. */
+	static const uint16_t down[] = {
+		16615, 14767, 10060, 4023, 62796, 55652, 50672, 48626, 46793
+	};
+	/* Wieder aufwaerts, aber noch jenseits des Umlaufs. */
+	static const uint16_t up_outside[] = { 47772, 49264 };
+
+	printf("Bereichsueberwachung (WSEN-PDMS):\n");
+
+	sensor_range_init(&st);
+
+	/* Die ersten vier Werte liegen im Nennbereich und muessen
+	 * unveraendert durchgereicht werden. */
+	for (i = 0; i < 4; i++)
+	{
+		check_i32("im Nennbereich unveraendert",
+		          sensor_range_to_ubar(&st, down[i]), sensor_raw_to_ubar(down[i]));
+	}
+	check_i32("im Nennbereich keine Richtung gemerkt", st.dir, 0);
+
+	/* Danach geht es hinaus - ab hier muss durchgehend voller
+	 * Unterdruck gemeldet werden, auch nach dem Umlauf. */
+	for (i = 4; i < sizeof(down) / sizeof(down[0]); i++)
+	{
+		check_i32("ausserhalb bleibt es Unterdruck",
+		          sensor_range_to_ubar(&st, down[i]), -SENSOR_FS_UBAR);
+	}
+	check_i32("Richtung Unterdruck gemerkt", st.dir, -1);
+
+	for (i = 0; i < sizeof(up_outside) / sizeof(up_outside[0]); i++)
+	{
+		check_i32("auf dem Rueckweg weiter Unterdruck",
+		          sensor_range_to_ubar(&st, up_outside[i]), -SENSOR_FS_UBAR);
+	}
+
+	/* Zurueck im Nennbereich zaehlt wieder der Messwert selbst. */
+	check_i32("zurueck im Nennbereich wieder echter Wert",
+	          sensor_range_to_ubar(&st, 10060), sensor_raw_to_ubar(10060));
+	check_i32("Richtung wieder geloescht", st.dir, 0);
+
+	/* Dasselbe in die andere Richtung: einmal oben hinaus, danach darf
+	 * auch ein umgelaufener Rohwert das Vorzeichen nicht mehr drehen. */
+	sensor_range_init(&st);
+	check_i32("Obergrenze ist noch im Bereich",
+	          sensor_range_to_ubar(&st, SENSOR_OUT_MAX), SENSOR_FS_UBAR);
+	check_i32("darueber wird Ueberdruck gemerkt",
+	          sensor_range_to_ubar(&st, 32000), SENSOR_FS_UBAR);
+	check_i32("Richtung Ueberdruck gemerkt", st.dir, 1);
+	check_i32("Umlauf dreht das Vorzeichen nicht mehr",
+	          sensor_range_to_ubar(&st, 49152), SENSOR_FS_UBAR);
+	check_i32("auch 65535 bleibt Ueberdruck",
+	          sensor_range_to_ubar(&st, 65535), SENSOR_FS_UBAR);
+
+	/* Ohne Vorgeschichte bleibt nur das Vorzeichen des Rohwerts. Das
+	 * ist bis zum Umlauf richtig - direkt nach dem Einschalten jenseits
+	 * davon nicht mehr, und genau so ist es festgelegt. */
+	sensor_range_init(&st);
+	check_i32("Kaltstart bei 62796 -> Unterdruck",
+	          sensor_range_to_ubar(&st, 62796), -SENSOR_FS_UBAR);
+	sensor_range_init(&st);
+	check_i32("Kaltstart jenseits des Umlaufs raet",
+	          sensor_range_to_ubar(&st, 48626), SENSOR_FS_UBAR);
+}
+
 static void test_temperature(void)
 {
 	printf("Temperatur (WSEN-PDMS):\n");
@@ -151,6 +229,12 @@ static void test_temperature(void)
 }
 
 #else	/* SENSOR_KIND_LEGACY */
+
+/* Der alte Sensor liefert einen vorzeichenbehafteten 24-Bit-Wert und
+ * kennt keinen Umlauf - hier gibt es nichts zu ueberwachen. */
+static void test_range_tracking(void)
+{
+}
 
 static void test_pressure(void)
 {
@@ -185,6 +269,7 @@ int main(void)
 	printf("=== sensor_scale.h, Variante: %s ===\n", SENSOR_NAME);
 
 	test_pressure();
+	test_range_tracking();
 	test_temperature();
 
 	printf("--- %d Pruefungen, %d Fehler ---\n\n", checks, fails);
