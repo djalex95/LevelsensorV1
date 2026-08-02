@@ -142,7 +142,17 @@ sensor_mess get_value(void)
 		return last_good;
 	}
 
-	mess_data.pressure = sensor_raw_to_ubar(p16) - EEPROM_values.offset;
+	/* Zwischenwerte fuer die Diagnose mitschreiben (Kommando 0x07).
+	 * sensor_delta ist bewusst der UNBEGRENZTE Abstand zur Mitte - nur
+	 * daran ist zu erkennen, wie weit der Sensor bei Unterdruck schon
+	 * unter den Nennbereich gefallen ist. */
+	sensor_raw_p = (int32_t)p16;
+	sensor_raw_t = (int32_t)t16;
+	sensor_delta = sensor_raw_delta(p16);
+	sensor_ubar_raw = sensor_raw_to_ubar(p16);
+	sensor_sat = sensor_raw_saturated(p16);
+
+	mess_data.pressure = sensor_ubar_raw - EEPROM_values.offset;
 	mess_data.temp = sensor_raw_to_temp(t16);
 
 	last_good = mess_data;

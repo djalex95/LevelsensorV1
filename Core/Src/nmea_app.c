@@ -11,6 +11,7 @@
 #include "app_types.h"
 #include "app_config.h"
 #include "config_store.h"
+#include "sensor.h"
 #include <string.h>
 
 /* Proprietary-Header fuer PGN 126720: MFR-Code 2046, reserved 0x3, Industry
@@ -24,6 +25,8 @@
 #define PROP_CMD_FRESET  0x05	/* Werksreset: kompletten Config loeschen + Neustart */
 #define PROP_CMD_BLEDIAG 0x06	/* BLE-Diagnose: Zustand + Ereignisprotokoll */
 #define PROP_BLEDIAG_VER 0x01	/* Aufbau der Antwort 0x86 */
+#define PROP_CMD_SENSRAW 0x07	/* Rohwerte der Druckmessung, Stufe fuer Stufe */
+#define PROP_SENSRAW_VER 0x01	/* Aufbau der Antwort 0x87 */
 
 /* CubeMX-Handle und App-Zustand - definiert in main.c.
  * (gf_buf/gf_len/gf_src kommen aus nmea2000.h.) */
@@ -33,9 +36,30 @@ extern prod_param device_param;
 extern calib_data EEPROM_values;
 extern char sensor_name[CFG_NAME_LEN + 1];
 extern uint16_t percent_val;
+extern uint16_t percent_raw;
 extern volatile int32_t raw_press;
+extern volatile int32_t press_unfilt;
+extern volatile uint8_t error_mode;
+extern sensor_mess sensor_data_rx;
 extern uint32_t claim_time;
 extern volatile uint8_t dev_info;
+
+/* Little-Endian in den Sendepuffer schreiben. Ausgeschrieben statt per
+ * memcpy, damit die Antwort unabhaengig von der Byte-Reihenfolge des
+ * Prozessors immer gleich aussieht - das PC-Tool liest sie fest als LE. */
+static void put16(uint8_t *b, uint16_t v)
+{
+	b[0] = (uint8_t)(v & 0xFFU);
+	b[1] = (uint8_t)((v >> 8) & 0xFFU);
+}
+
+static void put32(uint8_t *b, uint32_t v)
+{
+	b[0] = (uint8_t)(v & 0xFFU);
+	b[1] = (uint8_t)((v >> 8) & 0xFFU);
+	b[2] = (uint8_t)((v >> 16) & 0xFFU);
+	b[3] = (uint8_t)((v >> 24) & 0xFFU);
+}
 
 /*
  * Verarbeitet eine komplett empfangene Group Function (PGN 126208).
@@ -314,6 +338,38 @@ void handle_prop_config(void)
 		}
 
 		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, dg, len);
+	}
+	else if (gf_buf[2] == PROP_CMD_SENSRAW)
+	{
+		/* Rohwert-Diagnose der Druckmessung. Geliefert wird die ganze Kette
+		 * vom Registerwert bis zum Prozentwert, jede Stufe einzeln - nur so
+		 * laesst sich sagen, an welcher Stelle ein Messwert umschlaegt.
+		 * Ueber die App ist das nicht zu sehen: die zeigt nur das Ende der
+		 * Kette, und das steht bei Unterlast auf dem gesaettigten Wert.
+		 * Wie bei der BLE-Diagnose bewusst ueber den CAN-Bus, damit die
+		 * Messung nicht von der Funkstrecke abhaengt. */
+		uint8_t sr[48];
+
+		sr[0] = PROP_HDR_0;
+		sr[1] = PROP_HDR_1;
+		sr[2] = 0x87;
+		sr[3] = PROP_SENSRAW_VER;
+		put32(&sr[4],  (uint32_t)sensor_raw_p);			/* Rohwert Druck      */
+		put32(&sr[8],  (uint32_t)sensor_raw_t);			/* Rohwert Temperatur */
+		put32(&sr[12], (uint32_t)sensor_delta);			/* Abstand zur Mitte  */
+		put32(&sr[16], (uint32_t)sensor_ubar_raw);		/* uBar vor Offset    */
+		sr[20] = sensor_sat;							/* 1 = ausserhalb     */
+		put16(&sr[21], (uint16_t)EEPROM_values.offset);
+		put32(&sr[23], (uint32_t)press_unfilt);			/* uBar nach Offset   */
+		put32(&sr[27], (uint32_t)raw_press);			/* nach EMA-Filter    */
+		put16(&sr[31], (uint16_t)sensor_data_rx.temp);	/* 0,01 Grad C        */
+		put16(&sr[33], percent_raw);					/* vor Linearisierung */
+		put16(&sr[35], percent_val);					/* nach Linearisierung*/
+		put32(&sr[37], EEPROM_values.max_val);			/* 0,1 mBar bei 100 % */
+		sr[41] = error_mode;
+		put32(&sr[42], (uint32_t)SENSOR_FS_UBAR);		/* Vollausschlag uBar */
+
+		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, sr, 46);
 	}
 	else if (gf_buf[2] == PROP_CMD_FRESET)
 	{

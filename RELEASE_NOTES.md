@@ -65,6 +65,14 @@ Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
   rund 2,5-fachen Vollausschlag in beide Richtungen.
 - Die Host-Tests pruefen den Umschlagpunkt und laufen die Kennlinie
   ueber alle 65536 Rohwerte auf Monotonie ab.
+- Neu: eine Rohwert-Diagnose ueber den CAN-Bus (proprietaeres Kommando
+  0x07 auf PGN 126720, Schaltflaeche im PC-Programm
+  `LevelSense-NMEA2000`). Sie liefert die ganze Rechenkette einer Messung
+  einzeln - Registerwert, Abstand zur Bereichsmitte, uBar vor und nach
+  Offset, gefilterten Druck, Temperatur und Prozent vor und nach der
+  Linearisierung. Ueber die App ist das nicht zu sehen: die zeigt nur das
+  Ende der Kette, und das steht bei Unterlast auf dem begrenzten Wert.
+  Damit war nicht zu sagen, an welcher Stelle ein Wert umschlaegt.
 
 ## Firmware 1.2.11
 

@@ -172,6 +172,8 @@ uint32_t time_el = 0, last_run = 0, last_run_nmea=0;
  volatile int32_t LED_brightness = 0;
 
  uint16_t percent_val = 0;	//100,00 Prozent = 10000
+ uint16_t percent_raw = 0;	/* Fuellhoehe VOR der Tankform-Linearisierung,
+							 * nur fuer die Diagnose (Kommando 0x07) */
 
  volatile int16_t level_led = 0;
 
@@ -489,7 +491,8 @@ int main(void)
 
 	  		if(run_mode == 1){
 	  			/* Fuellhoehe (linear aus Druck) -> Volumen ueber Stuetzstellen-Tabelle */
-	  			percent_val = linearize_percent(calc_percent(&EEPROM_values, raw_press));
+	  			percent_raw = calc_percent(&EEPROM_values, raw_press);
+	  			percent_val = linearize_percent(percent_raw);
 	  			set_volt(percent_val, &DAC_EEPROM_values);
 	  			switch (setup_mode) {
 	  				case 1: if (press_unfilt>=100){	/* /100 muss max_val >= 1 ergeben (Div-durch-0-Schutz);

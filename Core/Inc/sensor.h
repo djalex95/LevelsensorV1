@@ -25,6 +25,25 @@ void init_Sensor(void);
  * gueltige Messwert zurueckgegeben. */
 sensor_mess get_value(void);
 
+/* Zwischenwerte der letzten Messung, nur fuer die Diagnose ueber
+ * NMEA2000 (Kommando 0x07). Der jeweilige Treiber legt sie in
+ * get_value() ab, definiert sind sie im variantenneutralen Teil - so
+ * kommt nmea_app.c ohne Abfrage von SENSOR_KIND aus.
+ *
+ *   sensor_raw_p    Rohwert des Drucks, wie aus dem Sensor gelesen
+ *                   (PDMS: P16 als 0..65535; alt: raw24 vorzeichenbehaftet)
+ *   sensor_raw_t    Rohwert der Temperatur
+ *   sensor_delta    Abstand zur Bereichsmitte, vorzeichenbehaftet und
+ *                   UNBEGRENZT (beim alten Sensor gleich sensor_raw_p)
+ *   sensor_ubar_raw Druck in uBar VOR Abzug des Offsets
+ *   sensor_sat      1 = Rohwert lag ausserhalb des Nennbereichs
+ */
+extern volatile int32_t sensor_raw_p;
+extern volatile int32_t sensor_raw_t;
+extern volatile int32_t sensor_delta;
+extern volatile int32_t sensor_ubar_raw;
+extern volatile uint8_t sensor_sat;
+
 /* Fuellhoehe aus Druck: 0..10000 = 0..100,00 %, begrenzt auf die
  * Kalibrierung (max_val). max_val == 0 -> 0 (Div-durch-0-Schutz). */
 uint16_t calc_percent(calib_data *datas, int64_t mw);

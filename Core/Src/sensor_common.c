@@ -16,6 +16,15 @@
 extern DAC_HandleTypeDef hdac1;
 extern prod_param device_param;
 
+/* Zwischenwerte der letzten Messung fuer die Diagnose - siehe sensor.h.
+ * Sie stehen hier und nicht im Treiber, damit es sie in jeder Variante
+ * genau einmal gibt. */
+volatile int32_t sensor_raw_p = 0;
+volatile int32_t sensor_raw_t = 0;
+volatile int32_t sensor_delta = 0;
+volatile int32_t sensor_ubar_raw = 0;
+volatile uint8_t sensor_sat = 0;
+
 uint16_t calc_percent(calib_data *datas, int64_t mw)
 {
 

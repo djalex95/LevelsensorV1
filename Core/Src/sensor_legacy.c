@@ -94,7 +94,17 @@ sensor_mess get_value(void)
 		t16 -= 65536;		/* 16-bit-Zweierkomplement */
 	}
 
-	mess_data.pressure = sensor_raw_to_ubar(raw24) - EEPROM_values.offset;
+	/* Zwischenwerte fuer die Diagnose mitschreiben (Kommando 0x07).
+	 * Der alte Sensor liefert den Wert schon vorzeichenbehaftet, es gibt
+	 * hier also keinen Abstand zu einer Bereichsmitte: sensor_delta ist
+	 * derselbe Rohwert. */
+	sensor_raw_p = raw24;
+	sensor_raw_t = t16;
+	sensor_delta = raw24;
+	sensor_ubar_raw = sensor_raw_to_ubar(raw24);
+	sensor_sat = sensor_raw_saturated(raw24);
+
+	mess_data.pressure = sensor_ubar_raw - EEPROM_values.offset;
 	mess_data.temp = sensor_raw_to_temp(t16);
 
 	last_good = mess_data;
