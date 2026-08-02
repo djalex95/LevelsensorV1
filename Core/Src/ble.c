@@ -24,6 +24,13 @@ volatile uint16_t ble_data_len = 0;
  * Startwert = garantiertes Minimum (19). */
 static uint8_t ble_mps = 19;
 
+/* Je Verbindung genau einmal protokollieren: der erste unterdrueckte und der
+ * erste tatsaechlich abgeschickte Sendeversuch. Nutzdaten laufen sonst nicht
+ * ins Protokoll (sie wuerden den Ringpuffer in Sekunden ueberschreiben),
+ * genau diese beiden Ereignisse sind aber die interessanten. */
+static uint8_t ble_tx_log_blocked = 0;
+static uint8_t ble_tx_log_sent = 0;
+
 /* Aufgeschobene Namensänderung (wird nach dem Trennen angewendet) */
 volatile uint8_t ble_setname_pending = 0;
 static char ble_pending_name[21];
@@ -111,6 +118,9 @@ static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
 	case CMD_CONNECT_IND:
 		ble_connected = 1;
 		ble_channel_open = 0;		/* Kanal erst nach CHANNELOPEN_RSP */
+		ble_sec_state = 0xFF;		/* Sicherheitszustand dieser Verbindung */
+		ble_tx_log_blocked = 1;
+		ble_tx_log_sent = 1;
 		break;
 
 	case CMD_CHANNELOPEN_RSP:
@@ -274,9 +284,30 @@ uint8_t BLE_SendData(const uint8_t *data, uint16_t len)
 	uint8_t frame[BLE_FRAME_MAX];
 	uint16_t sent = 0;
 
-	if (!ble_channel_open || ble_uart == NULL || len == 0)
+	if (ble_uart == NULL || len == 0)
 	{
 		return 0;
+	}
+
+	/* Nur ueber einen offenen UND verschluesselten Kanal senden. Der Kanal
+	 * geht schon auf, waehrend die Kopplung noch laeuft; wer dort hinein
+	 * sendet, laesst das Modul (FW 1.0.0) mit CMD_ERROR_IND neu starten und
+	 * bringt damit jede Kopplung um. ble_sec_state != 0xFF heisst: das Modul
+	 * hat CMD_SECURITY_IND gemeldet, die Verbindung ist verschluesselt. */
+	if (!ble_channel_open || (ble_sec_state == 0xFF))
+	{
+		if (ble_tx_log_blocked)
+		{
+			ble_tx_log_blocked = 0;
+			BLE_LogAdd(BLE_LOG_EV_TXBLOCK, ble_channel_open);
+		}
+		return 0;
+	}
+
+	if (ble_tx_log_sent)
+	{
+		ble_tx_log_sent = 0;
+		BLE_LogAdd((uint8_t)(0x20U | CMD_DATA_REQ), (uint8_t)len);
 	}
 
 	while (sent < len)

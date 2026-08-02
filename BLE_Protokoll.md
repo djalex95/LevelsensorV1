@@ -300,3 +300,41 @@ hängen blieb – warum der Sensor mitten im Koppeln verstummt:
   noch das Modul etwas gemeldet. Dann liegt es an der Funkstrecke oder am
   Modul selbst, und die Suche gehört auf die Modul-Firmware und die
   Sicherheitseinstellungen gelenkt.
+
+## 7. Senden erst über eine verschlüsselte Verbindung
+
+Die erste Messung mit dem Ereignisprotokoll hat den Fehler gefunden, an dem
+das Koppeln seit 2.0.0 gescheitert ist. Das Muster wiederholte sich alle zehn
+Sekunden identisch:
+
+```
+86.0 s  <- CONNECT_IND
+86.0 s  <- CHANNELOPEN_RSP
+86.0 s  <- ERROR_IND
+86.0 s  <- GETSTATE_CNF        (= Modul neu gestartet)
+```
+
+`CMD_CHANNELOPEN_RSP` heißt nicht, dass die Verbindung fertig ist. Der Kanal
+geht auf, während die Kopplung noch läuft und die Verbindung noch
+unverschlüsselt ist. Die Hauptschleife sendete bisher genau dort ihren
+Statustext hinein – rund hundert Zeichen, wegen der anfänglichen MPS von 19
+Byte in sechs Frames. Das Modul quittiert das mit `CMD_ERROR_IND` und startet
+neu. Ein Neustart des Moduls sieht für das Telefon aus wie ein verschwundener
+Sensor: keine Trennungsmeldung, nur `LINK_SUPERVISION_TIMEOUT`. Die Kopplung
+konnte nie fertig werden, weil der Sensor sie jedes Mal selbst abgeschossen
+hat, bevor die PIN überhaupt geprüft war.
+
+Seitdem gilt in `BLE_SendData` eine zweite Bedingung: gesendet wird erst,
+wenn der Kanal offen **und** `ble_sec_state != 0xFF` ist, das Modul also
+`CMD_SECURITY_IND` gemeldet hat. Der Sicherheitszustand wird dafür in der ISR
+bei `CMD_CONNECT_IND` zurückgesetzt, nicht mehr in der Hauptschleife – dort
+war es ein Wettlauf, der eine früh eintreffende `CMD_SECURITY_IND` verworfen
+hätte. Zusätzlich beginnt der Statustakt mit jeder neuen Verbindung von vorn,
+damit das erste Telegramm nicht in dem Moment losgeht, in dem das Telefon
+gerade fertig gekoppelt hat.
+
+Im Ereignisprotokoll tauchen dafür zwei neue Einträge auf, jeweils einmal pro
+Verbindung: `Senden unterdrueckt` für den ersten abgewiesenen Versuch und
+`DATA_REQ` für die ersten tatsächlich abgeschickten Nutzdaten, mit deren
+Länge im Nutzbyte. Zusammen zeigen sie in einer Zeile, ob die Reihenfolge
+stimmt.

@@ -16,6 +16,11 @@ Drucksensor liefert bei starkem Unterdruck wieder plausible Werte.
   startet damit, das Funkmodul neu zu starten. Waehrend es bootet, kann
   sich kein Telefon verbinden, und die Kette bekommt ihr erstes Kommando
   sicher los.
+- Nutzdaten gehen erst ueber eine verschluesselte Verbindung raus. Der
+  Datenkanal geht schon auf, waehrend die Kopplung noch laeuft; der
+  Statustext lief bisher genau dort hinein und liess das Funkmodul mit
+  einer Fehlermeldung neu starten. Fuer das Telefon sah das aus wie ein
+  verschwundener Sensor, und die Kopplung kam nie zustande.
 - Die Kette fasst das Funkmodul nicht mehr an, solange ein Telefon
   verbunden ist. Jede Aenderung und jeder Reset startet das Modul neu,
   und zwar ohne Trennungsmeldung - das Telefon sah den Sensor dadurch

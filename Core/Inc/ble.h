@@ -182,6 +182,10 @@ extern volatile uint8_t ble_log_cnt;	/* gefuellte Eintraege (max. BLE_LOG_N) */
 
 #define BLE_LOG_EV_MCUBOOT      0xFE
 
+/* Ein Sendeversuch wurde unterdrueckt, weil die Verbindung noch nicht
+ * verschluesselt ist. Nutzbyte = ble_channel_open zum Zeitpunkt des Versuchs. */
+#define BLE_LOG_EV_TXBLOCK      0x3F
+
 void BLE_LogAdd(uint8_t ev, uint8_t p);
 
 /* Zustandsbild fuer die NMEA2000-Diagnose. Wird in main.c gepflegt. */

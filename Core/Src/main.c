@@ -619,8 +619,11 @@ int main(void)
 		/* --- Bond-Selbstheilung: gescheiterte Verbindungen erkennen --- */
 		if (!ble_prev_conn && ble_connected)	/* neue Verbindung beginnt */
 		{
-			ble_sec_state = 0xFF;	/* Sicherheitsmeldung dieser Verbindung */
+			/* ble_sec_state setzt jetzt die ISR bei CMD_CONNECT_IND zurueck.
+			 * Hier waere es ein Wettlauf: eine frueh eintreffende
+			 * CMD_SECURITY_IND wuerde wieder verworfen. */
 			ble_sec_seen = 0;
+			last_run_ble = time_el;	/* erster Status erst eine Periode spaeter */
 		}
 		if (ble_connected && ble_channel_open)
 		{
