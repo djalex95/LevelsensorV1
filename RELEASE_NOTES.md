@@ -1,3 +1,29 @@
+## Firmware 2.1.0
+
+Nur Diagnose: die Firmware zeichnet jetzt auf, was mit den Kopplungen
+passiert. An der Funktion aendert sich nichts.
+
+- **Langzeit-Protokoll des BLE-Zweigs.** Das bisherige Ereignisprotokoll
+  fasst 24 Eintraege und ist im Normalbetrieb nach Minuten
+  ueberschrieben; sein Zeitstempel laeuft nach 109 Minuten um. Fuer
+  einen Fehler, der erst nach Stunden auftritt, taugt es damit nicht.
+  Daneben laeuft jetzt ein zweites, grobes Protokoll mit 24 Plaetzen,
+  in das nur die seltenen Ereignisse gehen: Neustart des
+  Mikrocontrollers, Neustart des Funkmoduls, Kopplung ohne bekannten
+  Bond, Fehlermeldung des Moduls, geloeschte Bonds, Modul-Reset, jede
+  ausgeloeste Selbstheilung und jede Verbindung, die unverschluesselt
+  endete. Zeitstempel in Sekunden seit dem Start, 32 Bit - der laeuft
+  nicht ueber.
+- **Zaehler seit dem Start.** Verbindungen insgesamt, davon
+  verschluesselt beendet, ohne Verschluesselung beendet,
+  Selbstheilungen samt Zeitpunkt der letzten, Neustarts des Funkmoduls.
+  Sie laufen unabhaengig vom Ringpuffer weiter, bleiben also aussagefaehig,
+  wenn der laengst umgelaufen ist.
+- Abgefragt wird beides ueber NMEA2000 (proprietaeres Kommando 0x08,
+  Antwort 0x88), im PC-Werkzeug ab 1.2.0 ueber die Schaltflaeche
+  »BLE-Langzeit«. Bewusst ueber den CAN-Bus: gebraucht wird die
+  Auskunft genau dann, wenn ueber BLE nichts mehr geht.
+
 ## Firmware 2.0.0
 
 Die BLE-Verbindung ist ab Werk mit einer PIN geschuetzt, und der

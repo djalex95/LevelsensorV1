@@ -626,6 +626,7 @@ int main(void)
 			 * Hier waere es ein Wettlauf: eine frueh eintreffende
 			 * CMD_SECURITY_IND wuerde wieder verworfen. */
 			ble_sec_seen = 0;
+			ble_stat.conn++;
 			last_run_ble = time_el;	/* erster Status erst eine Periode spaeter */
 		}
 		if (ble_connected && ble_channel_open)
@@ -651,10 +652,19 @@ int main(void)
 				 * Selbstheilung konnte nie anspringen. */
 				ble_fail_cnt = 0;
 				bond_heal_cnt = 0;	/* alles gut -> Heilung wieder frei */
+				ble_stat.conn_sec++;
 			}
-			else if (ble_fail_cnt < 255)
+			else
 			{
-				ble_fail_cnt++;
+				if (ble_fail_cnt < 255)
+				{
+					ble_fail_cnt++;
+				}
+				/* Genau diese Verbindungen treiben die Selbstheilung an.
+				 * Ins Langzeit-Protokoll, damit hinterher nachvollziehbar
+				 * ist, wann sie auftraten und wie weit der Zaehler stand. */
+				ble_stat.conn_nosec++;
+				BLE_EvtAdd(BLE_EVT_DISCNOSEC, ble_fail_cnt);
 			}
 			ble_chan_seen = 0;
 			ble_sec_seen = 0;
@@ -672,6 +682,9 @@ int main(void)
 				ble_fail_cnt = 0;	/* naechste Heilung braucht 3 neue Fehler */
 				bond_heal_step = 1;
 				bond_heal_t0 = time_el;
+				ble_stat.heal++;
+				ble_stat.heal_t = HAL_GetTick() / 1000U;
+				BLE_EvtAdd(BLE_EVT_HEAL, bond_heal_cnt);
 				BLE_DeleteBonds();
 			}
 		}

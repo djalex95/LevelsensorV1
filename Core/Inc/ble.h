@@ -188,6 +188,56 @@ extern volatile uint8_t ble_log_cnt;	/* gefuellte Eintraege (max. BLE_LOG_N) */
 
 void BLE_LogAdd(uint8_t ev, uint8_t p);
 
+/* --- Langzeit-Protokoll ------------------------------------------------
+ *
+ * Der Ringpuffer oben faengt jedes Ereignis ein und ist im Normalbetrieb
+ * nach wenigen Minuten ueberschrieben. Ein Fehler, der erst nach Stunden
+ * auftritt - etwa eine Kopplung, die sich ueber Nacht verabschiedet -
+ * laesst sich damit nicht einfangen. Dafuer gibt es dieses zweite, grobe
+ * Protokoll: nur die seltenen, aussagekraeftigen Ereignisse, dafuer mit
+ * Zeitstempel in Sekunden (32 Bit, laeuft praktisch nicht ueber). Dazu
+ * Zaehler, die unabhaengig vom Puffer weiterlaufen - selbst wenn der
+ * Puffer laengst umgelaufen ist, bleibt die Anzahl sichtbar.
+ * Ausgelesen wird beides ueber NMEA2000 (PROP_CMD_BLEEVT).
+ */
+#define BLE_EVT_N 24
+
+typedef struct
+{
+	uint32_t t;		/* Sekunden seit STM32-Start */
+	uint8_t  ev;	/* BLE_EVT_*                 */
+	uint8_t  p;		/* Zusatzbyte, Bedeutung je Ereignis */
+} ble_evt_entry;
+
+#define BLE_EVT_MCUBOOT   0x01	/* STM32 gestartet                          */
+#define BLE_EVT_MODBOOT   0x02	/* Funkmodul gestartet,  p = Status         */
+#define BLE_EVT_SEC       0x03	/* Pairing, aber nicht mit bekanntem Bond;
+								 * p = Status (0x01 = frisch gekoppelt)    */
+#define BLE_EVT_MODERR    0x04	/* ERROR_IND des Moduls, p = Status         */
+#define BLE_EVT_DELBONDS  0x05	/* Bonds im Modul geloescht                 */
+#define BLE_EVT_MODRESET  0x06	/* Modul-Reset gesendet                     */
+#define BLE_EVT_HEAL      0x07	/* Selbstheilung ausgeloest, p = Heilung Nr. */
+#define BLE_EVT_DISCNOSEC 0x08	/* Verbindung endete unverschluesselt,
+								 * p = ble_fail_cnt danach                  */
+
+/* Zaehler seit dem Start des STM32. */
+typedef struct
+{
+	uint32_t conn;			/* Verbindungen                          */
+	uint32_t conn_sec;		/* davon verschluesselt beendet          */
+	uint32_t conn_nosec;	/* ohne Verschluesselung beendet         */
+	uint32_t heal;			/* Selbstheilungen                       */
+	uint32_t heal_t;		/* Laufzeit (s) bei der letzten Heilung  */
+	uint32_t modboot;		/* Neustarts des Funkmoduls              */
+} ble_stat_t;
+
+extern volatile ble_evt_entry ble_evt[BLE_EVT_N];
+extern volatile uint8_t ble_evt_wr;	/* naechster Schreibindex           */
+extern volatile uint8_t ble_evt_cnt;	/* gefuellte Eintraege (max. BLE_EVT_N) */
+extern ble_stat_t ble_stat;
+
+void BLE_EvtAdd(uint8_t ev, uint8_t p);
+
 /* Zustandsbild fuer die NMEA2000-Diagnose. Wird in main.c gepflegt. */
 typedef struct
 {

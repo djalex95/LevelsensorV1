@@ -54,6 +54,10 @@ volatile uint8_t ble_sec_state = 0xFF;
 volatile ble_log_entry ble_log[BLE_LOG_N];
 volatile uint8_t ble_log_wr = 0;
 volatile uint8_t ble_log_cnt = 0;
+volatile ble_evt_entry ble_evt[BLE_EVT_N];
+volatile uint8_t ble_evt_wr = 0;
+volatile uint8_t ble_evt_cnt = 0;
+ble_stat_t ble_stat;
 ble_diag_t ble_diag;
 
 /* --- Frame-Parser-Zustand --- */
@@ -100,6 +104,27 @@ void BLE_LogAdd(uint8_t ev, uint8_t p)
 	__set_PRIMASK(pm);
 }
 
+/*
+ * Ein seltenes Ereignis ins Langzeit-Protokoll schreiben. Gleiche
+ * Absicherung wie BLE_LogAdd - der Aufruf kommt aus beiden Kontexten.
+ */
+void BLE_EvtAdd(uint8_t ev, uint8_t p)
+{
+	uint32_t pm = __get_PRIMASK();
+	__disable_irq();
+
+	ble_evt[ble_evt_wr].t  = HAL_GetTick() / 1000U;
+	ble_evt[ble_evt_wr].ev = ev;
+	ble_evt[ble_evt_wr].p  = p;
+	ble_evt_wr = (uint8_t)((ble_evt_wr + 1U) % BLE_EVT_N);
+	if (ble_evt_cnt < BLE_EVT_N)
+	{
+		ble_evt_cnt++;
+	}
+
+	__set_PRIMASK(pm);
+}
+
 /* Ein vollständig empfangenes, geprüftes Frame verarbeiten (ISR-Kontext). */
 static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
 {
@@ -111,6 +136,32 @@ static void ble_dispatch(uint8_t cmd, const uint8_t *payload, uint16_t len)
 			&& (cmd != CMD_TXCOMPLETE_RSP))
 	{
 		BLE_LogAdd(cmd, (len >= 1) ? payload[0] : 0);
+	}
+
+	/* Zusaetzlich ins Langzeit-Protokoll, aber nur das Seltene: ein
+	 * Modul-Neustart, ein Pairing, das nicht auf einen bekannten Bond
+	 * trifft, und Fehlermeldungen des Moduls. Alles andere wuerde die
+	 * 24 Plaetze in Stunden fuellen und damit nutzlos machen. */
+	switch (cmd)
+	{
+	case CMD_GETSTATE_CNF:
+		ble_stat.modboot++;
+		BLE_EvtAdd(BLE_EVT_MODBOOT, (len >= 1) ? payload[0] : 0);
+		break;
+	case CMD_SECURITY_IND:
+		/* 0x00 = mit bekanntem Bond wiederverbunden, der Normalfall.
+		 * Alles andere heisst: es wurde neu gekoppelt oder es ging
+		 * schief - genau die Momente, um die es hier geht. */
+		if ((len >= 1) && (payload[0] != 0x00))
+		{
+			BLE_EvtAdd(BLE_EVT_SEC, payload[0]);
+		}
+		break;
+	case 0xA2:	/* CMD_ERROR_IND des Proteus-e */
+		BLE_EvtAdd(BLE_EVT_MODERR, (len >= 1) ? payload[0] : 0);
+		break;
+	default:
+		break;
 	}
 
 	switch (cmd)
@@ -470,6 +521,7 @@ uint8_t BLE_DeleteBonds(void)
 		return 0;
 	}
 	ble_delbonds_cnf = 0;
+	BLE_EvtAdd(BLE_EVT_DELBONDS, 0);
 	ble_send_cmd0(CMD_DELETEBONDS_REQ);
 	return 1;
 }
@@ -481,6 +533,7 @@ uint8_t BLE_ResetModule(void)
 		return 0;
 	}
 	ble_boot_seen = 0;
+	BLE_EvtAdd(BLE_EVT_MODRESET, 0);
 	ble_send_cmd0(CMD_RESET_REQ);
 	/* Ein Reset trennt die Funkverbindung, das Modul sendet dabei KEIN
 	 * CMD_DISCONNECT_IND -> Zustand hier selbst zuruecksetzen. */
@@ -535,6 +588,7 @@ void BLE_Init(UART_HandleTypeDef *huart)
 	 * hat sich der STM32 neu gestartet - und hat dabei ueber MX_GPIO_Init
 	 * auch die Resetleitung des Moduls gezogen. */
 	BLE_LogAdd(BLE_LOG_EV_MCUBOOT, 0);
+	BLE_EvtAdd(BLE_EVT_MCUBOOT, 0);
 
 	ble_uart = huart;
 	pstate = ST_STX;

@@ -8,8 +8,8 @@
 #define INC_VERSION_H_
 
 /* Firmware-Version der Applikation. Bei jeder Freigabe erhöhen. */
-#define FW_VERSION       "2.0.0"
-#define FW_VERSION_DATE  "2026-08-02"
+#define FW_VERSION       "2.1.0"
+#define FW_VERSION_DATE  "2026-08-20"
 
 /* Kombinierte Anzeige, z. B. "1.2.0 (2026-07-07)". */
 #define FW_VERSION_STR   FW_VERSION " (" FW_VERSION_DATE ")"

@@ -301,6 +301,37 @@ hängen blieb – warum der Sensor mitten im Koppeln verstummt:
   Modul selbst, und die Suche gehört auf die Modul-Firmware und die
   Sicherheitseinstellungen gelenkt.
 
+### Langzeit-Protokoll (Kommando `0x08`, Antwort `0x88`)
+
+Das Protokoll oben fasst 24 Einträge und ist im Normalbetrieb nach wenigen
+Minuten überschrieben; sein Zeitstempel ist 16 Bit in Zehntelsekunden und läuft
+nach 109 Minuten um. Für einen Fehler, der erst nach Stunden auftritt - etwa
+eine Kopplung, die über Nacht verschwindet - taugt es damit nicht.
+
+Daneben läuft deshalb ein zweites, grobes Protokoll mit ebenfalls 24 Plätzen.
+Es nimmt nur die seltenen Ereignisse auf, dafür mit Zeitstempel in Sekunden
+(32 Bit, läuft nicht über):
+
+- `0x01` STM32 gestartet
+- `0x02` Funkmodul gestartet
+- `0x03` Kopplung ohne bekannten Bond (`0x01` = frisch gekoppelt)
+- `0x04` Fehlermeldung des Moduls
+- `0x05` Bonds im Modul gelöscht
+- `0x06` Modul-Reset gesendet
+- `0x07` Bond-Selbstheilung ausgelöst
+- `0x08` Verbindung endete unverschlüsselt (Nutzbyte = Fehlerzähler danach)
+
+Dazu Zähler, die unabhängig vom Ringpuffer weiterlaufen: Verbindungen
+insgesamt, davon verschlüsselt beendete, ohne Verschlüsselung beendete,
+Selbstheilungen samt Laufzeit der letzten und Neustarts des Funkmoduls. Sie
+bleiben aussagefähig, wenn der Puffer längst umgelaufen ist.
+
+Damit ist die Frage zu beantworten, wer eine verschwundene Kopplung gelöscht
+hat. Steht im Protokoll eine Selbstheilung, war es der Sensor, und die drei
+Einträge `0x08` davor zeigen, welche Verbindungen sie ausgelöst haben. Steht
+dort nichts, kam es von der Gegenseite - dann führt die Spur ins
+Verbindungsprotokoll der App.
+
 ## 7. Senden erst über eine verschlüsselte Verbindung
 
 Die erste Messung mit dem Ereignisprotokoll hat den Fehler gefunden, an dem

@@ -26,6 +26,8 @@
 #define PROP_CMD_BLEDIAG 0x06	/* BLE-Diagnose: Zustand + Ereignisprotokoll */
 #define PROP_BLEDIAG_VER 0x01	/* Aufbau der Antwort 0x86 */
 #define PROP_CMD_SENSRAW 0x07	/* Rohwerte der Druckmessung, Stufe fuer Stufe */
+#define PROP_CMD_BLEEVT  0x08	/* Langzeit-Protokoll: Zaehler + seltene Ereignisse */
+#define PROP_BLEEVT_VER  0x01	/* Aufbau der Antwort 0x88 */
 #define PROP_SENSRAW_VER 0x02	/* Aufbau der Antwort 0x87.
 								 * 0x02: Byte 20 meldet nicht mehr nur
 								 * ja/nein, sondern die Richtung der
@@ -341,6 +343,45 @@ void handle_prop_config(void)
 		}
 
 		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, dg, len);
+	}
+	else if (gf_buf[2] == PROP_CMD_BLEEVT)
+	{
+		/* Langzeit-Protokoll. Das Ereignisprotokoll der BLE-Diagnose oben
+		 * ist im Normalbetrieb nach Minuten ueberschrieben und sein
+		 * Zeitstempel laeuft nach 109 Minuten um - fuer einen Fehler, der
+		 * erst nach Stunden auftritt, taugt es nicht. Hier stehen deshalb
+		 * die Zaehler seit dem Start und nur die seltenen Ereignisse, mit
+		 * Zeitstempel in Sekunden. */
+		uint8_t ev[192];
+		uint8_t n = ble_evt_cnt;
+		uint8_t start = (uint8_t)((ble_evt_cnt < BLE_EVT_N)
+								  ? 0 : ble_evt_wr);
+		uint8_t len;
+
+		ev[0] = PROP_HDR_0;
+		ev[1] = PROP_HDR_1;
+		ev[2] = 0x88;
+		ev[3] = PROP_BLEEVT_VER;
+		put32(&ev[4],  (uint32_t)(HAL_GetTick() / 1000U));	/* Laufzeit  */
+		put32(&ev[8],  ble_stat.conn);
+		put32(&ev[12], ble_stat.conn_sec);
+		put32(&ev[16], ble_stat.conn_nosec);
+		put32(&ev[20], ble_stat.heal);
+		put32(&ev[24], ble_stat.heal_t);
+		put32(&ev[28], ble_stat.modboot);
+		ev[32] = n;
+
+		len = 33;
+		for (uint8_t i = 0; i < n; i++)
+		{
+			uint8_t k = (uint8_t)((start + i) % BLE_EVT_N);
+			put32(&ev[len], (uint32_t)ble_evt[k].t);
+			len = (uint8_t)(len + 4);
+			ev[len++] = ble_evt[k].ev;
+			ev[len++] = ble_evt[k].p;
+		}
+
+		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, ev, len);
 	}
 	else if (gf_buf[2] == PROP_CMD_SENSRAW)
 	{
