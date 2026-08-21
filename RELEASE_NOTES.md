@@ -1,3 +1,37 @@
+## Firmware 2.2.0
+
+Die Firmware loescht keine Kopplungen mehr von sich aus.
+
+- **Die Bond-Selbstheilung ist ausgebaut.** Bis 2.1.0 hat die Firmware nach
+  drei Verbindungen in Folge, die nie verschluesselt wurden, alle Bonds im
+  Funkmodul geloescht und das Modul neu gestartet. Das war die Kompensation
+  fuer einen Fehler, den es nicht mehr gibt: Daten in den noch
+  unverschluesselten Kanal zu senden, was das Modul zum Neustart brachte und
+  die gerade entstehende Kopplung zerlegte. Seit dieser Sendesperre ist die
+  Heilung ohne Aufgabe - geblieben waere nur ein Mechanismus, der von sich
+  aus Kopplungen zerstoert, auch die von Handys, die nichts falsch gemacht
+  haben.
+- **Bonds loescht jetzt ausschliesslich der Werksreset.** Bewusst und vom
+  Nutzer ausgeloest, nicht mehr im Hintergrund.
+- **Erkannt wird die Sackgasse weiter.** Zaehler und Bedingungen bleiben; im
+  Langzeit-Protokoll steht dann das neue Ereignis "Pairing-Sackgasse
+  erkannt" statt der ausgeloesten Heilung. Die Diagnose verliert also
+  nichts, nur das Eingreifen entfaellt. Das Werkzeug zeigt den Zaehler ab
+  Version 1.2.1 als "Sackgassen erkannt" an.
+- Auf der Gegenseite raeumt die App auf - ab App 2.2.0 fragt sie den Nutzer,
+  bevor sie die Kopplung erneuert, statt sie still zu loeschen.
+
+**Werksreset ueber den Taster.** Der Setup-Modus hat einen vierten Schritt
+bekommen. Die Reihenfolge ist jetzt gruen (nichts), gelb (100-%-Kalibrierung),
+blau (Kalibrierung auf Werkswerte - das war bisher rot) und rot (kompletter
+Werksreset wie in der App: Kalibrierung, Kennlinie, Name, Instanz und PIN).
+Der rote Schritt fragt nach: die LED blinkt danach 3 Sekunden schnell rot und
+will einen weiteren kurzen Druck sehen, sonst passiert nichts. Damit gibt es
+einen Ausweg aus einer verkorksten Kopplung, der ohne Bus und ohne Handy
+auskommt - der Grund, warum die Firmware sich das automatische Loeschen
+sparen kann. Nach so einem Reset haelt das Handy noch die alte Kopplung; die
+App merkt das und bietet an, sie zu erneuern.
+
 ## Firmware 2.1.0
 
 Nur Diagnose: die Firmware zeichnet jetzt auf, was mit den Kopplungen

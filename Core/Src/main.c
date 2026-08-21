@@ -130,6 +130,15 @@ uint8_t led_jump = 0;
 
 volatile uint8_t run_mode = 1;
  volatile uint8_t setup_mode = 0;
+
+/* Werksreset ueber den Taster (Setup-Schritt rot). Der Schritt loescht die
+ * gesamte Konfiguration - Kalibrierung, Kennlinie, Name, Instanz und die
+ * Kopplungs-PIN. Zu viel, um ihn mit vier Tastendruecken auszuloesen,
+ * deshalb eine Rueckfrage: die LED blinkt danach 3 s schnell rot und will
+ * einen weiteren kurzen Druck sehen. Bleibt der aus, passiert nichts. */
+ volatile uint8_t freset_pending = 0;	/* Rueckfrage laeuft */
+ volatile uint8_t freset_ok = 0;		/* im Tastendruck bestaetigt */
+ volatile uint32_t freset_t0 = 0;
 volatile int32_t raw_press = 0;	/* wird auch im EXTI-Callback gelesen;
 									   32 bit -> atomarer Zugriff auf dem M0+ (kein Torn Read) */
 volatile int32_t press_unfilt = 0;	/* letzter ungefilterter Messdruck (uBar, offset-
@@ -215,23 +224,25 @@ static uint8_t  secprov_rounds = 0;	/* abgebrochene Ketten-Anlaeufe dieses Boots
 volatile uint8_t bonds_req = 0;		/* 1 = anfragen, 2 = Antwort offen, 3 = Modul-FW abfragen, 4 = FW-Antwort offen */
 static uint32_t  bonds_t0 = 0;
 
-/* Bond-Selbstheilung (Sensor-Seite): Haelt das Modul einen alten Bond fuer
- * ein Handy, das seinen eigenen verloren hat, bricht das Pairing dort ab,
- * BEVOR die PIN abgefragt wird - die Verbindung stirbt per Timeout. Muster:
- * Verbindungen kommen, aber weder das Pairing laeuft noch geht der
- * Datenkanal auf. Nach 3 solchen Fehlversuchen in Folge werden die
- * Modul-Bonds geloescht und das Modul neu gestartet; danach klappt das
- * frische Koppeln wieder. Kam dagegen eine Sicherheitsmeldung oder ging
- * der Kanal auf, ist die Kopplung in Ordnung - dann wird NICHTS geloescht. */
+/* Pairing-Sackgassen erkennen (Sensor-Seite): Haelt das Modul einen alten
+ * Bond fuer ein Handy, das seinen eigenen verloren hat, bricht das Pairing
+ * dort ab, BEVOR die PIN abgefragt wird - die Verbindung stirbt per Timeout.
+ * Muster: Verbindungen kommen, aber weder das Pairing laeuft noch geht der
+ * Datenkanal auf. Nach 3 solchen Fehlversuchen in Folge wird das als
+ * Sackgasse festgehalten.
+ *
+ * Bis Firmware 2.1.0 hat die Firmware hier die Modul-Bonds geloescht und das
+ * Modul neu gestartet. Das ist vorbei: Bonds loescht nur noch der Werksreset.
+ * Ein Mechanismus, der von sich aus Kopplungen zerstoert, trifft immer auch
+ * die Handys, die nichts falsch gemacht haben - und die Ursache, fuer die er
+ * gebaut wurde, ist mit der Sendesperre in BLE_Send beseitigt. */
 static uint8_t ble_prev_conn = 0;	/* Verbindungszustand des letzten Durchlaufs */
 static uint8_t ble_chan_seen = 0;	/* Kanal war in dieser Verbindung offen */
 static uint8_t ble_sec_seen = 0;	/* Pairing/Verschluesselung lief in dieser
 									   Verbindung (CMD_SECURITY_IND kam) */
 static uint8_t ble_fail_cnt = 0;	/* Verbindungen ohne offenen Kanal in Folge */
-static uint8_t bond_heal_step = 0;	/* 0 = aus, 1 = DeleteBonds gesendet */
-static uint8_t bond_heal_cnt = 0;	/* Heilungen dieses Boots */
-#define BOND_HEAL_MAX 3				/* mehr als das ist keine Bond-Frage mehr */
-static uint32_t bond_heal_t0 = 0;
+static uint8_t bond_heal_cnt = 0;	/* protokollierte Sackgassen dieses Boots */
+#define BOND_HEAL_MAX 3				/* mehr davon fuellen nur das Protokoll */
 
 /* Einmaliges Ruecklesen der Modul-Einstellungen fuer die Diagnose:
  * 0/1 = RF_SecFlags, 2/3 = RF_StaticPasskey, 4/5 = Modul-Firmware,
@@ -503,11 +514,16 @@ int main(void)
 	  						}
 	  						setup_mode = 0;
 	  						break;
-	  				case 2:	setup_mode = 0;
+	  				case 2:	setup_mode = 0;		/* blau: Kalibrierung zurueck */
 	  						EEPROM_values.calib_available = 0xFF;
 	  						EEPROM_values.max_val = std_press;
 	  						EEPROM_values.offset = std_offset;
 	  						save_EEPROM(&EEPROM_values);
+	  						break;
+	  				case 3:	setup_mode = 0;		/* rot: kompletter Werksreset */
+	  						freset_pending = 1;	/* erst nach Rueckfrage */
+	  						freset_ok = 0;
+	  						freset_t0 = time_el;
 	  						break;
 	  				default: 	setup_mode = 0;
 	  							break;
@@ -651,7 +667,7 @@ int main(void)
 				 * die Bedingung war damit praktisch immer erfuellt und die
 				 * Selbstheilung konnte nie anspringen. */
 				ble_fail_cnt = 0;
-				bond_heal_cnt = 0;	/* alles gut -> Heilung wieder frei */
+				bond_heal_cnt = 0;	/* alles gut -> Protokoll wieder frei */
 				ble_stat.conn_sec++;
 			}
 			else
@@ -669,23 +685,31 @@ int main(void)
 			ble_chan_seen = 0;
 			ble_sec_seen = 0;
 
-			if ((ble_fail_cnt >= 3) && (bond_heal_cnt < BOND_HEAL_MAX)
-					&& (bond_heal_step == 0) && (ble_sync_step == 2))
+			if ((ble_fail_cnt >= 3) && (ble_sync_step == 2))
 			{
-				/* Pairing-Sackgasse -> Modul-Bonds loeschen, dann Reset.
-				 * BEWUSST ohne Marker-Bedingung: gerade nach einer
-				 * abgebrochenen Provisionierung (Marker leer) haelt das
-				 * Modul noch alte Bonds - genau dann muss die Heilung
-				 * greifen. Nur nicht mitten in eine laufende Kette funken
-				 * (ble_sync_step == 2 = Kette gerade nicht aktiv). */
-				bond_heal_cnt++;
-				ble_fail_cnt = 0;	/* naechste Heilung braucht 3 neue Fehler */
-				bond_heal_step = 1;
-				bond_heal_t0 = time_el;
+				/* Pairing-Sackgasse erkannt - und ab hier passiert nichts
+				 * weiter. Bis Firmware 2.1.0 hat die Selbstheilung an
+				 * dieser Stelle die Modul-Bonds geloescht und das Modul neu
+				 * gestartet. Das war die Kompensation fuer einen Fehler, den
+				 * es nicht mehr gibt: Senden in den noch unverschluesselten
+				 * Kanal, was das Modul zum Neustart brachte und die Kopplung
+				 * zerlegte (siehe die Sperre in BLE_Send). Was blieb, war
+				 * ein Mechanismus, der von sich aus Kopplungen zerstoert -
+				 * auch die von Handys, die nichts falsch gemacht haben.
+				 * Bonds loescht jetzt nur noch der Werksreset. Aufraeumen
+				 * auf der Gegenseite ist Sache der App, die dafuer den
+				 * Nutzer fragt. */
+				ble_fail_cnt = 0;	/* naechste Meldung braucht 3 neue Fehler */
 				ble_stat.heal++;
 				ble_stat.heal_t = HAL_GetTick() / 1000U;
-				BLE_EvtAdd(BLE_EVT_HEAL, bond_heal_cnt);
-				BLE_DeleteBonds();
+				if (bond_heal_cnt < BOND_HEAL_MAX)
+				{
+					/* Nur die ersten paar ins Ereignisprotokoll, sonst
+					 * verdraengt eine dauerhaft kaputte Kopplung alles
+					 * andere. Der Zaehler oben laeuft weiter. */
+					bond_heal_cnt++;
+					BLE_EvtAdd(BLE_EVT_DEADEND, bond_heal_cnt);
+				}
 			}
 		}
 		ble_prev_conn = ble_connected;
@@ -768,36 +792,6 @@ int main(void)
 				else
 				{
 					ble_rb_next = time_el + 20;
-				}
-			}
-		}
-
-		if (bond_heal_step == 1)
-		{
-			if (ble_connected)
-			{
-				/* Inzwischen haengt wieder ein Handy dran. Der Reset wuerde es
-				 * mitten im neuen Pairing rauswerfen - also genau den Fehler
-				 * erzeugen, den die Heilung beheben soll. Die Bonds sind
-				 * bereits geloescht, das ist der wirksame Teil. */
-				bond_heal_step = 0;
-			}
-			else if ((ble_delbonds_cnf != 0) || ((time_el - bond_heal_t0) > 800))
-			{
-				bond_heal_step = 0;
-				BLE_ResetModule();	/* frisch starten, Handy koppelt danach neu */
-				if (cfg_data[CFG_SECPROV_OFF] != CFG_SECPROV_MAGIC)
-				{
-					/* Provisionierung ist noch offen (z. B. Kette abgebrochen):
-					 * direkt einen frischen Anlauf starten - das Modul bootet
-					 * gerade, die Kette hat freie Bahn. */
-					ble_sync_step = 1;
-					secprov_sub = 0;
-					secprov_wait = 0;
-					secprov_att = 0;
-					secprov_ints = 0;
-					secprov_rounds = 0;
-					ble_sync_next = time_el + 1500;
 				}
 			}
 		}
@@ -1109,12 +1103,41 @@ int main(void)
 		}
 
 
+	  	/* Rueckfrage zum Werksreset: bestaetigt -> ausfuehren, sonst nach
+	  	 * 3 s verfallen lassen. Bewusst hier und nicht im Tastendruck: das
+	  	 * Loeschen der Flash-Seiten gehoert nicht in einen Interrupt. */
+	  	if(freset_pending != 0)
+	  	{
+	  		if(freset_ok != 0)
+	  		{
+	  			freset_pending = 0;
+	  			freset_ok = 0;
+	  			config_factory_reset();
+	  			__disable_irq();
+	  			NVIC_SystemReset();
+	  		}
+	  		else if((time_el - freset_t0) > 3000)
+	  		{
+	  			freset_pending = 0;	/* keine Bestaetigung -> nichts passiert */
+	  			LED_brightness = 0;
+	  		}
+	  	}
+
 	  	if((time_el-last_run_led)>=led_time)
 	  	{
 	  		last_run_led = time_el;
 
+	  		//########## Rueckfrage Werksreset -> schnelles rotes Blinken ####
+	  		if(freset_pending != 0)
+	  		{
+	  			LED_r = 255;
+	  			LED_g = 0;
+	  			LED_b = 0;
+	  			LED_brightness = (((time_el - freset_t0) / 150U) % 2U) ? 0 : 255;
+	  		}
+
 	  		//########## normaler Messmodus -> LED-Berechnungen ###########
-	  		if(run_mode == 1)
+	  		else if(run_mode == 1)
 	  		{
 	  			calc_color(&LED_r, &LED_g, &LED_b, percent_val);
 	  			if(led_up==1)
@@ -1216,7 +1239,12 @@ int main(void)
 	  						LED_g = 255;
 	  						LED_b = 0;
 	  						break;
-	  				case 2:
+	  				case 2:		/* blau: Kalibrierung auf Werkswerte */
+	  						LED_r = 0;
+	  						LED_g = 0;
+	  						LED_b = 255;
+	  						break;
+	  				case 3:		/* rot: kompletter Werksreset (mit Rueckfrage) */
 	  						LED_r = 255;
 	  						LED_g = 0;
 	  						LED_b = 0;
@@ -1665,6 +1693,12 @@ void HAL_GPIO_EXTI_Rising_Callback(uint16_t GPIO_Pin)
 	uint32_t press_cnt = TIM6->CNT;		/* Fix: CNT einmal lesen, && statt & */
 	if((press_cnt > 1500) && (press_cnt < 4500))
 	{
+		if(freset_pending != 0)
+		{
+			freset_ok = 1;		/* Rueckfrage bestaetigt */
+			TIM6->CNT = 1;
+			return;
+		}
 
 		sm_started =  HAL_GetTick();
 		if(run_mode == 1)

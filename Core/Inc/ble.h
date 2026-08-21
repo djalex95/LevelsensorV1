@@ -219,6 +219,9 @@ typedef struct
 #define BLE_EVT_HEAL      0x07	/* Selbstheilung ausgeloest, p = Heilung Nr. */
 #define BLE_EVT_DISCNOSEC 0x08	/* Verbindung endete unverschluesselt,
 								 * p = ble_fail_cnt danach                  */
+#define BLE_EVT_DEADEND   0x09	/* Pairing-Sackgasse erkannt, p = Nr.
+								 * Ab FW 2.2.0 wird dabei NICHT mehr
+								 * geloescht - nur noch festgehalten.      */
 
 /* Zaehler seit dem Start des STM32. */
 typedef struct
@@ -226,8 +229,8 @@ typedef struct
 	uint32_t conn;			/* Verbindungen                          */
 	uint32_t conn_sec;		/* davon verschluesselt beendet          */
 	uint32_t conn_nosec;	/* ohne Verschluesselung beendet         */
-	uint32_t heal;			/* Selbstheilungen                       */
-	uint32_t heal_t;		/* Laufzeit (s) bei der letzten Heilung  */
+	uint32_t heal;			/* erkannte Pairing-Sackgassen           */
+	uint32_t heal_t;		/* Laufzeit (s) der letzten Erkennung    */
 	uint32_t modboot;		/* Neustarts des Funkmoduls              */
 } ble_stat_t;
 
