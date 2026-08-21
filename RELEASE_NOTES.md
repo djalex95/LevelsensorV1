@@ -1,3 +1,20 @@
+## Firmware 2.2.1
+
+**Werksreset ueber den Taster.** Der Setup-Modus hat einen vierten Schritt
+bekommen. Die Reihenfolge ist jetzt gruen (nichts), gelb (100-%-Kalibrierung),
+blau (Kalibrierung auf Werkswerte - das war bisher rot) und rot (kompletter
+Werksreset wie in der App: Kalibrierung, Kennlinie, Name, Instanz und PIN).
+Der rote Schritt fragt nach: die LED blinkt danach 5 Sekunden schnell rot und
+will einen weiteren kurzen Druck sehen, sonst passiert nichts. Ist der Reset
+gelaufen, quittiert die LED mit rot, gruen, blau, weiss kurz hintereinander -
+und zwar bei jedem Werksreset, auch bei dem aus der App und dem vom Bus. Ohne
+diese Rueckmeldung bleibt offen, ob er ausgefuehrt wurde: Funk und Bus sind im
+selben Moment weg, die LED ist das einzige, was noch reden kann. Damit gibt es
+einen Ausweg aus einer verkorksten Kopplung, der ohne Bus und ohne Handy
+auskommt - der Grund, warum die Firmware sich das automatische Loeschen
+sparen kann. Nach so einem Reset haelt das Handy noch die alte Kopplung; die
+App merkt das und bietet an, sie zu erneuern.
+
 ## Firmware 2.2.0
 
 Die Firmware loescht keine Kopplungen mehr von sich aus.
@@ -20,17 +37,6 @@ Die Firmware loescht keine Kopplungen mehr von sich aus.
   Version 1.2.1 als "Sackgassen erkannt" an.
 - Auf der Gegenseite raeumt die App auf - ab App 2.2.0 fragt sie den Nutzer,
   bevor sie die Kopplung erneuert, statt sie still zu loeschen.
-
-**Werksreset ueber den Taster.** Der Setup-Modus hat einen vierten Schritt
-bekommen. Die Reihenfolge ist jetzt gruen (nichts), gelb (100-%-Kalibrierung),
-blau (Kalibrierung auf Werkswerte - das war bisher rot) und rot (kompletter
-Werksreset wie in der App: Kalibrierung, Kennlinie, Name, Instanz und PIN).
-Der rote Schritt fragt nach: die LED blinkt danach 3 Sekunden schnell rot und
-will einen weiteren kurzen Druck sehen, sonst passiert nichts. Damit gibt es
-einen Ausweg aus einer verkorksten Kopplung, der ohne Bus und ohne Handy
-auskommt - der Grund, warum die Firmware sich das automatische Loeschen
-sparen kann. Nach so einem Reset haelt das Handy noch die alte Kopplung; die
-App merkt das und bietet an, sie zu erneuern.
 
 ## Firmware 2.1.0
 
