@@ -425,6 +425,7 @@ void handle_prop_config(void)
 		NMEA2000_SendProprietaryFP(&hfdcan1, dev_info_par.srcAdr, gf_src, reply, 4);
 		HAL_Delay(100);
 		config_factory_reset();
+		led_factory_pattern();	/* Quittung: rot, gruen, blau, weiss */
 		__disable_irq();
 		NVIC_SystemReset();
 	}

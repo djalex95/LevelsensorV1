@@ -57,6 +57,11 @@ void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
 
+/* Quittung fuer einen ausgefuehrten Werksreset: rot, gruen, blau, weiss
+ * kurz hintereinander. Ausser der LED hat das Geraet nichts, womit es
+ * "erledigt" melden koennte - Bus und Funk sind im selben Moment weg. */
+void led_factory_pattern(void);
+
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/

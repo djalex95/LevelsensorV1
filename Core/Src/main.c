@@ -134,7 +134,7 @@ volatile uint8_t run_mode = 1;
 /* Werksreset ueber den Taster (Setup-Schritt rot). Der Schritt loescht die
  * gesamte Konfiguration - Kalibrierung, Kennlinie, Name, Instanz und die
  * Kopplungs-PIN. Zu viel, um ihn mit vier Tastendruecken auszuloesen,
- * deshalb eine Rueckfrage: die LED blinkt danach 3 s schnell rot und will
+ * deshalb eine Rueckfrage: die LED blinkt danach 5 s schnell rot und will
  * einen weiteren kurzen Druck sehen. Bleibt der aus, passiert nichts. */
  volatile uint8_t freset_pending = 0;	/* Rueckfrage laeuft */
  volatile uint8_t freset_ok = 0;		/* im Tastendruck bestaetigt */
@@ -1113,10 +1113,11 @@ int main(void)
 	  			freset_pending = 0;
 	  			freset_ok = 0;
 	  			config_factory_reset();
+	  			led_factory_pattern();	/* erst loeschen, dann quittieren */
 	  			__disable_irq();
 	  			NVIC_SystemReset();
 	  		}
-	  		else if((time_el - freset_t0) > 3000)
+	  		else if((time_el - freset_t0) > 5000)
 	  		{
 	  			freset_pending = 0;	/* keine Bestaetigung -> nichts passiert */
 	  			LED_brightness = 0;
@@ -1767,6 +1768,27 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
  * siehe nmea_app.c */
 /* get_adr_eeprom(), set_adr_eeprom(): siehe app_config.c */
 
+
+/* Quittung fuer einen ausgefuehrten Werksreset - siehe main.h. Blockierend,
+ * und das ist hier richtig: unmittelbar danach startet das Geraet neu, es
+ * gibt nichts mehr zu tun. Ohne diese Rueckmeldung bleibt offen, ob der
+ * Reset gelaufen ist oder der Tastendruck ins Leere ging. */
+void led_factory_pattern(void)
+{
+	static const int32_t col[4][3] = {
+		{ 255,   0,   0 },
+		{   0, 255,   0 },
+		{   0,   0, 255 },
+		{ 255, 255, 255 },
+	};
+	for (uint8_t i = 0; i < 4U; i++)
+	{
+		set_led(col[i][0], col[i][1], col[i][2], 255);
+		HAL_Delay(250);
+	}
+	set_led(0, 0, 0, 0);
+	HAL_Delay(150);
+}
 
 void set_led(int32_t red, int32_t green, int32_t blue, int32_t brightness)
 {

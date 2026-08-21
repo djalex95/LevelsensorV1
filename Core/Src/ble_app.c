@@ -348,6 +348,7 @@ void ble_handle_command(const uint8_t *data, uint16_t len)
 		BLE_SendString("OK FACTORYRESET\n");
 		HAL_Delay(100);
 		config_factory_reset();
+		led_factory_pattern();	/* Quittung: rot, gruen, blau, weiss */
 		__disable_irq();
 		NVIC_SystemReset();
 	}
